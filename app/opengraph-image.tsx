@@ -20,10 +20,9 @@ export default function OG() {
         }}
       >
         <div style={{ fontSize: 18, opacity: 0.8 }}>SMTM</div>
-        <div style={{ fontSize: 72, fontWeight: 800, lineHeight: 1.1, marginTop: 16 }}>
-          Truth is Profitable.
-          <br />
-          Lies are Costly.
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+          <div style={{ fontSize: 72, fontWeight: 800 }}>Truth is Profitable.</div>
+          <div style={{ fontSize: 72, fontWeight: 800 }}>Lies are Costly.</div>
         </div>
         <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
           <div

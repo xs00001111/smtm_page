@@ -1,10 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
-import { Inter, Orbitron } from 'next/font/google'
 import { Header } from '@/components/header'
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const orbitron = Orbitron({ subsets: ['latin'], variable: '--font-orbitron' })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://smtm.example.com'),
@@ -41,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${inter.variable} ${orbitron.variable} font-sans bg-background text-foreground`}
+        className={`font-sans bg-background text-foreground`}
       >
         <Header />
         {children}
