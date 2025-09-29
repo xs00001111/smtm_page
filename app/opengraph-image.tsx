@@ -25,7 +25,7 @@ export default function OG() {
           <br />
           Lies are Costly.
         </div>
-        <div style={{ marginTop: 24, display: 'inline-flex', gap: 8 }}>
+        <div style={{ marginTop: 24, display: 'flex', gap: 8 }}>
           <div
             style={{
               width: 14,
@@ -42,4 +42,3 @@ export default function OG() {
     { ...size }
   )
 }
-
