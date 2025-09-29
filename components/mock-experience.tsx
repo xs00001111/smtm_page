@@ -13,6 +13,8 @@ export function MockExperience() {
   const [hoverSide, setHoverSide] = useState<BetSide | null>(null)
   const [confidence, setConfidence] = useState<number>(60)
   const [animateBars, setAnimateBars] = useState(false)
+  const [confidenceTouched, setConfidenceTouched] = useState(false)
+  const [showHints, setShowHints] = useState(true)
 
   const claim = {
     asset: 'DOGE',
@@ -26,6 +28,7 @@ export function MockExperience() {
 
   const handleBet = (side: BetSide) => {
     setBet(side)
+    setShowHints(false)
   }
 
   const stake = 50 // mock dollars
@@ -38,6 +41,18 @@ export function MockExperience() {
   useEffect(() => {
     const t = setTimeout(() => setAnimateBars(true), 50)
     return () => clearTimeout(t)
+  }, [])
+
+  // Keyboard shortcuts to encourage interaction
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key.toLowerCase() === 'l') handleBet('LONG')
+      if (e.key.toLowerCase() === 's') handleBet('SHORT')
+      if (e.key === 'ArrowRight') setConfidence((c) => Math.min(100, c + 5))
+      if (e.key === 'ArrowLeft') setConfidence((c) => Math.max(0, c - 5))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
   return (
@@ -60,6 +75,13 @@ export function MockExperience() {
               </Button>
             </div>
           </div>
+          {/* Guided stepper */}
+          <div className="mb-2 text-xs text-white/70">
+            <span className="mr-3">Try it:</span>
+            <span className={`mr-3 ${bet ? 'text-teal' : 'text-white/70'}`}>1) Go Long/Short</span>
+            <span className={`mr-3 ${confidenceTouched ? 'text-teal' : 'text-white/70'}`}>2) Set confidence</span>
+            <span className={`${shared ? 'text-teal' : 'text-white/70'}`}>3) Share</span>
+          </div>
           <div className="text-muted text-xs mb-1">Influencer Claim</div>
           <div className="text-2xl md:text-3xl font-bold leading-snug mb-4">{claim.text}</div>
 
@@ -69,37 +91,66 @@ export function MockExperience() {
               <span>Long {claim.longPct}%</span>
               <span>Short {claim.shortPct}%</span>
             </div>
-            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
               <div
-                className="h-full bg-teal transition-[width] duration-200 ease-out"
-                style={{ width: animateBars ? `${claim.longPct}%` : '0%' }}
-              />
-              <div
-                className="h-full bg-red-500/80 -mt-2 transition-[width] duration-200 ease-out"
-                style={{ width: animateBars ? `${claim.shortPct}%` : '0%' }}
-              />
+                className="h-2 rounded-full bg-white/5 overflow-hidden cursor-pointer"
+                onClick={(e) => {
+                  const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                  const x = e.clientX - rect.left
+                  if (x < rect.width / 2) handleBet('LONG')
+                  else handleBet('SHORT')
+                }}
+                title="Click left for Long, right for Short"
+              >
+                <div
+                  className="h-full bg-teal transition-[width] duration-200 ease-out"
+                  style={{ width: animateBars ? `${claim.longPct}%` : '0%' }}
+                />
+                <div
+                  className="h-full bg-red-500/80 -mt-2 transition-[width] duration-200 ease-out"
+                  style={{ width: animateBars ? `${claim.shortPct}%` : '0%' }}
+                />
+              </div>
             </div>
-          </div>
 
           {/* Actions */}
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Button
-              className="bg-teal text-black hover:opacity-90"
-              onMouseEnter={() => setHoverSide('LONG')}
-              onMouseLeave={() => setHoverSide(null)}
-              onClick={() => handleBet('LONG')}
-            >
-              🔵 Go Long
-            </Button>
-            <Button
-              className="bg-red-500 text-white hover:bg-red-500/90"
-              onMouseEnter={() => setHoverSide('SHORT')}
-              onMouseLeave={() => setHoverSide(null)}
-              onClick={() => handleBet('SHORT')}
-            >
-              🔴 Go Short
-            </Button>
-          </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <div className="relative">
+                {showHints && !bet && (
+                  <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-xs text-white/80 bg-black/40 px-2 py-1 rounded-md border border-white/10">
+                    Press ‘L’
+                  </span>
+                )}
+                {showHints && !bet && (
+                  <span className="absolute -right-2 -bottom-2 h-3 w-3 rounded-full bg-teal animate-ping pointer-events-none" />
+                )}
+                <Button
+                  className="bg-teal text-black hover:opacity-90"
+                  onMouseEnter={() => setHoverSide('LONG')}
+                  onMouseLeave={() => setHoverSide(null)}
+                  onClick={() => handleBet('LONG')}
+                >
+                  🔵 Go Long
+                </Button>
+              </div>
+              <div className="relative">
+                {showHints && !bet && (
+                  <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-xs text-white/80 bg-black/40 px-2 py-1 rounded-md border border-white/10">
+                    Press ‘S’
+                  </span>
+                )}
+                {showHints && !bet && (
+                  <span className="absolute -right-2 -bottom-2 h-3 w-3 rounded-full bg-red-500 animate-ping pointer-events-none" />
+                )}
+                <Button
+                  className="bg-red-500 text-white hover:bg-red-500/90"
+                  onMouseEnter={() => setHoverSide('SHORT')}
+                  onMouseLeave={() => setHoverSide(null)}
+                  onClick={() => handleBet('SHORT')}
+                >
+                  🔴 Go Short
+                </Button>
+              </div>
+            </div>
 
           {/* Confidence slider appears after choosing a side */}
           {bet && (
@@ -108,19 +159,19 @@ export function MockExperience() {
                 <span>Confidence</span>
                 <span className="text-foreground font-medium">{confidence}%</span>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={1}
-                value={confidence}
-                onChange={(e) => setConfidence(Number(e.target.value))}
-                className="w-full accent-teal"
-                aria-label="Confidence slider"
-              />
-              <div className="mt-1 text-xs text-muted">Stake conviction for this call (0–100%).</div>
-            </div>
-          )}
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={confidence}
+                  onChange={(e) => { setConfidence(Number(e.target.value)); setConfidenceTouched(true) }}
+                  className="w-full accent-teal"
+                  aria-label="Confidence slider"
+                />
+                <div className="mt-1 text-xs text-muted">Stake conviction for this call (0–100%).</div>
+              </div>
+            )}
 
           {/* Proof Badge */}
           <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -134,7 +185,12 @@ export function MockExperience() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-3">
+          <div className="mt-4 flex items-center gap-3 relative">
+            {!shared && bet && confidenceTouched && (
+              <span className="absolute -top-7 left-0 text-xs text-white/80 bg-black/40 px-2 py-1 rounded-md border border-white/10 animate-bounce">
+                Finish: Share your card →
+              </span>
+            )}
             <Button variant="cta" size="lg" className="px-5 py-3 w-full sm:w-auto" onClick={() => setShared(true)}>
               <Share2 className="h-4 w-4 mr-2" /> Share → Auto Meme Card
             </Button>

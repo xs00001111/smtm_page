@@ -57,26 +57,61 @@ export default function HomePage() {
     <ProfileSample />
   </section>
 
+      {/* Divider before features/problem */}
       <hr className="my-16 h-px border-0 bg-gradient-to-r from-transparent via-[#00E5FF] to-[#B6FF00] opacity-50" />
 
-      <section id="learn-more" className="relative py-16 md:py-24">
+      {/* Feature grid (no cards) */}
+      <section id="learn-more" className="relative py-12">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard
               title="AI Portfolio Companion"
               description="News + signals tied to your assets."
-              icon={<BrainCircuit size={24} className="text-teal" />}
+              icon={<BrainCircuit size={28} className="text-teal" />}
             />
             <FeatureCard
               title="Stake Predictions"
               description="Put conviction behind your opinions, see who’s right."
-              icon={<TrendingUp size={24} className="text-teal" />}
+              icon={<TrendingUp size={28} className="text-teal" />}
             />
             <FeatureCard
               title="Viral Sharing"
-              description="Turn takes into prediction cards, roast bad calls."
-              icon={<Share2 size={24} className="text-teal" />}
+              description="Turn takes into meme cards, roast bad calls."
+              icon={<Share2 size={28} className="text-teal" />}
             />
+          </div>
+        </div>
+      </section>
+
+      {/* Divider before problem section */}
+      <hr className="my-10 h-px border-0 bg-gradient-to-r from-transparent via-[#00E5FF] to-[#B6FF00] opacity-50" />
+
+      {/* Problem → Agitation → Transformation */}
+      <section id="problem" className="relative py-12 md:py-20">
+        <div className="mx-auto max-w-6xl px-6">
+          <h2 className="font-display text-3xl md:text-5xl font-extrabold mb-8">From Clout to Credibility</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Before card */}
+            <article className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-6">
+              <h3 className="text-xl font-semibold mb-3">Before — The Problem</h3>
+              <ul className="space-y-2 text-white/85">
+                <li>❌ <strong>Hot takes</strong> win attention, not accuracy.</li>
+                <li>❌ <strong>No skin in the game</strong> — zero accountability.</li>
+                <li>❌ <strong>Signal is buried</strong> — hard to know who to trust.</li>
+                <li>❌ <strong>No upside</strong> for being right, only clout.</li>
+              </ul>
+            </article>
+
+            {/* After card */}
+            <article className="rounded-2xl border border-teal/20 bg-teal/[0.06] p-6">
+              <h3 className="text-xl font-semibold mb-3">After — The Transformation</h3>
+              <ul className="space-y-2 text-white/85">
+                <li>✅ <strong>Stake conviction</strong>: Long/Short + confidence.</li>
+                <li>✅ <strong>Earn credibility</strong>: transparent records, leaderboards.</li>
+                <li>✅ <strong>Get paid</strong>: tips and viral meme cards.</li>
+                <li>✅ <strong>Trust at a glance</strong>: verified portfolios, badges.</li>
+              </ul>
+            </article>
           </div>
         </div>
       </section>
