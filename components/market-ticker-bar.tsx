@@ -36,7 +36,7 @@ function Row({ reverse }: { reverse?: boolean }) {
 
 export function MarketTickerBar() {
   return (
-    <div className="w-full bg-black/30 backdrop-blur-sm py-2 border-b border-white/10">
+    <div className="w-full py-2">
       <div className="mx-auto max-w-7xl px-4 md:px-6">
         <div className="overflow-x-auto whitespace-nowrap">
           <div className="inline-flex items-center gap-8 text-white/80">
