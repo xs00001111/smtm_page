@@ -78,10 +78,11 @@ export function ProfileSample() {
   }, [])
 
   const react = useCallback((id: string, kind: 'fire' | 'skull' | 'rocket') => {
-    setReactions((prev) => ({
-      ...prev,
-      [id]: { fire: 0, skull: 0, rocket: 0, ...(prev[id] || {}) , [kind]: ((prev[id]?.[kind] || 0) + 1) },
-    }))
+    setReactions((prev) => {
+      const current = prev[id] ?? { fire: 0, skull: 0, rocket: 0 }
+      const next = { ...current, [kind]: current[kind] + 1 }
+      return { ...prev, [id]: next }
+    })
   }, [])
 
   const onCommentChange = useCallback((id: string, text: string) => {
