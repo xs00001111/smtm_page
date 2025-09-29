@@ -99,7 +99,7 @@ export function ProfileSample() {
   return (
     <div id="sample-profile" className="mx-auto max-w-6xl px-6">
 
-      <div className="rounded-2xl border border-white/10 bg-black/30 p-6 md:p-8 hover:shadow-[0_0_24px_rgba(0,229,255,0.08)] transition-shadow">
+      <div className="p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center gap-6">
           <div className="flex items-center gap-4">
             <div

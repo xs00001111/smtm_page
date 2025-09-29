@@ -38,14 +38,33 @@ export function MarketTickerBar() {
   return (
     <div className="w-full py-2">
       <div className="mx-auto max-w-7xl px-4 md:px-6">
-        <div className="overflow-x-auto whitespace-nowrap">
-          <div className="inline-flex items-center gap-8 text-white/80">
-            {TICKERS.map((t, idx) => (
-              <span key={`${t.sym}-${idx}`} className="inline-flex items-center gap-2 text-xs md:text-sm uppercase tracking-widest">
-                <span className={idx % 2 === 0 ? 'text-teal' : 'text-lime'}>{t.sym}</span>
-                <span className="text-white/90">{t.price}</span>
-                <span className={t.change.startsWith('-') ? 'text-red-400' : 'text-teal'}>{t.change}</span>
-              </span>
+        <div className="relative overflow-hidden">
+          {/* Row 1 (left) */}
+          <div className="inline-flex items-center gap-8 text-white/80 animate-tickerLeft will-change-transform">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="inline-flex items-center gap-8">
+                {TICKERS.map((t, idx) => (
+                  <span key={`${i}-${t.sym}-${idx}`} className="inline-flex items-center gap-2 text-xs md:text-sm uppercase tracking-widest">
+                    <span className={idx % 2 === 0 ? 'text-teal' : 'text-lime'}>{t.sym}</span>
+                    <span className="text-white/90">{t.price}</span>
+                    <span className={t.change.startsWith('-') ? 'text-red-400' : 'text-teal'}>{t.change}</span>
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+          {/* Row 2 (right) */}
+          <div className="mt-1 inline-flex items-center gap-8 text-white/70 animate-tickerRight will-change-transform">
+            {[...Array(2)].map((_, i) => (
+              <div key={`b-${i}`} className="inline-flex items-center gap-8">
+                {TICKERS.map((t, idx) => (
+                  <span key={`b-${i}-${t.sym}-${idx}`} className="inline-flex items-center gap-2 text-xs md:text-sm uppercase tracking-widest">
+                    <span className={idx % 2 === 0 ? 'text-teal' : 'text-lime'}>{t.sym}</span>
+                    <span className="text-white/80">{t.price}</span>
+                    <span className={t.change.startsWith('-') ? 'text-red-400' : 'text-teal'}>{t.change}</span>
+                  </span>
+                ))}
+              </div>
             ))}
           </div>
         </div>

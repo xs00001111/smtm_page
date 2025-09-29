@@ -11,8 +11,7 @@ import { MarketTickerBar } from '@/components/market-ticker-bar'
 export default function HomePage() {
   return (
     <>
-      {/* Full-width ticker above main container */}
-      <MarketTickerBar />
+      {/* Ticker inside hero background context (full-bleed) */}
       {/* Global radial glow across the whole page */}
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.08),transparent_60%)]" />
 
@@ -22,7 +21,11 @@ export default function HomePage() {
           <TradingGrid />
           {/* Full-bleed glow overlay (spans entire viewport width) */}
           <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.12),transparent_60%)]" />
-          <div className="relative z-10 text-center w-full flex flex-col items-center">
+          {/* Ticker strip anchored to top, sharing hero background */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-screen">
+            <MarketTickerBar />
+          </div>
+          <div className="relative z-10 text-center w-full flex flex-col items-center pt-20">
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
               Show Me The Money
             </h1>
@@ -90,13 +93,11 @@ export default function HomePage() {
       </section>
 
       <section id="waitlist" className="relative py-16 md:py-24">
-        <div className="mx-auto max-w-3xl px-6">
-          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] backdrop-blur">
-            <h3 className="font-display text-2xl md:text-3xl font-bold">Join the Waitlist</h3>
-            <p className="text-muted mt-2">Be first to trade on truth. Get early access updates.</p>
-            <div className="mt-6">
-              <WaitlistForm />
-            </div>
+        <div className="mx-auto max-w-6xl px-6">
+          <h3 className="font-display text-2xl md:text-3xl font-bold">Join the Waitlist</h3>
+          <p className="text-muted mt-2">Be first to trade on truth. Get early access updates.</p>
+          <div className="mt-6 max-w-lg">
+            <WaitlistForm />
           </div>
         </div>
       </section>
