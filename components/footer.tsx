@@ -4,8 +4,8 @@ import { Twitter, MessageCircle, Newspaper } from 'lucide-react'
 export function Footer() {
   return (
     <footer className="relative bg-[#121212]">
-      {/* Neon top border */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#00E5FF] to-[#B6FF00] opacity-60" />
+      {/* Neon top border with transparent ends (no hard edges) */}
+      <div className="absolute inset-x-0 top-0 h-px pointer-events-none bg-[linear-gradient(90deg,transparent,rgba(0,229,255,0.7)_25%,rgba(182,255,0,0.6)_75%,transparent)]" />
       <div className="mx-auto max-w-6xl px-6 py-14">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 items-start">
           {/* Brand */}
