@@ -40,7 +40,13 @@ export function WaitlistForm() {
         {loading ? 'Joining…' : 'Join'}
       </Button>
       {result?.ok && (
-        <p className="text-sm text-muted mt-2 sm:mt-0 sm:ml-3">Welcome! Your position: #{result.position}</p>
+        <p className="text-sm text-muted mt-2 sm:mt-0 sm:ml-3">
+          {typeof result.position === 'number' ? (
+            <>Welcome! Your position: #{result.position}</>
+          ) : (
+            <>Thanks for joining — we’ll email you soon!</>
+          )}
+        </p>
       )}
       {result?.error && (
         <p className="text-sm text-red-400 mt-2 sm:mt-0 sm:ml-3">{result.error}</p>
