@@ -13,12 +13,16 @@ export default function HomePage() {
     <>
       {/* Full-width ticker above main container */}
       <MarketTickerBar />
-      <main className="relative min-h-screen overflow-hidden mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      {/* Global radial glow across the whole page */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.08),transparent_60%)]" />
+
+      <main className="relative min-h-screen mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* Hero */}
         <section id="hero" className="relative min-h-[70vh] md:min-h-[80vh] flex items-center">
           <TradingGrid />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.08),transparent_60%)]" />
-          <div className="relative text-center w-full flex flex-col items-center">
+          {/* Full-bleed glow overlay (spans entire viewport width) */}
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.12),transparent_60%)]" />
+          <div className="relative z-10 text-center w-full flex flex-col items-center">
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
               Show Me The Money
             </h1>
@@ -99,5 +103,6 @@ export default function HomePage() {
 
       <Footer />
     </main>
+    </>
   )
 }

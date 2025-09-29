@@ -45,108 +45,104 @@ export function MockExperience() {
 
       {/* Demo grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left column: Prediction card */}
-        <article className="lg:col-span-7 rounded-2xl border border-white/10 bg-black/40 p-6 shadow-lg hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
-
-          {/* Claim Card */}
-          <div className="rounded-xl border border-white/10 bg-[#0F0F0F]/80 p-5 md:p-6">
-            {/* Influencer header + Tip button (social proximity) */}
-            <div className="flex items-center gap-3 mb-3">
-              <div className="h-9 w-9 rounded-full grid place-items-center text-sm font-semibold border border-white/10" style={avatarStyle('CryptoChad')}>C</div>
-              <div className="min-w-0">
-                <div className="font-semibold leading-tight">{claim.influencer}</div>
-                <div className="text-xs text-muted truncate">{claim.influencerMeta}</div>
-              </div>
-              <div className="ml-auto">
-                <Button variant="outline" size="sm">
-                  💸 Tip Creator ($1–5)
-                </Button>
-              </div>
+        {/* Left column: Single large influencer card (no outer/inner nesting) */}
+        <article className="lg:col-span-7 rounded-2xl border border-white/10 bg-[#0F0F0F]/80 p-5 md:p-6 shadow-lg hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
+          {/* Influencer header + Tip button (social proximity) */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="h-9 w-9 rounded-full grid place-items-center text-sm font-semibold border border-white/10" style={avatarStyle('CryptoChad')}>C</div>
+            <div className="min-w-0">
+              <div className="font-semibold leading-tight">{claim.influencer}</div>
+              <div className="text-xs text-muted truncate">{claim.influencerMeta}</div>
             </div>
-            <div className="text-muted text-xs mb-1">Influencer Claim</div>
-            <div className="text-2xl md:text-3xl font-bold leading-snug mb-4">{claim.text}</div>
-
-            {/* Odds Bar */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-xs text-muted mb-1">
-                <span>Long {claim.longPct}%</span>
-                <span>Short {claim.shortPct}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-white/5 overflow-hidden">
-                <div
-                  className="h-full bg-teal transition-[width] duration-200 ease-out"
-                  style={{ width: animateBars ? `${claim.longPct}%` : '0%' }}
-                />
-                <div
-                  className="h-full bg-red-500/80 -mt-2 transition-[width] duration-200 ease-out"
-                  style={{ width: animateBars ? `${claim.shortPct}%` : '0%' }}
-                />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="mt-5 flex flex-wrap gap-3">
-              <Button
-                className="bg-teal text-black hover:opacity-90"
-                onMouseEnter={() => setHoverSide('LONG')}
-                onMouseLeave={() => setHoverSide(null)}
-                onClick={() => handleBet('LONG')}
-              >
-                🔵 Go Long
-              </Button>
-              <Button
-                className="bg-red-500 text-white hover:bg-red-500/90"
-                onMouseEnter={() => setHoverSide('SHORT')}
-                onMouseLeave={() => setHoverSide(null)}
-                onClick={() => handleBet('SHORT')}
-              >
-                🔴 Go Short
-              </Button>
-            </div>
-
-            {/* Confidence slider appears after choosing a side */}
-            {bet && (
-              <div className="mt-4">
-                <div className="flex items-center justify-between text-xs text-muted mb-2">
-                  <span>Confidence</span>
-                  <span className="text-foreground font-medium">{confidence}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={confidence}
-                  onChange={(e) => setConfidence(Number(e.target.value))}
-                  className="w-full accent-teal"
-                  aria-label="Confidence slider"
-                />
-                <div className="mt-1 text-xs text-muted">Stake conviction for this call (0–100%).</div>
-              </div>
-            )}
-
-            {/* Proof Badge */}
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-                <Shield className="h-4 w-4 text-teal" />
-                <span className="text-sm text-muted">{claim.influencerMeta}</span>
-              </div>
-              <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
-                <Trophy className="h-4 w-4 text-lime" />
-                <span className="text-sm text-muted">{claim.record}</span>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center gap-3">
-              <Button variant="cta" size="lg" className="px-5 py-3 w-full sm:w-auto" onClick={() => setShared(true)}>
-                <Share2 className="h-4 w-4 mr-2" /> Share → Auto Meme Card
+            <div className="ml-auto">
+              <Button variant="outline" size="sm">
+                💸 Tip Creator ($1–5)
               </Button>
             </div>
           </div>
+          <div className="text-muted text-xs mb-1">Influencer Claim</div>
+          <div className="text-2xl md:text-3xl font-bold leading-snug mb-4">{claim.text}</div>
 
-          {/* Brag/Roast Card Preview */}
+          {/* Odds Bar */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs text-muted mb-1">
+              <span>Long {claim.longPct}%</span>
+              <span>Short {claim.shortPct}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+              <div
+                className="h-full bg-teal transition-[width] duration-200 ease-out"
+                style={{ width: animateBars ? `${claim.longPct}%` : '0%' }}
+              />
+              <div
+                className="h-full bg-red-500/80 -mt-2 transition-[width] duration-200 ease-out"
+                style={{ width: animateBars ? `${claim.shortPct}%` : '0%' }}
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button
+              className="bg-teal text-black hover:opacity-90"
+              onMouseEnter={() => setHoverSide('LONG')}
+              onMouseLeave={() => setHoverSide(null)}
+              onClick={() => handleBet('LONG')}
+            >
+              🔵 Go Long
+            </Button>
+            <Button
+              className="bg-red-500 text-white hover:bg-red-500/90"
+              onMouseEnter={() => setHoverSide('SHORT')}
+              onMouseLeave={() => setHoverSide(null)}
+              onClick={() => handleBet('SHORT')}
+            >
+              🔴 Go Short
+            </Button>
+          </div>
+
+          {/* Confidence slider appears after choosing a side */}
+          {bet && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-xs text-muted mb-2">
+                <span>Confidence</span>
+                <span className="text-foreground font-medium">{confidence}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={confidence}
+                onChange={(e) => setConfidence(Number(e.target.value))}
+                className="w-full accent-teal"
+                aria-label="Confidence slider"
+              />
+              <div className="mt-1 text-xs text-muted">Stake conviction for this call (0–100%).</div>
+            </div>
+          )}
+
+          {/* Proof Badge */}
+          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+              <Shield className="h-4 w-4 text-teal" />
+              <span className="text-sm text-muted">{claim.influencerMeta}</span>
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+              <Trophy className="h-4 w-4 text-lime" />
+              <span className="text-sm text-muted">{claim.record}</span>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-3">
+            <Button variant="cta" size="lg" className="px-5 py-3 w-full sm:w-auto" onClick={() => setShared(true)}>
+              <Share2 className="h-4 w-4 mr-2" /> Share → Auto Meme Card
+            </Button>
+          </div>
+
+          {/* Brag/Roast Card Preview inside same card */}
           {shared && (
-            <div className="mt-4 rounded-xl border border-white/10 p-4 bg-gradient-to-br from-white/[0.04] to-white/[0.02]">
+            <div className="mt-4 pt-4 border-t border-white/10">
               <div className="text-sm text-muted mb-1">Brag/Roast Card</div>
               <div className="font-semibold">@CryptoChad called it right!</div>
               <div className="text-muted">"DOGE didn’t double" ✅</div>

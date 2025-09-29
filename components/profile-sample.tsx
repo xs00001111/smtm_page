@@ -98,19 +98,18 @@ export function ProfileSample() {
 
   return (
     <div id="sample-profile" className="mx-auto max-w-6xl px-6">
-      <div className="h-1 w-full rounded bg-[linear-gradient(90deg,#00E5FF_0%,#B6FF00_100%)] mb-6" />
 
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 md:p-8">
+      <div className="rounded-2xl border border-white/10 bg-black/30 p-6 md:p-8 hover:shadow-[0_0_24px_rgba(0,229,255,0.08)] transition-shadow">
         <div className="flex flex-col md:flex-row md:items-center gap-6">
           <div className="flex items-center gap-4">
             <div
-              className="h-16 w-16 md:h-20 md:w-20 rounded-xl grid place-items-center text-2xl md:text-3xl font-bold border border-white/10"
+              className="w-[72px] h-[72px] rounded-xl grid place-items-center text-2xl md:text-3xl font-bold border border-white/10"
               style={avatarStyle(profile.handle)}
             >
               {profile.name.charAt(0)}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="font-display text-2xl md:text-3xl font-extrabold leading-tight">
                   {profile.name}
                 </h2>
@@ -119,42 +118,42 @@ export function ProfileSample() {
                     <CheckCircle2 className="h-4 w-4" /> Verified
                   </span>
                 )}
+                <span className="inline-flex items-center rounded-full bg-white/5 text-white/80 text-xs px-2 py-0.5 border border-white/10">
+                  Credibility {profile.credibility}
+                </span>
               </div>
               <div className="text-muted">@{profile.handle}</div>
             </div>
           </div>
 
-          <div className="md:ml-auto grid grid-cols-3 gap-3 w-full md:w-auto">
-            <CredibilityCard value={profile.credibility} />
-            <Stat label="Predictions" value={`${profile.stats.predictions}`} />
-            <AccuracyCard value={`${profile.stats.accuracy}%`} series={accuracySeries} />
+          <div className="md:ml-auto inline-flex items-center gap-2 w-full md:w-auto">
+            <button onClick={onFollow} className="h-9 px-3 rounded-md bg-teal text-black text-sm font-semibold hover:opacity-90 transition w-full md:w-auto">
+              {isFollowing ? 'Following' : 'Follow'}
+            </button>
+            <GhostButton>⚔️ Challenge</GhostButton>
+            <GhostButton onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share'}</GhostButton>
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-1.5">
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Stat label="Predictions" value={`${profile.stats.predictions}`} />
+          <AccuracyCard value={`${profile.stats.accuracy}%`} series={accuracySeries} />
+          <Stat label="Tips Earned" value={`$${profile.stats.tips}`} />
+        </div>
+
+        <div className="mt-6 pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 text-sm">
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">
             <Shield className="h-4 w-4 text-teal" />
             Trust Layer: Reputation-first
           </span>
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-1.5">
-            <Link2 className="h-4 w-4 text-lime" />
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">
+            <Link2 className="h-4 w-4 text-teal" />
             Portfolio: {profile.portfolioLinked ? 'Linked (Coinbase API)' : 'Not Linked'}
           </span>
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-1.5">
-            <Trophy className="h-4 w-4 text-yellow-300" />
-            Tips Earned: ${profile.stats.tips}
-          </span>
-
           {/* Badges */}
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-1.5">🏅 Top 10% Accuracy</span>
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-1.5">🎲 High Roller</span>
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-1.5">💸 Most Tipped</span>
-
-          <div className="ml-auto inline-flex items-center gap-2">
-            <GhostButton onClick={onFollow} icon={<UserPlus className="h-4 w-4" />}>{isFollowing ? 'Following' : 'Follow'}</GhostButton>
-            <GhostButton>⚔️ Challenge</GhostButton>
-            <GhostButton onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share Prediction'}</GhostButton>
-          </div>
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">🏅 Top 10% Accuracy</span>
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">🎲 High Roller</span>
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">💸 Most Tipped</span>
         </div>
       </div>
 
@@ -191,7 +190,7 @@ export function ProfileSample() {
 
       <div className="mt-4 space-y-3">
         {predictions.map((p) => (
-          <div key={p.id} className={`rounded-xl border border-white/10 bg-white/[0.02] p-4 ${p.status==='Resolved' ? (p.outcome==='WIN' ? 'animate-winPulse' : 'animate-losePulse') : ''}`}>
+          <div key={p.id} className={`rounded-xl border border-white/10 bg-white/[0.02] p-4`}>
             <div className="flex items-start gap-4">
               <div className="h-10 w-10 rounded-lg bg-white/10 grid place-items-center">
                 {assetTypeIcon(p.type)}
@@ -270,9 +269,9 @@ export function ProfileSample() {
 
 function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-xl border border-white/10 p-4 text-center transition-shadow ${highlight ? 'bg-white/[0.04] shadow-glow' : 'bg-white/[0.02] hover:bg-white/[0.04]'} dark:hover:shadow-glow hover:shadow-glow-soft`}>
-      <div className="text-xs text-muted">{label}</div>
-      <div className="text-2xl font-extrabold">{value}</div>
+    <div className={`rounded-xl border border-white/10 p-4 text-center transition-shadow ${highlight ? 'bg-white/5 shadow-glow' : 'bg-white/5 hover:bg-white/[0.08]'} hover:shadow-glow-soft`}>
+      <div className="text-xs text-white/60">{label}</div>
+      <div className="text-2xl font-extrabold text-white/90">{value}</div>
     </div>
   )
 }
@@ -298,9 +297,9 @@ function AccuracyCard({ value, series }: { value: string; series: number[] }) {
   const xLast = series.length > 1 ? ((series.length - 1) / (series.length - 1)) * 80 : 0
   const yLast = 24 - (last / 100) * 24
   return (
-    <div className="rounded-xl border border-white/10 p-4 text-center bg-white/[0.02] transition-shadow hover:bg-white/[0.04] dark:hover:shadow-glow hover:shadow-glow-soft">
-      <div className="text-xs text-muted">Accuracy</div>
-      <div className="text-2xl font-extrabold">{value}</div>
+    <div className="rounded-xl border border-white/10 p-4 text-center bg-white/5 transition-shadow hover:bg-white/[0.08] hover:shadow-glow-soft">
+      <div className="text-xs text-white/60">Accuracy</div>
+      <div className="text-2xl font-extrabold text-white/90">{value}</div>
       <svg width="80" height="24" viewBox="0 0 80 24" className="mx-auto mt-1">
         <path d={path} fill="none" stroke="#00E5FF" strokeWidth="2" />
         <circle cx={xLast} cy={yLast} r="2" fill="#B6FF00" />
@@ -321,11 +320,9 @@ function sparklinePath(data: number[], width: number, height: number) {
     .join(' ')
 }
 
-function assetTypeIcon(type: 'crypto' | 'stock' | 'macro') {
-  const common = 'h-5 w-5'
-  if (type === 'crypto') return <Coins className={`${common} text-teal`} />
-  if (type === 'stock') return <LineChart className={`${common} text-lime`} />
-  return <Globe className={`${common} text-yellow-300`} />
+function assetTypeIcon(_type: 'crypto' | 'stock' | 'macro') {
+  const common = 'h-5 w-5 text-teal'
+  return <LineChart className={common} />
 }
 
 function Strip({ label, value }: { label: string; value: string }) {
