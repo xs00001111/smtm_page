@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+  background: #0C0C0C;
+  color: #FFFFFF;
+}
+
+/* Animated trading grid background */
+.trading-grid {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.06) 0px,
+      rgba(255, 255, 255, 0.06) 1px,
+      transparent 1px,
+      transparent 40px
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.06) 0px,
+      rgba(255, 255, 255, 0.06) 1px,
+      transparent 1px,
+      transparent 40px
+    );
+  opacity: 0.12;
+  pointer-events: none;
+  animation: gridPulse 6s ease-in-out infinite;
+}
+
+.neon-glow {
+  box-shadow: 0 0 24px rgba(0, 229, 255, 0.25), 0 0 48px rgba(182, 255, 0, 0.15);
+}
+
+/* Buttons base for hover effects */
+.btn {
+  @apply inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0C0C0C];
+}
+
