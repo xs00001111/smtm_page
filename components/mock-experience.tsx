@@ -41,14 +41,15 @@ export function MockExperience() {
   }, [])
 
   return (
-    <div className="mx-auto max-w-6xl px-6">
+    <div>
 
-      {/* Feed (swipe-like) */}
-      <div className="grid md:grid-cols-2 gap-6 items-start">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 md:p-6 overflow-hidden">
+      {/* Demo grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left column: Prediction card */}
+        <article className="lg:col-span-7 rounded-2xl border border-white/10 bg-black/40 p-6 shadow-lg hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
 
           {/* Claim Card */}
-          <div className="rounded-xl border border-white/10 bg-[#0F0F0F] p-5 md:p-6">
+          <div className="rounded-xl border border-white/10 bg-[#0F0F0F]/80 p-5 md:p-6">
             {/* Influencer header + Tip button (social proximity) */}
             <div className="flex items-center gap-3 mb-3">
               <div className="h-9 w-9 rounded-full grid place-items-center text-sm font-semibold border border-white/10" style={avatarStyle('CryptoChad')}>C</div>
@@ -63,7 +64,7 @@ export function MockExperience() {
               </div>
             </div>
             <div className="text-muted text-xs mb-1">Influencer Claim</div>
-            <div className="text-2xl md:text-3xl font-bold leading-snug">{claim.text}</div>
+            <div className="text-2xl md:text-3xl font-bold leading-snug mb-4">{claim.text}</div>
 
             {/* Odds Bar */}
             <div className="mt-4">
@@ -73,11 +74,11 @@ export function MockExperience() {
               </div>
               <div className="h-2 rounded-full bg-white/5 overflow-hidden">
                 <div
-                  className="h-full bg-teal transition-[width] duration-700 ease-out"
+                  className="h-full bg-teal transition-[width] duration-200 ease-out"
                   style={{ width: animateBars ? `${claim.longPct}%` : '0%' }}
                 />
                 <div
-                  className="h-full bg-red-500/80 -mt-2 transition-[width] duration-700 ease-out"
+                  className="h-full bg-red-500/80 -mt-2 transition-[width] duration-200 ease-out"
                   style={{ width: animateBars ? `${claim.shortPct}%` : '0%' }}
                 />
               </div>
@@ -137,7 +138,7 @@ export function MockExperience() {
             </div>
 
             <div className="mt-4 flex items-center gap-3">
-              <Button variant="cta" size="lg" className="px-5 py-3" onClick={() => setShared(true)}>
+              <Button variant="cta" size="lg" className="px-5 py-3 w-full sm:w-auto" onClick={() => setShared(true)}>
                 <Share2 className="h-4 w-4 mr-2" /> Share → Auto Meme Card
               </Button>
             </div>
@@ -152,13 +153,13 @@ export function MockExperience() {
               <div className="mt-2 text-teal">+15 Credibility | +$5 Tips</div>
             </div>
           )}
-        </div>
+        </article>
 
-        {/* Right column: Post-engagement + Profile */}
-        <div className="space-y-6">
-          {/* Prediction Card (after engagement) */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-            <div className="text-sm text-muted mb-2">Prediction Card</div>
+        {/* Right column */}
+        <div className="lg:col-span-5 flex flex-col gap-6">
+          {/* Preview card */}
+          <aside className="rounded-2xl border border-white/10 bg-black/40 p-6 hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
+            <div className="text-sm text-muted mb-4">Prediction Preview</div>
             <div>
               {bet ? (
                 <>
@@ -170,20 +171,22 @@ export function MockExperience() {
               )}
               <div
                 className={
-                  `mt-2 rounded-md px-3 py-2 inline-flex items-center gap-2 transition ` +
+                  `mt-2 rounded-md px-3 py-2 inline-flex items-center gap-2 transition transition-transform hover:-translate-y-0.5 ` +
                   `${hoverSide ? 'bg-white/[0.06] shadow-glow text-lime-300' : 'bg-white/[0.03] text-teal'}`
                 }
               >
                 <span className="font-medium">Potential Reward:</span>
                 <span>+${previewReward}</span>
               </div>
-              <div className="mt-3 text-sm text-muted">Leaderboard Position: #32</div>
-              <div className="text-sm text-muted">Credibility Score: 68</div>
+              <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-3 text-sm text-muted">
+                <div>Leaderboard Position: #32</div>
+                <div>Credibility Score: 68</div>
+              </div>
             </div>
-          </div>
+          </aside>
 
-          {/* Profile Page mock */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          {/* User snapshot */}
+          <aside className="rounded-2xl border border-white/10 bg-black/40 p-6 hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-white/10 grid place-items-center text-xl">C</div>
               <div>
@@ -194,24 +197,24 @@ export function MockExperience() {
                 <CheckCircle2 className="h-4 w-4" /> Verified
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-3 text-sm">
+            <div className="mt-4 flex flex-wrap gap-3 text-sm">
               <span className="rounded-md border border-white/10 px-2 py-1 text-muted">Portfolio: Linked (Coinbase API)</span>
             </div>
             <div className="mt-4 grid grid-cols-3 gap-3">
-              <div className="rounded-lg border border-white/10 p-3 bg-white/[0.02]">
+              <div className="rounded-lg border border-white/10 p-3 bg-white/[0.02] text-center">
                 <div className="text-xs text-muted">Total Predictions</div>
                 <div className="text-xl font-bold">52</div>
               </div>
-              <div className="rounded-lg border border-white/10 p-3 bg-white/[0.02]">
+              <div className="rounded-lg border border-white/10 p-3 bg-white/[0.02] text-center">
                 <div className="text-xs text-muted">Accuracy</div>
                 <div className="text-xl font-bold">72%</div>
               </div>
-              <div className="rounded-lg border border-white/10 p-3 bg-white/[0.02]">
+              <div className="rounded-lg border border-white/10 p-3 bg-white/[0.02] text-center">
                 <div className="text-xs text-muted">Tips Earned</div>
                 <div className="text-xl font-bold">$87</div>
               </div>
             </div>
-          </div>
+          </aside>
         </div>
       </div>
 

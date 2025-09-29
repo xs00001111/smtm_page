@@ -10,32 +10,38 @@ import { MarketTickerBar } from '@/components/market-ticker-bar'
 
 export default function HomePage() {
   return (
-    <main className="relative min-h-screen overflow-hidden">
-      <section className="relative isolate min-h-[90vh]">
-        <TradingGrid />
-        <MarketTickerBar />
-        <div className="relative mx-auto max-w-6xl px-6 mt-20 md:mt-24 flex flex-col items-center justify-center md:justify-start text-center">
-          <div aria-hidden className="pointer-events-none absolute -z-10 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-[radial-gradient(circle_at_center,rgba(0,229,255,0.16),rgba(182,255,0,0.10)_40%,transparent_70%)] blur-2xl" />
-
-          <h1 className="font-display font-extrabold tracking-tight leading-tight text-[clamp(42px,6vw,72px)]">
-            Show Me The Money
-          </h1>
-          <p className="mt-4 text-[18px] md:text-[20px] text-muted max-w-2xl">
-            Win credibility. Earn cash. Roast the pretenders.
-          </p>
-          <div className="mt-8 flex flex-col sm:flex-row gap-5 justify-center">
-            <a href="#waitlist">
-              <Button variant="cta">Join the Waitlist</Button>
-            </a>
-            <a href="#learn-more">
-              <Button variant="outline">Learn More</Button>
-            </a>
+    <>
+      {/* Full-width ticker above main container */}
+      <MarketTickerBar />
+      <main className="relative min-h-screen overflow-hidden mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        {/* Hero */}
+        <section id="hero" className="relative min-h-[70vh] md:min-h-[80vh] flex items-center">
+          <TradingGrid />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.08),transparent_60%)]" />
+          <div className="relative text-center w-full flex flex-col items-center">
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
+              Show Me The Money
+            </h1>
+            <p className="mt-4 text-lg text-white/80 max-w-[46ch]">
+              Win credibility. Earn cash. Roast the pretenders.
+            </p>
+            <div className="mt-8 flex gap-4">
+              <a href="#waitlist" className="w-full sm:w-auto">
+                <button className="w-full sm:w-auto bg-gradient-to-r from-[#00E5FF] to-[#B6FF00] text-black font-semibold px-5 py-3 rounded-xl shadow-[0_0_40px_rgba(182,255,0,0.2)]">
+                  Join the Waitlist
+                </button>
+              </a>
+              <a href="#learn-more" className="w-full sm:w-auto">
+                <button className="w-full sm:w-auto border border-[#00E5FF] text-[#00E5FF] px-5 py-3 rounded-xl">
+                  Learn More
+                </button>
+              </a>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-  {/* Mock experience directly under hero */}
-  <section className="relative py-16 md:py-24 bg-[#111111]">
+  {/* Demo under hero with overlap and spacing */}
+  <section id="demo" className="-mt-12 md:-mt-16 relative z-10 pt-14 md:pt-20 pb-20">
     <MockExperience />
   </section>
 
@@ -44,7 +50,9 @@ export default function HomePage() {
     <ProfileSample />
   </section>
 
-      <section id="learn-more" className="relative py-16 md:py-24 bg-[#111111]">
+      <hr className="my-16 h-px border-0 bg-gradient-to-r from-transparent via-[#00E5FF] to-[#B6FF00] opacity-50" />
+
+      <section id="learn-more" className="relative py-16 md:py-24">
         <div className="mx-auto max-w-6xl px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard
