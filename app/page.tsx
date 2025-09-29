@@ -21,7 +21,7 @@ export default function HomePage() {
             Show Me The Money
           </h1>
           <p className="mt-4 text-[18px] md:text-[20px] text-muted max-w-2xl">
-            Stake your predictions, build credibility, and get tipped for being right.
+            Win credibility. Earn cash. Roast the pretenders.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-5 justify-center">
             <a href="#waitlist">
