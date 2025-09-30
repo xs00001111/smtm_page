@@ -67,12 +67,12 @@ export default function HomePage() {
         </section>
 
   {/* Demo under hero with overlap and spacing */}
-  <section id="demo" className="-mt-12 md:-mt-16 relative z-10 pt-14 md:pt-20 pb-20">
+  <section id="demo" className="-mt-12 md:-mt-16 relative z-10 pt-14 md:pt-20 pb-20" style={{ contentVisibility: 'auto' }}>
     <MockExperience />
   </section>
 
   {/* Sample profile to show full experience */}
-  <section className="relative py-16 md:py-24 bg-[#111111]">
+  <section className="relative py-16 md:py-24 bg-[#111111]" style={{ contentVisibility: 'auto' }}>
     <ProfileSample />
   </section>
 

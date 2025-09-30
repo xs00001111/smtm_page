@@ -40,7 +40,7 @@ export function MarketTickerBar() {
       <div className="mx-auto max-w-7xl px-4 md:px-6">
         <div className="relative overflow-hidden">
           {/* Row 1 (left) */}
-          <div className="inline-flex items-center gap-8 text-white/80 animate-tickerLeft will-change-transform">
+          <div className="inline-flex items-center gap-8 text-white/80 motion-safe:animate-tickerLeft will-change-transform">
             {[...Array(2)].map((_, i) => (
               <div key={i} className="inline-flex items-center gap-8">
                 {TICKERS.map((t, idx) => (
@@ -54,7 +54,7 @@ export function MarketTickerBar() {
             ))}
           </div>
           {/* Row 2 (right) */}
-          <div className="mt-1 inline-flex items-center gap-8 text-white/70 animate-tickerRight will-change-transform">
+          <div className="mt-1 hidden sm:inline-flex items-center gap-8 text-white/70 motion-safe:animate-tickerRight will-change-transform">
             {[...Array(2)].map((_, i) => (
               <div key={`b-${i}`} className="inline-flex items-center gap-8">
                 {TICKERS.map((t, idx) => (

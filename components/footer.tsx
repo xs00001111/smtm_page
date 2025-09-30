@@ -11,7 +11,7 @@ export function Footer() {
           {/* Brand */}
           <div className="text-center md:text-left">
             <div className="inline-flex items-center gap-2">
-              <img src="/logo-mark.svg" alt="SMTM" className="h-6 w-6" />
+              <img src="/logo-mark.svg" alt="SMTM" className="h-6 w-6" loading="lazy" />
               <span className="font-display text-xl font-bold">SMTM</span>
             </div>
             <p className="text-white/70 mt-2 max-w-xs mx-auto md:mx-0">Get rewarded for being right. Outplay the scammers.</p>

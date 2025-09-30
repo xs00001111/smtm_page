@@ -88,9 +88,10 @@ export function MockExperience() {
     return () => obs.disconnect()
   }, [])
 
+  const mobileAnimDuration = typeof window !== 'undefined' && window.innerWidth < 640 ? 1600 : 2200
   return (
     <div ref={rootRef} className="relative">
-      <FireworksOverlay active={celebrate} onDone={() => setCelebrate(false)} message="Congratulations!" rewardAmount={rewardAmount ?? undefined} />
+      <FireworksOverlay active={celebrate} onDone={() => setCelebrate(false)} message="Congratulations!" rewardAmount={rewardAmount ?? undefined} durationMs={mobileAnimDuration} />
 
       {/* Demo grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
