@@ -285,7 +285,7 @@ export function ProfileSample() {
             You followed <span className="text-foreground font-medium">@AlphaWolf</span>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white/80">
-            <span className="text-foreground font-medium">@CryptoChad</span> posted a new prediction: <em>“NVDA beats by >10%”</em>
+            <span className="text-foreground font-medium">@CryptoChad</span> posted a new prediction: <em>“NVDA beats by &gt;10%”</em>
           </div>
         </div>
       )}
