@@ -156,7 +156,7 @@ export default function HomePage() {
           <div className="mt-5 overflow-x-auto whitespace-nowrap">
             <div className="inline-flex items-center gap-4 text-sm text-white/85">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ NVDA beat EPS +12% <span className="text-teal">+25 cred</span></span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ BTC > $70k pre-halving <span className="text-teal">+18 cred</span></span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ BTC &gt; $70k pre-halving <span className="text-teal">+18 cred</span></span>
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">❌ DOGE to $2 <span className="text-red-400">-7 cred</span></span>
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ ETH ETF approved <span className="text-teal">+22 cred</span></span>
             </div>
