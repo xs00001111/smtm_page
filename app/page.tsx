@@ -25,24 +25,43 @@ export default function HomePage() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-screen">
             <MarketTickerBar />
           </div>
-          <div className="relative z-10 text-center w-full flex flex-col items-center pt-20">
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
+          <div className="relative z-10 text-center w-full flex flex-col items-center pt-24">
+            <div className="text-xs sm:text-sm tracking-[0.2em] text-white/70 uppercase mb-3 sm:mb-4">
               Show Me The Money
+            </div>
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
+              Earn when you’re right. Lose nothing to lies.
             </h1>
-            <p className="mt-4 text-lg text-white/80 max-w-[46ch]">
-              Win credibility. Earn cash. Roast the pretenders.
+            <p className="mt-6 sm:mt-7 text-lg text-white/80 max-w-[46ch]">
+              SMTM makes conviction profitable and hype worthless.
             </p>
-            <div className="mt-8 flex gap-4">
+            <div className="mt-10 sm:mt-12 flex gap-6">
               <a href="#waitlist" className="w-full sm:w-auto">
                 <button className="w-full sm:w-auto bg-gradient-to-r from-[#00E5FF] to-[#B6FF00] text-black font-semibold px-5 py-3 rounded-xl shadow-[0_0_40px_rgba(182,255,0,0.2)]">
                   Join the Waitlist
                 </button>
               </a>
-              <a href="#learn-more" className="w-full sm:w-auto">
+              <a href="#demo" className="w-full sm:w-auto">
                 <button className="w-full sm:w-auto border border-[#00E5FF] text-[#00E5FF] px-5 py-3 rounded-xl">
-                  Learn More
+                  Try the Demo
                 </button>
               </a>
+            </div>
+            {/* FOMO + engagement baits */}
+            <div className="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-4 sm:gap-5 text-sm text-white/80">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5">
+                🔓 Founding Member Badge
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5">
+                ⚡ Limited early spots
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5">
+                📛 Claim your @handle
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full px-4 py-1.5">
+                <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
+                12,482 joined • 89 today
+              </span>
             </div>
           </div>
         </section>
@@ -127,10 +146,22 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="waitlist" className="relative py-16 md:py-24">
+      <section id="waitlist" className="relative py-12 md:py-16">
         <div className="mx-auto max-w-6xl px-6">
+          <hr className="mx-auto mb-6 h-px w-40 sm:w-60 border-0 rounded bg-[linear-gradient(90deg,transparent,rgba(0,229,255,0.8),rgba(182,255,0,0.8),transparent)] opacity-70" />
           <h3 className="font-display text-2xl md:text-3xl font-bold">Join the Waitlist</h3>
-          <p className="text-muted mt-2">Be first to trade on truth. Get early access updates.</p>
+          <p className="text-white/80 mt-2">Be first to profit from conviction. Join early, shape the market.</p>
+
+          {/* Mini leaderboard / ticker */}
+          <div className="mt-5 overflow-x-auto whitespace-nowrap">
+            <div className="inline-flex items-center gap-4 text-sm text-white/85">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ NVDA beat EPS +12% <span className="text-teal">+25 cred</span></span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ BTC > $70k pre-halving <span className="text-teal">+18 cred</span></span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">❌ DOGE to $2 <span className="text-red-400">-7 cred</span></span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ ETH ETF approved <span className="text-teal">+22 cred</span></span>
+            </div>
+          </div>
+
           <div className="mt-6 max-w-lg">
             <WaitlistForm />
           </div>

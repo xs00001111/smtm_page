@@ -60,6 +60,9 @@ export function ProfileSample() {
   const [followerCount, setFollowerCount] = useState(profile.stats.followers)
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
   const [reactions, setReactions] = useState<Record<string, { fire: number; skull: number; rocket: number }>>({})
+  const [activeTab, setActiveTab] = useState<'predictions' | 'feed' | 'leaderboard' | 'badges' | 'about'>(
+    'predictions'
+  )
 
   const onFollow = useCallback(() => {
     setIsFollowing((prev) => {
@@ -99,7 +102,7 @@ export function ProfileSample() {
   return (
     <div id="sample-profile" className="mx-auto max-w-6xl px-6">
 
-      <div className="p-6 md:p-8">
+      <div className="rounded-2xl border-2 border-white/20 p-6 md:p-8">
         <div className="flex flex-col md:flex-row md:items-center gap-6">
           <div className="flex items-center gap-4">
             <div
@@ -127,11 +130,11 @@ export function ProfileSample() {
           </div>
 
           <div className="md:ml-auto inline-flex items-center gap-2 w-full md:w-auto">
-            <button onClick={onFollow} className="h-9 px-3 rounded-md bg-teal text-black text-sm font-semibold hover:opacity-90 transition w-full md:w-auto">
+            <button onClick={onFollow} className="h-10 px-4 rounded-md bg-teal text-black text-sm font-semibold hover:opacity-90 transition w-full md:w-auto">
               {isFollowing ? 'Following' : 'Follow'}
             </button>
-            <GhostButton>⚔️ Challenge</GhostButton>
-            <GhostButton onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share'}</GhostButton>
+            <GhostButton className="h-10 px-4">⚔️ Challenge</GhostButton>
+            <GhostButton className="h-10 px-4" onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share'}</GhostButton>
           </div>
         </div>
 
@@ -155,7 +158,7 @@ export function ProfileSample() {
           <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">🎲 High Roller</span>
           <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">💸 Most Tipped</span>
         </div>
-      </div>
+      
 
       <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Strip label="Followers" value={followerCount.toLocaleString()} />
@@ -164,13 +167,48 @@ export function ProfileSample() {
         <Strip label="Resolved" value={predictions.filter(p=>p.status==='Resolved').length.toString()} />
       </div>
 
-      <div className="mt-8 flex items-center gap-4 text-sm">
-        <span className="text-foreground font-semibold">Predictions</span>
-        <span className="text-muted">Feed</span>
-        <span className="text-muted">Leaderboard</span>
-        <span className="text-muted">Badges</span>
-        <span className="text-muted">About</span>
-      </div>
+      <nav className="mt-8 flex items-center gap-4 text-sm" role="tablist" aria-label="Profile sections">
+        <button
+          role="tab"
+          aria-selected={activeTab === 'predictions'}
+          onClick={() => setActiveTab('predictions')}
+          className={`pb-1 -mb-px border-b-2 transition ${activeTab === 'predictions' ? 'text-foreground border-teal' : 'text-muted border-transparent hover:text-foreground'}`}
+        >
+          Predictions
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'feed'}
+          onClick={() => setActiveTab('feed')}
+          className={`pb-1 -mb-px border-b-2 transition ${activeTab === 'feed' ? 'text-foreground border-teal' : 'text-muted border-transparent hover:text-foreground'}`}
+        >
+          Feed
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'leaderboard'}
+          onClick={() => setActiveTab('leaderboard')}
+          className={`pb-1 -mb-px border-b-2 transition ${activeTab === 'leaderboard' ? 'text-foreground border-teal' : 'text-muted border-transparent hover:text-foreground'}`}
+        >
+          Leaderboard
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'badges'}
+          onClick={() => setActiveTab('badges')}
+          className={`pb-1 -mb-px border-b-2 transition ${activeTab === 'badges' ? 'text-foreground border-teal' : 'text-muted border-transparent hover:text-foreground'}`}
+        >
+          Badges
+        </button>
+        <button
+          role="tab"
+          aria-selected={activeTab === 'about'}
+          onClick={() => setActiveTab('about')}
+          className={`pb-1 -mb-px border-b-2 transition ${activeTab === 'about' ? 'text-foreground border-teal' : 'text-muted border-transparent hover:text-foreground'}`}
+        >
+          About
+        </button>
+      </nav>
 
       {/* Weekly Challenge */}
       <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-4">
@@ -188,58 +226,73 @@ export function ProfileSample() {
         </div>
       </div>
 
-      <div className="mt-4 space-y-3">
-        {predictions.map((p) => (
-          <div key={p.id} className={`rounded-xl border border-white/10 bg-white/[0.02] p-4`}>
-            <div className="flex items-start gap-4">
-              <div className="h-10 w-10 rounded-lg bg-white/10 grid place-items-center">
-                {assetTypeIcon(p.type)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold">{p.statement}</h3>
-                  <span className="text-xs rounded-md border border-white/10 px-2 py-0.5 text-muted inline-flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3 text-teal" /> {p.side}
-                  </span>
-                  <span className="text-xs rounded-md border border-white/10 px-2 py-0.5 text-muted">Stake: ${p.stake}</span>
-                  <span className="text-xs rounded-md border border-white/10 px-2 py-0.5 text-muted">Status: {p.status}</span>
-                  {p.status === 'Resolved' && (
-                    <span className={`text-xs rounded-md px-2 py-0.5 ${p.outcome === 'WIN' ? 'bg-teal/10 text-teal' : 'bg-red-500/10 text-red-400'}`}>
-                      {p.outcome}
+      {activeTab === 'predictions' && (
+        <div id="predictions" className="mt-4 space-y-3">
+          {predictions.map((p) => (
+            <div key={p.id} className={`rounded-xl border border-white/10 bg-white/[0.02] p-4`}>
+              <div className="flex items-start gap-4">
+                <div className="h-10 w-10 rounded-lg bg-white/10 grid place-items-center">
+                  {assetTypeIcon(p.type)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold">{p.statement}</h3>
+                    <span className="text-xs rounded-md border border-white/10 px-2 py-0.5 text-muted inline-flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3 text-teal" /> {p.side}
                     </span>
-                  )}
-                  {p.reward && (
-                    <span className="text-xs rounded-md bg-teal/10 text-teal px-2 py-0.5">+${p.reward} Reward</span>
-                  )}
-                </div>
-                <div className="text-xs text-muted mt-1">Posted 3d ago • #{p.id}</div>
+                    <span className="text-xs rounded-md border border-white/10 px-2 py-0.5 text-muted">Stake: ${p.stake}</span>
+                    <span className="text-xs rounded-md border border-white/10 px-2 py-0.5 text-muted">Status: {p.status}</span>
+                    {p.status === 'Resolved' && (
+                      <span className={`text-xs rounded-md px-2 py-0.5 ${p.outcome === 'WIN' ? 'bg-teal/10 text-teal' : 'bg-red-500/10 text-red-400'}`}>
+                        {p.outcome}
+                      </span>
+                    )}
+                    {p.reward && (
+                      <span className="text-xs rounded-md bg-teal/10 text-teal px-2 py-0.5">+${p.reward} Reward</span>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted mt-1">Posted 3d ago • #{p.id}</div>
 
-                {/* Reactions + Comments */}
-                <div className="mt-3 flex items-center gap-2">
-                  <button onClick={() => react(p.id, 'fire')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 hover:bg-white/[0.06]">🔥 {(reactions[p.id]?.fire)||0}</button>
-                  <button onClick={() => react(p.id, 'rocket')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 hover:bg-white/[0.06]">🚀 {(reactions[p.id]?.rocket)||0}</button>
-                  <button onClick={() => react(p.id, 'skull')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 hover:bg-white/[0.06]">💀 {(reactions[p.id]?.skull)||0}</button>
-                  <div className="ml-auto inline-flex items-center text-muted text-sm"><MessageSquare className="h-4 w-4 mr-1" /> Comment</div>
-                </div>
-                <div className="mt-2">
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={commentDrafts[p.id] || ''}
-                      onChange={(e)=>onCommentChange(p.id, e.target.value)}
-                      placeholder="Add a comment..."
-                      className="flex-1 rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-teal/60"
-                    />
-                    <button onClick={()=>onSubmitComment(p.id)} className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm hover:bg-white/[0.06]">Post</button>
+                  {/* Reactions + Comments */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <button onClick={() => react(p.id, 'fire')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 hover:bg-white/[0.06]">🔥 {(reactions[p.id]?.fire)||0}</button>
+                    <button onClick={() => react(p.id, 'rocket')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 hover:bg-white/[0.06]">🚀 {(reactions[p.id]?.rocket)||0}</button>
+                    <button onClick={() => react(p.id, 'skull')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 hover:bg-white/[0.06]">💀 {(reactions[p.id]?.skull)||0}</button>
+                    <div className="ml-auto inline-flex items-center text-muted text-sm"><MessageSquare className="h-4 w-4 mr-1" /> Comment</div>
+                  </div>
+                  <div className="mt-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={commentDrafts[p.id] || ''}
+                        onChange={(e)=>onCommentChange(p.id, e.target.value)}
+                        placeholder="Add a comment..."
+                        className="flex-1 rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-teal/60"
+                      />
+                      <button onClick={()=>onSubmitComment(p.id)} className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm hover:bg-white/[0.06]">Post</button>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* Feed */}
+      {activeTab === 'feed' && (
+        <div id="feed" className="mt-6 space-y-3">
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white/80">
+            You followed <span className="text-foreground font-medium">@AlphaWolf</span>
           </div>
-        ))}
-      </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white/80">
+            <span className="text-foreground font-medium">@CryptoChad</span> posted a new prediction: <em>“NVDA beats by >10%”</em>
+          </div>
+        </div>
+      )}
 
       {/* Leaderboard */}
-      <div className="mt-8">
+      {activeTab === 'leaderboard' && (
+      <div id="leaderboard" className="mt-8">
         <div className="flex items-center gap-3 mb-3">
           <span className="text-foreground font-semibold">Leaderboard</span>
           <span className="text-muted text-sm">This week</span>
@@ -263,15 +316,40 @@ export function ProfileSample() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Badges */}
+      {activeTab === 'badges' && (
+        <div id="badges" className="mt-6 flex flex-wrap gap-3 text-sm">
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">🏅 Top 10% Accuracy</span>
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">🎲 High Roller</span>
+          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">💸 Most Tipped</span>
+        </div>
+      )}
+
+      {/* About */}
+      {activeTab === 'about' && (
+        <div id="about" className="mt-6 space-y-3 text-sm text-white/80">
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">Joined: Jan 2024 • Location: Internet</div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 inline-flex items-center gap-2">
+            <Shield className="h-4 w-4 text-teal" /> Trust Layer: Reputation-first
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 inline-flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-teal" /> Portfolio: {profile.portfolioLinked ? 'Linked (Coinbase API)' : 'Not Linked'}
+          </div>
+        </div>
+      )}
+      </div>
     </div>
   )
 }
 
 function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-xl border border-white/10 p-4 text-center transition-shadow ${highlight ? 'bg-white/5 shadow-glow' : 'bg-white/5 hover:bg-white/[0.08]'} hover:shadow-glow-soft`}>
+    <div className={`rounded-xl border border-white/10 p-4 text-center transition-shadow ${highlight ? 'bg-white/5 shadow-glow' : 'bg-white/5 hover:bg-white/[0.08]'} hover:shadow-glow-soft grid grid-rows-[auto_auto_24px] items-center justify-items-center min-h-[140px]`}>
       <div className="text-xs text-white/60">{label}</div>
       <div className="text-2xl font-extrabold text-white/90">{value}</div>
+      <div className="h-6" aria-hidden />
     </div>
   )
 }
@@ -297,10 +375,10 @@ function AccuracyCard({ value, series }: { value: string; series: number[] }) {
   const xLast = series.length > 1 ? ((series.length - 1) / (series.length - 1)) * 80 : 0
   const yLast = 24 - (last / 100) * 24
   return (
-    <div className="rounded-xl border border-white/10 p-4 text-center bg-white/5 transition-shadow hover:bg-white/[0.08] hover:shadow-glow-soft">
+    <div className="rounded-xl border border-white/10 p-4 text-center bg-white/5 transition-shadow hover:bg-white/[0.08] hover:shadow-glow-soft grid grid-rows-[auto_auto_24px] items-center justify-items-center min-h-[140px]">
       <div className="text-xs text-white/60">Accuracy</div>
       <div className="text-2xl font-extrabold text-white/90">{value}</div>
-      <svg width="80" height="24" viewBox="0 0 80 24" className="mx-auto mt-1">
+      <svg width="80" height="24" viewBox="0 0 80 24" className="mx-auto">
         <path d={path} fill="none" stroke="#00E5FF" strokeWidth="2" />
         <circle cx={xLast} cy={yLast} r="2" fill="#B6FF00" />
       </svg>
@@ -334,9 +412,9 @@ function Strip({ label, value }: { label: string; value: string }) {
   )
 }
 
-function GhostButton({ icon, children, onClick }: { icon?: React.ReactNode; children: React.ReactNode; onClick?: () => void }) {
+function GhostButton({ icon, children, onClick, className }: { icon?: React.ReactNode; children: React.ReactNode; onClick?: () => void; className?: string }) {
   return (
-    <button onClick={onClick} className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.01] px-3 py-1.5 text-sm hover:bg-white/[0.06] hover:shadow-glow transition">
+    <button onClick={onClick} className={`inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.01] px-3 py-1.5 text-sm hover:bg-white/[0.06] hover:shadow-glow transition ${className ?? ''}`}>
       {icon}
       {children}
     </button>

@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Share2, Shield, Trophy } from 'lucide-react'
+// removed LuckySpin per request
+import { FireworksOverlay } from '@/components/fireworks-overlay'
 
 type BetSide = 'LONG' | 'SHORT'
 
@@ -15,6 +17,10 @@ export function MockExperience() {
   const [animateBars, setAnimateBars] = useState(false)
   const [confidenceTouched, setConfidenceTouched] = useState(false)
   const [showHints, setShowHints] = useState(true)
+  const [celebrate, setCelebrate] = useState(false)
+  const autoShownRef = useRef(false)
+  const [rewardAmount, setRewardAmount] = useState<number | null>(null)
+  const rootRef = useRef<HTMLDivElement | null>(null)
 
   const claim = {
     asset: 'DOGE',
@@ -26,9 +32,18 @@ export function MockExperience() {
     record: 'Last 7 bets: 5W / 2L',
   }
 
+  const triggerCelebrate = (amount?: number) => {
+    if (typeof amount === 'number') setRewardAmount(amount)
+    else setRewardAmount(Math.floor(10 + Math.random() * 90))
+    setCelebrate(true)
+    setTimeout(() => setCelebrate(false), 2200)
+  }
+
   const handleBet = (side: BetSide) => {
     setBet(side)
     setShowHints(false)
+    // trigger celebration fireworks with preview reward
+    triggerCelebrate(previewReward)
   }
 
   const stake = 50 // mock dollars
@@ -55,13 +70,32 @@ export function MockExperience() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // Auto-celebrate once when the demo scrolls into view
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el || autoShownRef.current) return
+    const obs = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting && !autoShownRef.current) {
+          autoShownRef.current = true
+          triggerCelebrate()
+          obs.disconnect()
+          break
+        }
+      }
+    }, { threshold: 0.35 })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
   return (
-    <div>
+    <div ref={rootRef} className="relative">
+      <FireworksOverlay active={celebrate} onDone={() => setCelebrate(false)} message="Congratulations!" rewardAmount={rewardAmount ?? undefined} />
 
       {/* Demo grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left column: Single large influencer card (no outer/inner nesting) */}
-        <article className="lg:col-span-7 rounded-2xl border border-white/10 bg-[#0F0F0F]/80 p-5 md:p-6 shadow-lg hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
+        <article className="lg:col-span-7 rounded-2xl border border-white/10 bg-[#0F0F0F]/80 p-4 md:p-6 shadow-lg hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
           {/* Influencer header + Tip button (social proximity) */}
           <div className="flex items-center gap-3 mb-3">
             <div className="h-9 w-9 rounded-full grid place-items-center text-sm font-semibold border border-white/10" style={avatarStyle('CryptoChad')}>C</div>
@@ -124,7 +158,7 @@ export function MockExperience() {
                   <span className="absolute -right-2 -bottom-2 h-3 w-3 rounded-full bg-teal animate-ping pointer-events-none" />
                 )}
                 <Button
-                  className="bg-teal text-black hover:opacity-90"
+                  className="bg-teal text-black hover:opacity-90 w-full sm:w-auto"
                   onMouseEnter={() => setHoverSide('LONG')}
                   onMouseLeave={() => setHoverSide(null)}
                   onClick={() => handleBet('LONG')}
@@ -142,7 +176,7 @@ export function MockExperience() {
                   <span className="absolute -right-2 -bottom-2 h-3 w-3 rounded-full bg-red-500 animate-ping pointer-events-none" />
                 )}
                 <Button
-                  className="bg-red-500 text-white hover:bg-red-500/90"
+                  className="bg-red-500 text-white hover:bg-red-500/90 w-full sm:w-auto"
                   onMouseEnter={() => setHoverSide('SHORT')}
                   onMouseLeave={() => setHoverSide(null)}
                   onClick={() => handleBet('SHORT')}
@@ -210,7 +244,7 @@ export function MockExperience() {
         {/* Right column */}
         <div className="lg:col-span-5 flex flex-col gap-6">
           {/* Preview card */}
-          <aside className="rounded-2xl border border-white/10 bg-black/40 p-6 hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
+          <aside className="rounded-2xl border border-white/10 bg-black/40 p-4 md:p-6 hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
             <div className="text-sm text-muted mb-4">Prediction Preview</div>
             <div>
               {bet ? (
@@ -238,7 +272,7 @@ export function MockExperience() {
           </aside>
 
           {/* User snapshot */}
-          <aside className="rounded-2xl border border-white/10 bg-black/40 p-6 hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
+          <aside className="rounded-2xl border border-white/10 bg-black/40 p-4 md:p-6 hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-white/10 grid place-items-center text-xl">C</div>
               <div>
