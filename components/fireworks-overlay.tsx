@@ -37,11 +37,22 @@ export function FireworksOverlay({ active, onDone, message = 'Congratulations! ð
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')!
-    let w = (canvas.width = window.innerWidth)
-    let h = (canvas.height = window.innerHeight)
+    let w = window.innerWidth
+    let h = window.innerHeight
+    // helper to set canvas internal resolution with a quality-based scale factor
+    const setupCanvasSize = () => {
+      w = window.innerWidth
+      h = window.innerHeight
+      const dpr = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1
+      const scale = resolvedQuality === 'high' ? Math.min(dpr, 1.5) : resolvedQuality === 'medium' ? 1 : 0.75
+      canvas.width = Math.max(1, Math.floor(w * scale))
+      canvas.height = Math.max(1, Math.floor(h * scale))
+      ctx.setTransform(scale, 0, 0, scale, 0, 0)
+    }
+    setupCanvasSize()
+
     const onResize = () => {
-      w = canvas.width = window.innerWidth
-      h = canvas.height = window.innerHeight
+      setupCanvasSize()
     }
     window.addEventListener('resize', onResize)
 
@@ -55,6 +66,33 @@ export function FireworksOverlay({ active, onDone, message = 'Congratulations! ð
     const particles: Particle[] = []
     const rings: Ring[] = []
     const floaties: Floaty[] = []
+
+    // cache for pre-rendered particle heads (glow sprite) per color
+    const spriteCache = new Map<string, HTMLCanvasElement>()
+    const getSprite = (color: string, baseSize: number) => {
+      const key = `${color}-${resolvedQuality}`
+      const cached = spriteCache.get(key)
+      if (cached) return cached
+      const s = Math.max(8, Math.floor(baseSize * (resolvedQuality === 'high' ? 10 : 8)))
+      const off = document.createElement('canvas')
+      off.width = s
+      off.height = s
+      const octx = off.getContext('2d')!
+      const r = s / 2
+      // radial gradient glow
+      const grad = octx.createRadialGradient(r, r, 0, r, r, r)
+      const c0 = color
+      octx.clearRect(0, 0, s, s)
+      grad.addColorStop(0, `${c0}AA`)
+      grad.addColorStop(0.4, `${c0}66`)
+      grad.addColorStop(1, `${c0}00`)
+      octx.fillStyle = grad
+      octx.beginPath()
+      octx.arc(r, r, r, 0, Math.PI * 2)
+      octx.fill()
+      spriteCache.set(key, off)
+      return off
+    }
 
     // seed bursts from center top-third
     const baseCount = w < 640 ? 2 : 4
@@ -92,17 +130,27 @@ export function FireworksOverlay({ active, onDone, message = 'Congratulations! ð
     let start = performance.now()
     const gravity = 0.05
     const drag = 0.992
-    const headShadow = resolvedQuality === 'high' ? 8 : resolvedQuality === 'medium' ? 4 : 0
+    const headShadow = 0 // replaced by glow sprite
     const drawHeads = resolvedQuality !== 'low' && !prefersReduced
     const drawStreaks = true
     let frame = 0
+    let acc = 0
+    const targetMs = resolvedQuality === 'low' ? 1000 / 30 : resolvedQuality === 'medium' ? 1000 / 45 : 1000 / 60
 
     const tick = (t: number) => {
       const dt = Math.min(32, t - start)
       start = t
 
+      // frame cap for low/medium to reduce work
+      acc += dt
+      if (acc < targetMs) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
+      acc = 0
+
       ctx.clearRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'lighter'
+      ctx.globalCompositeOperation = resolvedQuality === 'low' ? 'source-over' : 'lighter'
       ctx.lineCap = 'round'
       // particles with streaks
       for (let p of particles) {
@@ -127,15 +175,9 @@ export function FireworksOverlay({ active, onDone, message = 'Congratulations! ð
         }
         if (drawHeads) {
           ctx.globalAlpha = a
-          ctx.fillStyle = p.color
-          if (headShadow > 0) {
-            ctx.shadowBlur = headShadow
-            ctx.shadowColor = p.color
-          }
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-          ctx.fill()
-          if (headShadow > 0) ctx.shadowBlur = 0
+          const sprite = getSprite(p.color, 2)
+          const size = p.size * (resolvedQuality === 'high' ? 4 : 3)
+          ctx.drawImage(sprite, p.x - size / 2, p.y - size / 2, size, size)
         }
       }
       ctx.globalAlpha = 1
