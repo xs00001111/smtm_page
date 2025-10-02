@@ -1,8 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#0C0C0C"/>
-  <g transform="translate(8,8)">
-    <path d="M0 32 L10 22 L18 30 L36 12 L48 24" stroke="#00E5FF" stroke-width="6" fill="none" stroke-linecap="round"/>
-    <circle cx="48" cy="24" r="3" fill="#B6FF00"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0C0C0C"/>
+  <!-- Scale the mark for higher-resolution clarity; keep non-scaling stroke for crispness -->
+  <g transform="translate(64,64) scale(8)">
+    <path d="M0 32 L10 22 L18 30 L36 12 L48 10" stroke="#00E5FF" stroke-width="7" fill="none" stroke-linecap="round"/>
   </g>
 </svg>
-
