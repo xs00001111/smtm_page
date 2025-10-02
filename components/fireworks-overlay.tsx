@@ -39,6 +39,12 @@ export function FireworksOverlay({ active, onDone, message = 'Congratulations! ð
     const ctx = canvas.getContext('2d')!
     let w = window.innerWidth
     let h = window.innerHeight
+    // respect reduced motion
+    const prefersReduced = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    // Resolve quality from shared helper for a single source of truth
+    const resolvedQuality = resolveFireworksQuality(qualityOverride, w)
+
     // helper to set canvas internal resolution with a quality-based scale factor
     const setupCanvasSize = () => {
       w = window.innerWidth
@@ -55,12 +61,6 @@ export function FireworksOverlay({ active, onDone, message = 'Congratulations! ð
       setupCanvasSize()
     }
     window.addEventListener('resize', onResize)
-
-    // respect reduced motion
-    const prefersReduced = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-
-    // Resolve quality from shared helper for a single source of truth
-    const resolvedQuality = resolveFireworksQuality(qualityOverride, w)
 
     const colors = ['#00E5FF', '#B6FF00', '#FFFFFF']
     const particles: Particle[] = []
