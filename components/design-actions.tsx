@@ -58,6 +58,13 @@ export function SimulateModal({ ctx, onClose }: { ctx: TradeContext; onClose: ()
   const estPayout = useMemo(() => (ctx.price > 0 ? amount * (1 / ctx.price) : 0), [amount, ctx.price])
 
   // --- Bayes-y bot evidence controls (mock) ---
+  // Sources & URLs to make the simulation concrete
+  const [eventUrl, setEventUrl] = useState('https://polymarket.com/event/eth-spot-etf-approved-by-q4')
+  const [sentimentUrl, setSentimentUrl] = useState('https://twitter.com/user/status/1234567890')
+  const [crossUrl, setCrossUrl] = useState('https://kalshi.com/events/ETH-ETF-approval')
+  const [pollsUrl, setPollsUrl] = useState('https://projects.fivethirtyeight.com/')
+  const [relatedUrl, setRelatedUrl] = useState('https://polymarket.com/event/sec-issues-staff-comments')
+  const [topicName, setTopicName] = useState('Regulatory Tone (SEC)')
   const [zSent, setZSent] = useState(0) // standardized surprise
   const [kSent, setKSent] = useState(0.15) // sensitivity
   const [decay, setDecay] = useState(0.8) // e^{-lambda dt} proxy 0..1
@@ -109,6 +116,39 @@ export function SimulateModal({ ctx, onClose }: { ctx: TradeContext; onClose: ()
           </div>
         </div>
       </div>
+    )
+  }
+
+  function host(u: string) {
+    try { return new URL(u).host.replace('www.', '') } catch { return '—' }
+  }
+
+  function DagSketch() {
+    const w = 560, h = 160
+    const nodes = [
+      { id: 'S', label: 'Sentiment', x: 40, y: 40 },
+      { id: 'Q', label: 'Cross‑venue', x: 40, y: 110 },
+      { id: 'R', label: 'Related', x: 210, y: 40 },
+      { id: 'T', label: `Topic: ${topicName}`, x: 210, y: 110 },
+      { id: 'E', label: 'Event', x: 400, y: 80 },
+    ]
+    const edges = [ ['S','E'], ['Q','E'], ['R','T'], ['T','E'] ] as const
+    return (
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-40">
+        {edges.map(([a,b],i)=>{
+          const A = nodes.find(n=>n.id===a)!; const B = nodes.find(n=>n.id===b)!
+          return <g key={i}>
+            <line x1={A.x+70} y1={A.y+16} x2={B.x-10} y2={B.y+16} stroke="#7dd3fc" strokeOpacity={0.7} />
+            <polygon points={`${B.x-10},${B.y+16} ${B.x-18},${B.y+12} ${B.x-18},${B.y+20}`} fill="#7dd3fc" fillOpacity={0.7} />
+          </g>
+        })}
+        {nodes.map((n,i)=> (
+          <g key={i}>
+            <rect x={n.x} y={n.y} rx={10} ry={10} width={140} height={32} fill="#0c1114" stroke="#1f2937" />
+            <text x={n.x+10} y={n.y+20} fontSize={12} fill="#e5e7eb">{n.label}</text>
+          </g>
+        ))}
+      </svg>
     )
   }
 
@@ -212,6 +252,49 @@ export function SimulateModal({ ctx, onClose }: { ctx: TradeContext; onClose: ()
             </button>
           </div>
           <div className="mt-2 text-sm text-white/80">{ctx.market}</div>
+          {/* Event & correlated markets inputs */}
+          <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+            <div className="text-sm font-semibold mb-2">Event & Correlated Markets</div>
+            <div className="grid grid-cols-1 gap-3 text-sm">
+              <div>
+                <label className="text-xs text-white/70">Event URL</label>
+                <input value={eventUrl} onChange={e=>setEventUrl(e.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 py-2" placeholder="https://polymarket.com/event/..." />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-white/70">Sentiment / News URL</label>
+                  <input value={sentimentUrl} onChange={e=>setSentimentUrl(e.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 py-2" placeholder="https://twitter.com/..." />
+                  <div className="mt-1 text-xs text-white/60">Source: {host(sentimentUrl)}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-white/70">Cross‑venue Market URL</label>
+                  <input value={crossUrl} onChange={e=>setCrossUrl(e.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 py-2" placeholder="https://kalshi.com/..." />
+                  <div className="mt-1 text-xs text-white/60">Venue: {host(crossUrl)}</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-white/70">Polls / Quant URL</label>
+                  <input value={pollsUrl} onChange={e=>setPollsUrl(e.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 py-2" placeholder="https://..." />
+                  <div className="mt-1 text-xs text-white/60">Source: {host(pollsUrl)}</div>
+                </div>
+                <div>
+                  <label className="text-xs text-white/70">Related Market URL (upstream)</label>
+                  <input value={relatedUrl} onChange={e=>setRelatedUrl(e.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 py-2" placeholder="https://polymarket.com/event/..." />
+                  <div className="mt-1 text-xs text-white/60">Used to update topic belief</div>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-white/70">Topic (latent driver)</label>
+                <input value={topicName} onChange={e=>setTopicName(e.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 py-2" placeholder="e.g., Regulatory Tone (SEC)" />
+              </div>
+            </div>
+            <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3">
+              <div className="text-xs text-white/70 mb-1">Bayesian Network Sketch</div>
+              <DagSketch />
+              <div className="mt-1 text-xs text-white/60">Edges: Sentiment → Event, Cross‑venue → Event, Related → Topic → Event</div>
+            </div>
+          </div>
           <div className="mt-2 flex items-center gap-2 text-sm">
             <DirChip d={ctx.direction} />
             <span className="rounded-md border border-white/10 bg-white/[0.02] px-2 py-0.5">Price {ctx.price.toFixed(2)}</span>
