@@ -20,7 +20,7 @@ function Backdrop({ onClose }: { onClose: () => void }) {
 function Panel({ children }: { children: React.ReactNode }) {
   return (
     <div className="fixed z-50 inset-0 grid place-items-center p-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0F0F0F] shadow-glow">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0F0F0F] shadow-glow max-h-[85vh] overflow-y-auto">
         {children}
       </div>
     </div>
