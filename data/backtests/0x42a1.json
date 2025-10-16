@@ -1,0 +1,30 @@
+{
+  "name": "0x42A1...9fC7",
+  "periods": {
+    "7d": {
+      "equityCurve": [1.0,1.02,1.04,1.03,1.06,1.07,1.09],
+      "holdings": [
+        { "label": "Politics", "weight": 0.50 },
+        { "label": "Crypto", "weight": 0.35 },
+        { "label": "Macro", "weight": 0.15 }
+      ]
+    },
+    "30d": {
+      "equityCurve": [1.0,1.05,1.02,1.07,1.13,1.10,1.15,1.17,1.16,1.19,1.22],
+      "holdings": [
+        { "label": "Politics", "weight": 0.45 },
+        { "label": "Crypto", "weight": 0.38 },
+        { "label": "Macro", "weight": 0.17 }
+      ]
+    },
+    "90d": {
+      "equityCurve": [1.0,0.99,1.03,1.08,1.12,1.09,1.15,1.20,1.18,1.25,1.30,1.28,1.35],
+      "holdings": [
+        { "label": "Politics", "weight": 0.48 },
+        { "label": "Crypto", "weight": 0.34 },
+        { "label": "Macro", "weight": 0.18 }
+      ]
+    }
+  }
+}
+

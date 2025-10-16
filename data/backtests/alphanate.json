@@ -1,0 +1,33 @@
+{
+  "name": "AlphaNate",
+  "periods": {
+    "7d": {
+      "equityCurve": [1.0,1.01,1.03,1.02,1.05,1.06,1.08],
+      "holdings": [
+        { "label": "ETH ETF", "weight": 0.38 },
+        { "label": "US Elections", "weight": 0.34 },
+        { "label": "Rates/Fed", "weight": 0.16 },
+        { "label": "AI Equities", "weight": 0.12 }
+      ]
+    },
+    "30d": {
+      "equityCurve": [1.0,1.03,1.01,1.06,1.08,1.04,1.09,1.12,1.11,1.15,1.18],
+      "holdings": [
+        { "label": "ETH ETF", "weight": 0.35 },
+        { "label": "US Elections", "weight": 0.40 },
+        { "label": "Rates/Fed", "weight": 0.15 },
+        { "label": "AI Equities", "weight": 0.10 }
+      ]
+    },
+    "90d": {
+      "equityCurve": [1.0,0.98,1.02,1.05,1.04,1.08,1.12,1.1,1.15,1.2,1.22,1.25,1.28],
+      "holdings": [
+        { "label": "ETH ETF", "weight": 0.30 },
+        { "label": "US Elections", "weight": 0.42 },
+        { "label": "Rates/Fed", "weight": 0.18 },
+        { "label": "AI Equities", "weight": 0.10 }
+      ]
+    }
+  }
+}
+
