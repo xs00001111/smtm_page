@@ -438,6 +438,95 @@ export function ExecuteModal({ ctx, onClose }: { ctx: TradeContext; onClose: () 
   const estFillPrice = ctx.price // mock: 1:1
   const estShares = amount > 0 && estFillPrice > 0 ? amount / estFillPrice : 0
 
+  // Hedging & protection UI component (local to Execute modal)
+  function HedgeProtection({ amount }: { amount: number }) {
+    const [enableHedge, setEnableHedge] = useState(true)
+    const [hedgeUrl, setHedgeUrl] = useState('https://polymarket.com/event/eth-spot-etf-NO')
+    const [hedgeType, setHedgeType] = useState<'Complement' | 'Inverse ETF' | 'Basket'>('Complement')
+    const [hedgeRatio, setHedgeRatio] = useState(0.5)
+    const [stopLoss, setStopLoss] = useState(10)
+    const [takeProfit, setTakeProfit] = useState(25)
+    const [riskBudget, setRiskBudget] = useState(2) // % portfolio
+    const [sizePct, setSizePct] = useState(0.5) // portion of budget
+
+    const exposureBefore = amount
+    const exposureAfter = enableHedge ? amount * (1 - hedgeRatio) : amount
+
+    function host(u: string) { try { return new URL(u).host.replace('www.','') } catch { return '—' } }
+
+    return (
+      <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+        <div className="text-sm font-semibold">Hedging & Protection</div>
+        <div className="mt-1 text-xs text-white/70">Set protective rules and add a complement hedge to cap downside.</div>
+
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-xs text-white/70 mb-1">Stop‑loss %</div>
+            <input type="range" min={1} max={50} step={1} value={stopLoss} onChange={e=>setStopLoss(parseInt(e.target.value))} className="w-full" />
+            <div className="text-right text-xs text-white/60">{stopLoss}%</div>
+          </div>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-xs text-white/70 mb-1">Take‑profit %</div>
+            <input type="range" min={5} max={200} step={5} value={takeProfit} onChange={e=>setTakeProfit(parseInt(e.target.value))} className="w-full" />
+            <div className="text-right text-xs text-white/60">{takeProfit}%</div>
+          </div>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-xs text-white/70 mb-1">Risk budget (% portfolio)</div>
+            <input type="range" min={0.5} max={10} step={0.5} value={riskBudget} onChange={e=>setRiskBudget(parseFloat(e.target.value))} className="w-full" />
+            <div className="text-right text-xs text-white/60">{riskBudget}%</div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+          <label className="rounded-md border border-white/10 bg-white/[0.02] p-3 inline-flex items-center gap-2">
+            <input type="checkbox" className="accent-teal" checked={enableHedge} onChange={e=>setEnableHedge(e.target.checked)} />
+            Enable hedge
+          </label>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-xs text-white/70 mb-1">Hedge type</div>
+            <div className="inline-flex rounded-md border border-white/10 p-1">
+              {(['Complement','Inverse ETF','Basket'] as const).map(t => (
+                <button key={t} onClick={()=>setHedgeType(t)} className={`px-2 py-1 rounded text-xs ${t===hedgeType?'bg-white text-black':'text-white/80 hover:bg-white/10'}`}>{t}</button>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-xs text-white/70 mb-1">Hedge ratio</div>
+            <input type="range" min={0} max={1} step={0.05} value={hedgeRatio} onChange={e=>setHedgeRatio(parseFloat(e.target.value))} className="w-full" />
+            <div className="text-right text-xs text-white/60">{Math.round(hedgeRatio*100)}%</div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <div>
+            <label className="text-xs text-white/70">Hedge market URL</label>
+            <input value={hedgeUrl} onChange={e=>setHedgeUrl(e.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 py-2" placeholder="https://polymarket.com/event/..." />
+            <div className="mt-1 text-xs text-white/60">Venue: {host(hedgeUrl)} • Type: {hedgeType}</div>
+          </div>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-xs text-white/70">Position sizing</div>
+            <input type="range" min={0} max={1} step={0.05} value={sizePct} onChange={e=>setSizePct(parseFloat(e.target.value))} className="w-full" />
+            <div className="text-xs text-white/60 mt-1">Use {Math.round(sizePct*100)}% of risk budget ({riskBudget}% portfolio)</div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-xs text-white/70">Exposure before</div>
+            <div className="mt-1 font-semibold">${exposureBefore.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+          </div>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+            <div className="text-xs text-white/70">Exposure after hedge</div>
+            <div className="mt-1 font-semibold">${exposureAfter.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+          </div>
+        </div>
+
+        <div className="mt-3 text-xs text-white/60">Optional rules: trailing stop, volatility guard, time‑based exit. Configure in settings.</div>
+      </div>
+    )
+  }
+
+
   function placeOrder() {
     // No network; just simulate transitions
     setStep('confirm')
@@ -507,6 +596,9 @@ export function ExecuteModal({ ctx, onClose }: { ctx: TradeContext; onClose: () 
                   <div className="mt-1 text-white font-semibold">${(amount+fee).toLocaleString(undefined,{maximumFractionDigits:0})}</div>
                 </div>
               </div>
+
+              {/* Hedging & Protection (UX mock) */}
+              <HedgeProtection amount={amount} />
 
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={onClose} className="rounded-md border border-white/10 px-3 py-2 text-sm hover:bg-white/[0.06]">Cancel</button>
