@@ -71,7 +71,8 @@ export async function GET() {
           : `timestamp,email\n${row}\n`
 
         const body = {
-          message: `chore(waitlist-test): add ${testEmail}`,
+          // Add [skip netlify] to avoid triggering Netlify build on test commits
+          message: `chore(waitlist-test): add ${testEmail} [skip netlify]`,
           content: Buffer.from(nextContent, 'utf-8').toString('base64'),
           sha,
           branch,
@@ -122,4 +123,3 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: 'Malformed request' }, { status: 400 })
   }
 }
-

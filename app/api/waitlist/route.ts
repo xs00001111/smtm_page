@@ -72,7 +72,8 @@ export async function POST(req: Request) {
           : `timestamp,email\n${row}\n`
 
         const body = {
-          message: `chore(waitlist): add ${email}`,
+          // Include [skip netlify] to prevent automatic Netlify builds from waitlist storage commits
+          message: `chore(waitlist): add ${email} [skip netlify]`,
           content: Buffer.from(nextContent, 'utf-8').toString('base64'),
           sha,
           branch,
