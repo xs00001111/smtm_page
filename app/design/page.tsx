@@ -1,6 +1,8 @@
 import { ArrowRight, Bolt, Network, SignalHigh, Siren, UserCircle2 } from 'lucide-react'
-import { UserProfileCard, WhaleProfileCard } from '@/components/design-cards'
+import type { Metadata } from 'next'
+import { UserProfileCard, WhaleProfileCard, MarketCard } from '@/components/design-cards'
 import { SignalAlertCard, SignalFeed } from '@/components/design-signal'
+import { DesignInteractive } from '@/components/design-interactive'
 
 function SourceBox({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -47,6 +49,7 @@ export default function DesignPage() {
           A lightweight mock of the SMTM product flow based on the sequence graph: sources feed the
           command layer, which powers alerts, mirroring, and execution.
         </p>
+        <a href="/design/light" className="mt-3 inline-block rounded-md border border-white/15 bg-white/[0.06] px-3 py-1.5 text-sm hover:bg-white/[0.1]">Switch to Light</a>
       </header>
 
       {/* Hub */}
@@ -60,9 +63,9 @@ export default function DesignPage() {
       {/* Rows: Source → Detail */}
       <section className="grid grid-cols-1 gap-4">
         {/* Top Predictors */}
-        <div className="grid grid-cols-[minmax(220px,260px)_36px_minmax(280px,1fr)] items-stretch gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(220px,260px)_36px_minmax(280px,1fr)] items-stretch gap-3">
           <SourceBox title="Top Predictors" subtitle="High Win‑Rate" />
-          <div className="grid place-items-center text-teal"><ArrowRight /></div>
+          <div className="hidden sm:grid place-items-center text-teal"><ArrowRight /></div>
           <DetailCard
             title="Creator Profile Card"
             points={[
@@ -73,9 +76,9 @@ export default function DesignPage() {
         </div>
 
         {/* Early Alpha Signals */}
-        <div className="grid grid-cols-[minmax(220px,260px)_36px_minmax(280px,1fr)] items-stretch gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(220px,260px)_36px_minmax(280px,1fr)] items-stretch gap-3">
           <SourceBox title="Early Alpha Signals" subtitle="Pre‑move Alerts" />
-          <div className="grid place-items-center text-teal"><ArrowRight /></div>
+          <div className="hidden sm:grid place-items-center text-teal"><ArrowRight /></div>
           <DetailCard
             title="Sudden Inflow Detector"
             points={['Amount vs price', 'Time before move', 'Result move…']}
@@ -83,9 +86,9 @@ export default function DesignPage() {
         </div>
 
         {/* Whale Tracker */}
-        <div className="grid grid-cols-[minmax(220px,260px)_36px_minmax(280px,1fr)] items-stretch gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(220px,260px)_36px_minmax(280px,1fr)] items-stretch gap-3">
           <SourceBox title="Whale Tracker" subtitle="High‑Stake Accounts" />
-          <div className="grid place-items-center text-teal"><ArrowRight /></div>
+          <div className="hidden sm:grid place-items-center text-teal"><ArrowRight /></div>
           <DetailCard
             title="Whale Profile Card"
             points={[
@@ -97,9 +100,9 @@ export default function DesignPage() {
         </div>
 
         {/* Signal Feed */}
-        <div className="grid grid-cols-[minmax(220px,260px)_36px_minmax(280px,1fr)] items-stretch gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(220px,260px)_36px_minmax(280px,1fr)] items-stretch gap-3">
           <SourceBox title="Signal Feed" subtitle="Bot‑style" />
-          <div className="grid place-items-center text-teal"><ArrowRight /></div>
+          <div className="hidden sm:grid place-items-center text-teal"><ArrowRight /></div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <DetailCard
               title="System Voice"
@@ -123,12 +126,34 @@ export default function DesignPage() {
             <Bolt className="text-teal" size={18} />
             <span className="text-sm font-semibold tracking-wide">Command Layer</span>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <CommandPill label="/follow" />
-            <CommandPill label="/simulate" />
-            <CommandPill label="/execute (API)" />
-            <CommandPill label="/alert" />
-            <CommandPill label="/alpha-note" />
+          <div className="-mx-2 overflow-x-auto">
+            <div className="flex flex-nowrap sm:flex-wrap items-center gap-3 px-2 py-1">
+              <CommandPill label="/follow" />
+              <CommandPill label="/execute (API)" />
+              <CommandPill label="/alert" />
+              <CommandPill label="/daily-tip" />
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3 text-sm text-white/80">
+            <div className="font-semibold mb-2">Command Details:</div>
+            <div className="space-y-2 text-xs">
+              <div><code className="text-teal">/follow</code> — Copy-trade a high win-rate predictor or whale</div>
+              <div><code className="text-teal">/execute</code> — Execute trade via API with hedging & protection</div>
+              <div><code className="text-teal">/alert</code> — Set alerts with secondary options:
+                <div className="ml-4 mt-1 space-y-1">
+                  <div>• <code className="text-white/70">/alert market</code> — Alert on market price changes</div>
+                  <div>• <code className="text-white/70">/alert whale</code> — Alert when whale places bet</div>
+                </div>
+              </div>
+              <div>
+                <code className="text-teal">/daily-tip</code> — Get daily rewards, new markets, and quick profit opportunities
+                <div className="ml-4 mt-1 space-y-1 text-white/60">
+                  <div>• Auto-pushed daily at 8:00 AM with curated tips</div>
+                  <div>• Includes: rebate rewards, trending new markets, almost-ending low-risk bets</div>
+                  <div>• Request additional tips anytime: <code className="text-white/70">/daily-tip</code> or <code className="text-white/70">/daily-tip more</code></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -149,45 +174,24 @@ export default function DesignPage() {
         </div>
       </section>
 
-      {/* Profile Cards — concrete mocks */}
-      <section className="mt-10">
-        <h2 className="text-2xl font-bold mb-4">Profile Cards</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <div className="mb-2 text-sm text-white/70">User Profile Card</div>
-            <UserProfileCard />
-          </div>
-          <div>
-            <div className="mb-2 text-sm text-white/70">Whale Card</div>
-            <WhaleProfileCard />
-          </div>
-        </div>
-      </section>
-
-      {/* Signals */}
-      <section className="mt-12">
-        <h2 className="text-2xl font-bold mb-4">Signals</h2>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <div className="mb-2 text-sm text-white/70">New Bet Alert</div>
-            <SignalAlertCard
-              alert={{
-                wallet: '0x42A1...9fC7',
-                market: 'ETH ETF approval by Q4',
-                direction: 'Long',
-                amount: '$12,000',
-                odds: '0.56',
-                timeAgo: 'just now',
-                caption: 'Desk thinks SEC is warming up after staff comments.',
-              }}
-            />
-          </div>
-          <div>
-            <div className="mb-2 text-sm text-white/70">Feed (bot‑style)</div>
-            <SignalFeed />
-          </div>
-        </div>
-      </section>
+      <DesignInteractive defaultMode="dark" />
     </main>
   )
+}
+
+export const metadata: Metadata = {
+  title: 'Design · SMTM',
+  description: 'Mobile-friendly mocks of the intelligence → command layer, with shareable signal formats compatible with Telegram and Discord.',
+  openGraph: {
+    title: 'SMTM Design · Intelligence → Command',
+    description: 'Mobile-friendly mocks of the intelligence → command layer, with shareable signal formats.',
+    type: 'article',
+    images: [{ url: '/logo-1024.png', width: 1024, height: 1024 }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SMTM Design · Intelligence → Command',
+    description: 'Mobile-friendly mocks of the intelligence → command layer, with shareable signal formats.',
+    images: ['/logo-1024.png'],
+  },
 }

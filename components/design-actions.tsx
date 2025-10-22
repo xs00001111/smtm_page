@@ -11,16 +11,24 @@ export type TradeContext = {
   defaultAmount?: number
 }
 
+export type Mode = 'dark' | 'light'
+
+function panelClass(mode: Mode) {
+  return mode === 'light'
+    ? 'light-panel w-full max-w-[600px] rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-glow max-h-[85vh] overflow-y-auto'
+    : 'w-full max-w-[600px] rounded-2xl border border-white/10 bg-[#0F0F0F] shadow-glow max-h-[85vh] overflow-y-auto'
+}
+
 function Backdrop({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-40 bg-black/70" onClick={onClose} />
   )
 }
 
-function Panel({ children }: { children: React.ReactNode }) {
+function Panel({ children, mode = 'dark' }: { children: React.ReactNode; mode?: Mode }) {
   return (
     <div className="fixed z-50 inset-0 grid place-items-center p-4">
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0F0F0F] shadow-glow max-h-[85vh] overflow-y-auto">
+      <div className={panelClass(mode)}>
         {children}
       </div>
     </div>
@@ -53,7 +61,7 @@ function CurrencyInput({ value, onChange }: { value: number; onChange: (v: numbe
   )
 }
 
-export function SimulateModal({ ctx, onClose }: { ctx: TradeContext; onClose: () => void }) {
+export function SimulateModal({ ctx, onClose, mode = 'dark' }: { ctx: TradeContext; onClose: () => void; mode?: Mode }) {
   const [amount, setAmount] = useState<number>(ctx.defaultAmount ?? 1000)
   const estPayout = useMemo(() => (ctx.price > 0 ? amount * (1 / ctx.price) : 0), [amount, ctx.price])
 
@@ -243,11 +251,11 @@ export function SimulateModal({ ctx, onClose }: { ctx: TradeContext; onClose: ()
   return (
     <>
       <Backdrop onClose={onClose} />
-      <Panel>
+      <Panel mode={mode}>
         <div className="p-5">
           <div className="flex items-start gap-3">
             <div className="text-lg font-semibold">Simulate</div>
-            <button className="ml-auto rounded-md border border-white/10 p-1 hover:bg-white/10" onClick={onClose} aria-label="Close">
+            <button className={`ml-auto rounded-md border ${mode==='light'?'border-neutral-200 hover:bg-neutral-50':'border-white/10 hover:bg-white/10'} p-1`} onClick={onClose} aria-label="Close">
               <X size={16} />
             </button>
           </div>
@@ -427,15 +435,14 @@ export function SimulateModal({ ctx, onClose }: { ctx: TradeContext; onClose: ()
   )
 }
 
-export function ExecuteModal({ ctx, onClose }: { ctx: TradeContext; onClose: () => void }) {
+export function ExecuteModal({ ctx, onClose, mode = 'dark' }: { ctx: TradeContext; onClose: () => void; mode?: Mode }) {
   const [connected, setConnected] = useState(false)
   const [amount, setAmount] = useState<number>(ctx.defaultAmount ?? 1000)
-  const [slippage, setSlippage] = useState<number>(0.5)
+  const [orderType, setOrderType] = useState<'market' | 'limit'>('market')
+  const [limitPrice, setLimitPrice] = useState<number>(ctx.price)
   const [step, setStep] = useState<'review' | 'confirm' | 'done'>('review')
 
-  const feeRate = 0.02 // 2% platform/route fee (mock)
-  const fee = Math.max(0, amount * feeRate)
-  const estFillPrice = ctx.price // mock: 1:1
+  const estFillPrice = orderType === 'market' ? ctx.price : limitPrice
   const estShares = amount > 0 && estFillPrice > 0 ? amount / estFillPrice : 0
 
   // Hedging & protection UI component (local to Execute modal)
@@ -455,73 +462,73 @@ export function ExecuteModal({ ctx, onClose }: { ctx: TradeContext; onClose: () 
     function host(u: string) { try { return new URL(u).host.replace('www.','') } catch { return '—' } }
 
     return (
-      <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.02] p-3 sm:p-4">
         <div className="text-sm font-semibold">Hedging & Protection</div>
         <div className="mt-1 text-xs text-white/70">Set protective rules and add a complement hedge to cap downside.</div>
 
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+        <div className="mt-3 grid grid-cols-1 gap-3 text-sm">
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-2 sm:p-3">
             <div className="text-xs text-white/70 mb-1">Stop‑loss %</div>
             <input type="range" min={1} max={50} step={1} value={stopLoss} onChange={e=>setStopLoss(parseInt(e.target.value))} className="w-full" />
             <div className="text-right text-xs text-white/60">{stopLoss}%</div>
           </div>
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-2 sm:p-3">
             <div className="text-xs text-white/70 mb-1">Take‑profit %</div>
             <input type="range" min={5} max={200} step={5} value={takeProfit} onChange={e=>setTakeProfit(parseInt(e.target.value))} className="w-full" />
             <div className="text-right text-xs text-white/60">{takeProfit}%</div>
           </div>
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-2 sm:p-3">
             <div className="text-xs text-white/70 mb-1">Risk budget (% portfolio)</div>
             <input type="range" min={0.5} max={10} step={0.5} value={riskBudget} onChange={e=>setRiskBudget(parseFloat(e.target.value))} className="w-full" />
             <div className="text-right text-xs text-white/60">{riskBudget}%</div>
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-          <label className="rounded-md border border-white/10 bg-white/[0.02] p-3 inline-flex items-center gap-2">
+        <div className="mt-3 grid grid-cols-1 gap-3 text-sm">
+          <label className="rounded-md border border-white/10 bg-white/[0.02] p-2 sm:p-3 inline-flex items-center gap-2">
             <input type="checkbox" className="accent-teal" checked={enableHedge} onChange={e=>setEnableHedge(e.target.checked)} />
-            Enable hedge
+            <span className="text-xs sm:text-sm">Enable hedge</span>
           </label>
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-            <div className="text-xs text-white/70 mb-1">Hedge type</div>
-            <div className="inline-flex rounded-md border border-white/10 p-1">
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-2 sm:p-3">
+            <div className="text-xs text-white/70 mb-2">Hedge type</div>
+            <div className="flex flex-col sm:inline-flex sm:flex-row rounded-md border border-white/10 overflow-hidden">
               {(['Complement','Inverse ETF','Basket'] as const).map(t => (
-                <button key={t} onClick={()=>setHedgeType(t)} className={`px-2 py-1 rounded text-xs ${t===hedgeType?'bg-white text-black':'text-white/80 hover:bg-white/10'}`}>{t}</button>
+                <button key={t} onClick={()=>setHedgeType(t)} className={`px-3 py-2 text-xs sm:rounded ${t===hedgeType?'bg-white text-black':'text-white/80 hover:bg-white/10'} ${t !== 'Basket' ? 'border-b sm:border-b-0 sm:border-r border-white/10' : ''}`}>{t}</button>
               ))}
             </div>
           </div>
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-2 sm:p-3">
             <div className="text-xs text-white/70 mb-1">Hedge ratio</div>
             <input type="range" min={0} max={1} step={0.05} value={hedgeRatio} onChange={e=>setHedgeRatio(parseFloat(e.target.value))} className="w-full" />
             <div className="text-right text-xs text-white/60">{Math.round(hedgeRatio*100)}%</div>
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+        <div className="mt-3 grid grid-cols-1 gap-3 text-sm">
           <div>
             <label className="text-xs text-white/70">Hedge market URL</label>
-            <input value={hedgeUrl} onChange={e=>setHedgeUrl(e.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 py-2" placeholder="https://polymarket.com/event/..." />
-            <div className="mt-1 text-xs text-white/60">Venue: {host(hedgeUrl)} • Type: {hedgeType}</div>
+            <input value={hedgeUrl} onChange={e=>setHedgeUrl(e.target.value)} className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-2 py-2 text-xs sm:text-sm break-all" placeholder="https://polymarket.com/..." />
+            <div className="mt-1 text-xs text-white/60 break-all">Venue: {host(hedgeUrl)} • Type: {hedgeType}</div>
           </div>
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-            <div className="text-xs text-white/70">Position sizing</div>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-2 sm:p-3">
+            <div className="text-xs text-white/70 mb-1">Position sizing</div>
             <input type="range" min={0} max={1} step={0.05} value={sizePct} onChange={e=>setSizePct(parseFloat(e.target.value))} className="w-full" />
             <div className="text-xs text-white/60 mt-1">Use {Math.round(sizePct*100)}% of risk budget ({riskBudget}% portfolio)</div>
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3 text-sm">
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-2 sm:p-3">
             <div className="text-xs text-white/70">Exposure before</div>
-            <div className="mt-1 font-semibold">${exposureBefore.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+            <div className="mt-1 font-semibold text-xs sm:text-sm">${exposureBefore.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
           </div>
-          <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-            <div className="text-xs text-white/70">Exposure after hedge</div>
-            <div className="mt-1 font-semibold">${exposureAfter.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+          <div className="rounded-md border border-white/10 bg-white/[0.02] p-2 sm:p-3">
+            <div className="text-xs text-white/70">Exposure after</div>
+            <div className="mt-1 font-semibold text-xs sm:text-sm">${exposureAfter.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
           </div>
         </div>
 
-        <div className="mt-3 text-xs text-white/60">Optional rules: trailing stop, volatility guard, time‑based exit. Configure in settings.</div>
+        <div className="mt-3 text-xs text-white/60">Optional: trailing stop, volatility guard, time‑based exit</div>
       </div>
     )
   }
@@ -536,11 +543,11 @@ export function ExecuteModal({ ctx, onClose }: { ctx: TradeContext; onClose: () 
   return (
     <>
       <Backdrop onClose={onClose} />
-      <Panel>
+      <Panel mode={mode}>
         <div className="p-5">
           <div className="flex items-start gap-3">
             <div className="text-lg font-semibold">Execute</div>
-            <button className="ml-auto rounded-md border border-white/10 p-1 hover:bg-white/10" onClick={onClose} aria-label="Close">
+            <button className={`ml-auto rounded-md border ${mode==='light'?'border-neutral-200 hover:bg-neutral-50':'border-white/10 hover:bg-white/10'} p-1`} onClick={onClose} aria-label="Close">
               <X size={16} />
             </button>
           </div>
@@ -569,16 +576,49 @@ export function ExecuteModal({ ctx, onClose }: { ctx: TradeContext; onClose: () 
 
               <CurrencyInput value={amount} onChange={setAmount} />
 
-              {/* Advanced */}
+              {/* Order Type Selection */}
+              <div className="mt-3">
+                <label className="text-xs text-white/70">Order Type</label>
+                <div className="mt-1 inline-flex rounded-md border border-white/10 bg-white/[0.02] p-1 text-sm w-full">
+                  <button
+                    onClick={() => setOrderType('market')}
+                    className={`flex-1 px-3 py-2 rounded ${orderType === 'market' ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  >
+                    Market
+                  </button>
+                  <button
+                    onClick={() => setOrderType('limit')}
+                    className={`flex-1 px-3 py-2 rounded ${orderType === 'limit' ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'}`}
+                  >
+                    Limit
+                  </button>
+                </div>
+              </div>
+
+              {/* Limit Price (only show for limit orders) */}
+              {orderType === 'limit' && (
+                <div className="mt-3">
+                  <label className="text-xs text-white/70">Limit Price</label>
+                  <input
+                    type="number"
+                    min={0.01}
+                    max={0.99}
+                    step="0.01"
+                    className="mt-1 w-full rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 outline-none focus:ring-2 focus:ring-teal/40"
+                    value={limitPrice}
+                    onChange={(e) => setLimitPrice(parseFloat(e.target.value || '0'))}
+                  />
+                  <div className="mt-1 text-xs text-white/60">
+                    {limitPrice < ctx.price ? 'Below market — may not fill immediately' : limitPrice > ctx.price ? 'Above market — will fill immediately' : 'At current market price'}
+                  </div>
+                </div>
+              )}
+
+              {/* Order Details */}
               <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-                  <div className="text-white/70 text-xs">Slippage tolerance</div>
-                  <div className="mt-1 flex items-center gap-2">
-                    <input type="number" min={0} step="0.1" value={slippage}
-                      onChange={(e)=>setSlippage(parseFloat(e.target.value||'0'))}
-                      className="w-20 rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 text-sm outline-none" />
-                    <span className="text-white/70 text-xs">%</span>
-                  </div>
+                  <div className="text-white/70 text-xs">Est. Fill Price</div>
+                  <div className="mt-1 text-white font-semibold">{estFillPrice.toFixed(3)}</div>
                 </div>
                 <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
                   <div className="text-white/70 text-xs">Estimated shares</div>
@@ -586,15 +626,9 @@ export function ExecuteModal({ ctx, onClose }: { ctx: TradeContext; onClose: () 
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-                  <div className="text-white/70 text-xs">Fees (2%)</div>
-                  <div className="mt-1 text-white font-semibold">${fee.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
-                </div>
-                <div className="rounded-md border border-white/10 bg-white/[0.02] p-3">
-                  <div className="text-white/70 text-xs">Total</div>
-                  <div className="mt-1 text-white font-semibold">${(amount+fee).toLocaleString(undefined,{maximumFractionDigits:0})}</div>
-                </div>
+              <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3 text-sm">
+                <div className="text-white/70 text-xs">Total Amount</div>
+                <div className="mt-1 text-white font-semibold text-lg">${amount.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
               </div>
 
               {/* Hedging & Protection (UX mock) */}
@@ -614,9 +648,14 @@ export function ExecuteModal({ ctx, onClose }: { ctx: TradeContext; onClose: () 
           {step === 'confirm' && (
             <>
               <div className="mt-3 rounded-md border border-white/10 bg-white/[0.02] p-3 text-sm">
-                <div className="font-semibold mb-1">Confirm Order</div>
-                <div>Buy <span className="font-semibold">{estShares.toFixed(2)}</span> {ctx.direction} at price <span className="font-semibold">{estFillPrice.toFixed(2)}</span></div>
-                <div className="mt-1">Amount: <span className="font-semibold">${amount.toLocaleString()}</span> • Fees: <span className="font-semibold">${fee.toLocaleString(undefined,{maximumFractionDigits:0})}</span> • Slippage: {slippage}%</div>
+                <div className="font-semibold mb-1">Confirm {orderType === 'limit' ? 'Limit' : 'Market'} Order</div>
+                <div>Buy <span className="font-semibold">{estShares.toFixed(2)}</span> shares {ctx.direction} at {orderType === 'limit' ? 'limit price' : 'market price'} <span className="font-semibold">{estFillPrice.toFixed(3)}</span></div>
+                <div className="mt-1">Amount: <span className="font-semibold">${amount.toLocaleString()}</span></div>
+                {orderType === 'limit' && limitPrice !== ctx.price && (
+                  <div className="mt-1 text-xs text-white/60">
+                    {limitPrice < ctx.price ? '⚠️ Order will execute when price drops to limit' : 'Order will execute immediately at market'}
+                  </div>
+                )}
               </div>
               <div className="mt-4 flex items-center justify-end gap-2">
                 <button onClick={() => setStep('review')} className="rounded-md border border-white/10 px-3 py-2 text-sm hover:bg-white/[0.06]">Edit</button>
@@ -756,7 +795,7 @@ function computeDrawdown(equity: number[]) {
   return maxDD
 }
 
-export function FollowSimulateModal({ ctx, onClose }: { ctx: FollowContext; onClose: () => void }) {
+export function FollowSimulateModal({ ctx, onClose, mode = 'dark' }: { ctx: FollowContext; onClose: () => void; mode?: Mode }) {
   const [amount, setAmount] = useState(1000)
   const [period, setPeriod] = useState<'7d'|'30d'|'90d'>(
     (ctx.periodLabel as any) || '30d'
@@ -821,11 +860,11 @@ export function FollowSimulateModal({ ctx, onClose }: { ctx: FollowContext; onCl
   return (
     <>
       <Backdrop onClose={onClose} />
-      <Panel>
+      <Panel mode={mode}>
         <div className="p-5">
           <div className="flex items-start gap-3">
             <div className="text-lg font-semibold">Simulate Follow</div>
-            <button className="ml-auto rounded-md border border-white/10 p-1 hover:bg-white/10" onClick={onClose} aria-label="Close">
+            <button className={`ml-auto rounded-md border ${mode==='light'?'border-neutral-200 hover:bg-neutral-50':'border-white/10 hover:bg-white/10'} p-1`} onClick={onClose} aria-label="Close">
               <X size={16} />
             </button>
           </div>

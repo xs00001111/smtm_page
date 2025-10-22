@@ -12,6 +12,14 @@ html, body {
   color: #FFFFFF;
 }
 
+/* Light modal override for legacy dark utility classes */
+.light-panel .text-white\/60 { color: #6b7280 !important; }
+.light-panel .text-white\/70 { color: #525252 !important; }
+.light-panel .text-white\/80 { color: #404040 !important; }
+.light-panel .text-white\/85 { color: #262626 !important; }
+.light-panel .bg-white\/\[0\.02\] { background-color: rgba(0,0,0,0.02) !important; }
+.light-panel .border-white\/10 { border-color: rgba(0,0,0,0.1) !important; }
+
 /* Animated trading grid background */
 .trading-grid {
   position: absolute;
@@ -44,4 +52,3 @@ html, body {
 .btn {
   @apply inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0C0C0C];
 }
-
