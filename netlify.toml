@@ -2,5 +2,5 @@
   command = "npm run build"
   publish = ".next"
   # Skip builds for commits that include [skip netlify] in the message
-  ignore = "bash -lc 'git log -1 --pretty=%B | grep -qi \"\[skip netlify\]\" && exit 0; exit 1'"
+  ignore = "bash -lc 'git log -1 --pretty=%B | grep -qi \"\\[skip netlify\\]\" && exit 0; exit 1'"
 
