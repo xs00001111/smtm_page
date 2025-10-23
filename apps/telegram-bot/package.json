@@ -1,0 +1,21 @@
+{
+  "name": "@smtm/telegram-bot",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./index.ts",
+  "scripts": {
+    "dev": "tsx watch index.ts",
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@smtm/shared": "*",
+    "telegraf": "^4.16.3",
+    "node-cron": "^4.2.1",
+    "pino": "^10.1.0",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.4"
+  }
+}
