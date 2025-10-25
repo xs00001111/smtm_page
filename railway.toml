@@ -1,0 +1,12 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm run start:bot"
+restartPolicyType = "always"
+healthcheckPath = "/"
+healthcheckTimeout = 100
+
+[env]
+# Railway will auto-inject DATABASE_URL, RAILWAY_ENVIRONMENT, etc.
+# Add your custom env vars in Railway dashboard

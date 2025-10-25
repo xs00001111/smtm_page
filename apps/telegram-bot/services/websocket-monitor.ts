@@ -7,6 +7,10 @@ import { RealTimeDataClient } from '@polymarket/real-time-data-client';
 import type { Message } from '@polymarket/real-time-data-client';
 import { Telegraf } from 'telegraf';
 import { logger } from '../utils/logger';
+import { gammaApi, dataApi } from '@smtm/data';
+import { updateMarketToken, updateWhaleToken } from './subscriptions';
+import { whaleAggregator } from './whale-aggregator';
+import { botConfig } from '../config/bot';
 import { formatPrice, formatVolume, formatAddress } from '@smtm/data';
 
 interface MarketSubscription {
@@ -22,6 +26,7 @@ interface WhaleTradeSubscription {
   tokenId: string;
   marketName: string;
   minTradeSize: number; // Minimum trade size in USD to trigger alert
+  addressFilter?: string; // Optional wallet address to follow
 }
 
 export class WebSocketMonitorService {
@@ -29,6 +34,9 @@ export class WebSocketMonitorService {
   private bot: Telegraf;
   private marketSubscriptions: Map<string, MarketSubscription[]> = new Map();
   private whaleSubscriptions: Map<string, WhaleTradeSubscription[]> = new Map();
+  private pendingWhaleSubscriptions: Map<string, Array<{ userId: number; marketName: string; minTradeSize: number; addressFilter?: string }>> = new Map();
+  private observerTokenIds: Set<string> = new Set();
+  private pendingMarketSubscriptions: Map<string, MarketSubscription[]> = new Map(); // key: conditionId
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private reconnectDelay = 5000; // Start with 5 seconds
@@ -36,6 +44,10 @@ export class WebSocketMonitorService {
 
   constructor(bot: Telegraf) {
     this.bot = bot;
+  }
+
+  private hasSubscriptions(): boolean {
+    return this.marketSubscriptions.size > 0 || this.whaleSubscriptions.size > 0;
   }
 
   /**
@@ -47,6 +59,11 @@ export class WebSocketMonitorService {
       return;
     }
 
+    // Avoid connecting if feature disabled or no subs yet
+    if (!botConfig.websocket.enabled) {
+      logger.info('WebSocket disabled by config');
+      return;
+    }
     this.isConnecting = true;
     logger.info('Starting Polymarket WebSocket monitoring service');
 
@@ -62,6 +79,9 @@ export class WebSocketMonitorService {
       this.reconnectAttempts = 0;
       this.isConnecting = false;
       logger.info('WebSocket connection established');
+
+      // Attempt resolving any pending market subscriptions
+      this.resolvePendingMarkets().catch(()=>{})
     } catch (error) {
       this.isConnecting = false;
       logger.error('Failed to start WebSocket service', error);
@@ -109,11 +129,104 @@ export class WebSocketMonitorService {
     subs.push(subscription);
     this.marketSubscriptions.set(tokenId, subs);
 
-    // Update WebSocket subscriptions
+    // Ensure WS started and update subscriptions
+    if (!this.client && !this.isConnecting) {
+      this.start();
+    }
     this.updateSubscriptions();
 
     logger.info('Added market subscription', { userId, tokenId, marketName });
     return true;
+  }
+
+  /**
+   * Subscribe user to a market by condition id (pending until token is resolved)
+   */
+  subscribePendingMarket(
+    userId: number,
+    conditionId: string,
+    marketName: string,
+    priceChangeThreshold: number = 5
+  ): boolean {
+    const list = this.pendingMarketSubscriptions.get(conditionId) || []
+    if (list.find((s) => s.userId === userId)) {
+      logger.info('User already has pending market subscription', { userId, conditionId })
+      return false
+    }
+    list.push({ userId, tokenId: '', marketName, priceChangeThreshold })
+    this.pendingMarketSubscriptions.set(conditionId, list)
+    logger.info('Added pending market subscription', { userId, conditionId })
+    // Try to resolve shortly
+    setTimeout(()=>{ this.resolvePendingMarkets().catch(()=>{}) }, 500)
+    return true
+  }
+
+  private async resolvePendingMarkets(): Promise<void> {
+    if (this.pendingMarketSubscriptions.size === 0) return
+    logger.info('Resolving pending market subscriptions', { count: this.pendingMarketSubscriptions.size, whales: this.pendingWhaleSubscriptions.size })
+    const conditionIds = new Set<string>([
+      ...this.pendingMarketSubscriptions.keys(),
+      ...this.pendingWhaleSubscriptions.keys(),
+    ])
+    for (const conditionId of Array.from(conditionIds)) {
+      const marketSubs = this.pendingMarketSubscriptions.get(conditionId) || []
+      const whaleSubs = this.pendingWhaleSubscriptions.get(conditionId) || []
+      let tokenId: string | null = null
+      try {
+        const market = await gammaApi.getMarket(conditionId)
+        if (market?.tokens && market.tokens.length > 0) {
+          tokenId = market.tokens[0].token_id
+        }
+        if (!tokenId) {
+          const holders = await dataApi.getTopHolders({ market: conditionId, limit: 1, minBalance: 1 })
+          tokenId = holders?.[0]?.token || null
+        }
+      } catch (e) {
+        logger.error('resolvePendingMarkets error', e)
+      }
+      if (tokenId) {
+        logger.info('Resolved condition to token', { conditionId, tokenId, priceSubs: marketSubs.length, whaleSubs: whaleSubs.length })
+        // Activate price alert subscribers
+        for (const sub of marketSubs) {
+          this.subscribeToMarket(sub.userId, tokenId, sub.marketName, sub.priceChangeThreshold)
+          // Notify user
+          try { await this.bot.telegram.sendMessage(sub.userId, `✅ Price alerts activated for: ${sub.marketName}`) } catch {}
+          // Update CSV
+          try { await updateMarketToken(sub.userId, conditionId, tokenId) } catch {}
+        }
+        // Activate whale alert subscribers
+        for (const sub of whaleSubs) {
+          this.subscribeToWhaleTrades(sub.userId, tokenId, sub.marketName, sub.minTradeSize, sub.addressFilter)
+          try { await this.bot.telegram.sendMessage(sub.userId, `✅ Whale alerts activated for: ${sub.marketName}`) } catch {}
+          try { await updateWhaleToken(sub.userId, conditionId, tokenId) } catch {}
+        }
+        if (marketSubs.length) this.pendingMarketSubscriptions.delete(conditionId)
+        if (whaleSubs.length) this.pendingWhaleSubscriptions.delete(conditionId)
+      }
+    }
+  }
+
+  /**
+   * Subscribe user to whale alerts by condition id (pending until token available)
+   */
+  subscribePendingWhale(
+    userId: number,
+    conditionId: string,
+    marketName: string,
+    minTradeSize: number,
+    addressFilter?: string,
+  ): boolean {
+    const list = this.pendingWhaleSubscriptions.get(conditionId) || []
+    if (list.find((s) => s.userId === userId)) {
+      logger.info('User already has pending whale subscription', { userId, conditionId })
+      return false
+    }
+    list.push({ userId, marketName, minTradeSize, addressFilter })
+    this.pendingWhaleSubscriptions.set(conditionId, list)
+    logger.info('Added pending whale subscription', { userId, conditionId })
+    // Try to resolve shortly
+    setTimeout(()=>{ this.resolvePendingMarkets().catch(()=>{}) }, 500)
+    return true
   }
 
   /**
@@ -148,7 +261,8 @@ export class WebSocketMonitorService {
     userId: number,
     tokenId: string,
     marketName: string,
-    minTradeSize: number = 1000
+    minTradeSize: number = 1000,
+    addressFilter?: string
   ): boolean {
     const existing = this.whaleSubscriptions
       .get(tokenId)
@@ -164,13 +278,17 @@ export class WebSocketMonitorService {
       tokenId,
       marketName,
       minTradeSize,
+      addressFilter: addressFilter?.toLowerCase(),
     };
 
     const subs = this.whaleSubscriptions.get(tokenId) || [];
     subs.push(subscription);
     this.whaleSubscriptions.set(tokenId, subs);
 
-    // Update WebSocket subscriptions
+    // Ensure WS started and update subscriptions
+    if (!this.client && !this.isConnecting) {
+      this.start();
+    }
     this.updateSubscriptions();
 
     logger.info('Added whale trade subscription', { userId, tokenId, marketName });
@@ -336,11 +454,18 @@ export class WebSocketMonitorService {
       return;
     }
 
+    // Record into aggregator
+    const makerAddr = (payload.maker_address || payload.maker || '').toLowerCase()
+    whaleAggregator.recordTrade(makerAddr, tokenId, tradeValue, Date.now())
+
     const subscriptions = this.whaleSubscriptions.get(tokenId);
     if (!subscriptions || subscriptions.length === 0) return;
 
     for (const sub of subscriptions) {
       if (tradeValue >= sub.minTradeSize) {
+        // If following a specific wallet, filter by maker address
+        const maker = (payload.maker_address || payload.maker || '').toLowerCase();
+        if (sub.addressFilter && maker !== sub.addressFilter) continue;
         await this.notifyWhaleTrade(sub, payload, tradeValue);
       }
     }
@@ -419,6 +544,44 @@ export class WebSocketMonitorService {
   }
 
   /**
+   * Debug helpers to validate push delivery without real market activity
+   */
+  async debugSendPrice(userId: number): Promise<boolean> {
+    // Pick first market subscription for this user
+    for (const [_, subs] of this.marketSubscriptions) {
+      const sub = subs.find((s) => s.userId === userId)
+      if (sub) {
+        const oldP = sub.lastPrice ?? 0.45
+        const newP = oldP * (1 + sub.priceChangeThreshold / 50) // trigger >threshold change
+        const delta = Math.abs(((newP - oldP) / oldP) * 100)
+        await this.notifyPriceChange(sub, oldP, newP, delta)
+        return true
+      }
+    }
+    return false
+  }
+
+  async debugSendWhale(userId: number): Promise<boolean> {
+    for (const [tokenId, subs] of this.whaleSubscriptions) {
+      const sub = subs.find((s) => s.userId === userId)
+      if (sub) {
+        const maker = sub.addressFilter || '0x56687bf447db6ffa42ffe2204a05edaa20f55839'
+        const trade = {
+          asset_id: tokenId,
+          price: '0.62',
+          size: '2500',
+          maker_address: maker,
+          side: 'BUY',
+        }
+        const tradeValue = parseFloat(trade.size) * parseFloat(trade.price)
+        await this.notifyWhaleTrade(sub, trade, tradeValue)
+        return true
+      }
+    }
+    return false
+  }
+
+  /**
    * Handle successful connection
    */
   private handleConnect(client: RealTimeDataClient): void {
@@ -432,7 +595,11 @@ export class WebSocketMonitorService {
   private handleDisconnect(): void {
     logger.warn('WebSocket disconnected');
     this.client = null;
-    this.scheduleReconnect();
+    if (this.hasSubscriptions()) {
+      this.scheduleReconnect();
+    } else {
+      logger.info('No active subscriptions; will reconnect on first subscription');
+    }
   }
 
   /**
@@ -454,9 +621,10 @@ export class WebSocketMonitorService {
     const subscriptions: any[] = [];
 
     // Collect all unique token IDs
-    const allTokenIds = new Set([
+    const allTokenIds = new Set<string>([
       ...this.marketSubscriptions.keys(),
       ...this.whaleSubscriptions.keys(),
+      ...this.observerTokenIds,
     ]);
 
     if (allTokenIds.size === 0) {
@@ -483,13 +651,13 @@ export class WebSocketMonitorService {
       });
     }
 
-    // Subscribe to activity/trades for whale monitoring
-    if (this.whaleSubscriptions.size > 0) {
+    // Subscribe to activity/trades for whale monitoring and aggregator
+    if (this.whaleSubscriptions.size > 0 || this.observerTokenIds.size > 0) {
       subscriptions.push({
         topic: 'activity',
         type: 'trades',
         filters: JSON.stringify({
-          asset_ids: Array.from(this.whaleSubscriptions.keys()),
+          asset_ids: Array.from(new Set<string>([...this.whaleSubscriptions.keys(), ...this.observerTokenIds])),
         }),
       });
     }
@@ -503,6 +671,22 @@ export class WebSocketMonitorService {
       });
     } catch (error) {
       logger.error('Failed to update subscriptions', error);
+    }
+  }
+
+  /**
+   * Provide a background set of assets to observe trades for (feeds the aggregator)
+   */
+  setObserverAssets(tokenIds: string[]): void {
+    let added = 0
+    for (const id of tokenIds) {
+      if (id && !this.observerTokenIds.has(id)) { this.observerTokenIds.add(id); added++ }
+    }
+    if (added > 0) {
+      logger.info('Observer assets updated', { added, total: this.observerTokenIds.size })
+      // Ensure WS started and refresh subs
+      if (!this.client && !this.isConnecting) this.start()
+      this.updateSubscriptions()
     }
   }
 

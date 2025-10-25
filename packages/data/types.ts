@@ -157,6 +157,20 @@ export interface HoldersParams {
   minBalance?: number;
 }
 
+export interface LeaderboardEntry {
+  rank: string;
+  user_id: string;
+  user_name: string;
+  vol: number;
+  pnl: number;
+  profile_image: string;
+}
+
+export interface LeaderboardParams {
+  limit?: number;
+  offset?: number;
+}
+
 export interface PricesHistoryParams {
   market?: string;
   interval?: 'max' | '1d' | '1w' | '1m' | '3m' | '1y';

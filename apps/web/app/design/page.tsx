@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { UserProfileCard, WhaleProfileCard, MarketCard } from '@/components/design-cards'
 import { SignalAlertCard, SignalFeed } from '@/components/design-signal'
 import { DesignInteractive } from '@/components/design-interactive'
+import { TradeCard, TradeCardCompact } from '@/components/trade-card'
 
 function SourceBox({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -174,7 +175,124 @@ export default function DesignPage() {
         </div>
       </section>
 
-      <DesignInteractive defaultMode="dark" />
+      {/* Interactive sections (includes Market Cards) */}
+      <div className="mt-16">
+        <DesignInteractive defaultMode="dark" />
+      </div>
+
+      {/* Trade Cards Showcase (placed after Market Cards) */}
+      <section className="mt-16">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold mb-2">📊 Shareable Trade Cards</h2>
+          <p className="text-white/80 text-sm">Beautiful, shareable trade receipts. Perfect for social sharing, Telegram, and Discord.</p>
+        </div>
+
+        {/* Full Trade Cards (dark variant only) */}
+        <div className="grid grid-cols-1 gap-6 mb-8 max-w-xl">
+          <div>
+            <div className="text-xs text-white/60 mb-2 uppercase tracking-wide">Dark</div>
+            <TradeCard
+              question="Will Solana reach $210 in July?"
+              outcome="NO"
+              side="BUY"
+              odds={93}
+              size={5}
+              toWin={5.38}
+              username="koda432"
+              source="smtm"
+              timestamp="Just now"
+              variant="dark"
+            />
+          </div>
+        </div>
+
+        {/* Compact Cards */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-3">Compact Version (for feeds)</h3>
+          <div className="space-y-3 max-w-2xl">
+            <TradeCardCompact
+              question="Will Bitcoin hit $100k by end of 2025?"
+              outcome="YES"
+              odds={72}
+              size={500}
+              toWin={694.44}
+              username="CryptoWhale"
+            />
+            <TradeCardCompact
+              question="House passes Epstein disclosure bill/resolution in 2025?"
+              outcome="NO"
+              odds={29}
+              size={113.93}
+              toWin={388.98}
+              username="koda432"
+            />
+            <TradeCardCompact
+              question="Will AI surpass human performance in coding by 2026?"
+              outcome="YES"
+              odds={45}
+              size={250}
+              toWin={555.56}
+              username="TechBull"
+            />
+          </div>
+        </div>
+
+        {/* Feature callouts */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+          <div className="rounded-xl border border-teal/20 bg-teal/5 p-4">
+            <div className="text-sm font-semibold text-teal mb-1">🖤 Clean Dark Aesthetic</div>
+            <div className="text-xs text-white/70">Focused design that reads well everywhere</div>
+          </div>
+          <div className="rounded-xl border border-teal/20 bg-teal/5 p-4">
+            <div className="text-sm font-semibold text-teal mb-1">📱 Social Ready</div>
+            <div className="text-xs text-white/70">
+              Perfect dimensions for Twitter, Telegram, Discord sharing
+            </div>
+          </div>
+          <div className="rounded-xl border border-teal/20 bg-teal/5 p-4">
+            <div className="text-sm font-semibold text-teal mb-1">⚡ Copy & Share</div>
+            <div className="text-xs text-white/70">
+              One-click copy as image or share directly to social platforms
+            </div>
+          </div>
+        </div>
+
+        {/* Usage examples */}
+        <div className="mt-8 rounded-xl border border-white/10 bg-white/[0.02] p-6">
+          <h3 className="text-lg font-semibold mb-3">Usage Examples</h3>
+          <div className="space-y-3 text-sm font-mono">
+            <div className="rounded bg-black/30 p-3">
+              <div className="text-white/60 mb-2">// Dark card</div>
+              <code className="text-teal">
+                {`<TradeCard
+  question="Your market question"
+  outcome="YES"
+  side="BUY"
+  odds={65}
+  size={100}
+  toWin={153.85}
+  username="YourUsername"
+  variant="dark"
+/>`}
+              </code>
+            </div>
+            <div className="rounded bg-black/30 p-3">
+              <div className="text-white/60 mb-2">// Compact version for feeds</div>
+              <code className="text-teal">
+                {`<TradeCardCompact
+  question="Quick market preview"
+  outcome="NO"
+  odds={35}
+  size={50}
+  toWin={142.86}
+/>`}
+              </code>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Interactive section already placed above */}
     </main>
   )
 }

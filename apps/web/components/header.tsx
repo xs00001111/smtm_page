@@ -7,6 +7,8 @@ export function Header() {
           <span>SMTM</span>
         </a>
         <nav className="ml-auto flex items-center gap-2 text-sm">
+          <a href="/design" className="rounded-md px-3 py-1.5 text-muted hover:text-foreground transition">Design</a>
+          <a href="/whales" className="rounded-md px-3 py-1.5 text-muted hover:text-foreground transition">Whales</a>
           <a href="/about" className="rounded-md px-3 py-1.5 text-muted hover:text-foreground transition">About</a>
           <a href="/blog" className="rounded-md px-3 py-1.5 text-muted hover:text-foreground transition">Blog</a>
           <a href="/#waitlist" className="rounded-md border border-teal/60 text-teal px-3 py-1.5 hover:bg-teal/10 transition">Join</a>

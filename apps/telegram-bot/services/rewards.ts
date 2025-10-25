@@ -22,31 +22,34 @@ export interface RewardInfo {
  */
 export async function getRewardMarkets(limit = 20): Promise<RewardInfo[]> {
   try {
-    logger.info('Fetching reward markets from Polymarket');
+    logger.info('rewards: fetching via gammaApi.getActiveMarkets')
 
-    // Get active markets sorted by volume
-    const markets = await gammaApi.getActiveMarkets(100, 'volume_24hr');
+    // Primary: active markets, sort by total volume
+    const markets = await gammaApi.getActiveMarkets(200, 'volume')
 
-    // Filter markets that have rewards enabled
     const rewardMarkets = markets
-      .filter((market) => market.rewards && market.rewards.rates?.length > 0)
+      .filter((m: any) => m && m.rewards && Array.isArray(m.rewards.rates) && m.rewards.rates.length > 0)
+      .map((m: any) => ({
+        market: m.condition_id,
+        question: m.question,
+        slug: m.market_slug || '',
+        rewardRate: m.rewards?.rates?.[0]?.rate_per_day || '0',
+        minSize: m.rewards?.min_size || m.rewards?.rates?.[0]?.min_size || '0',
+        maxSpread: m.rewards?.max_spread || m.rewards?.rates?.[0]?.max_spread || '0',
+        volume24h: m.volume_24hr || '0',
+        liquidity: m.liquidity || '0',
+      }))
       .slice(0, limit)
-      .map((market) => ({
-        market: market.condition_id,
-        question: market.question,
-        slug: market.market_slug || '',
-        rewardRate: market.rewards?.rates?.[0]?.rate_per_day || '0',
-        minSize: market.rewards?.min_size || market.rewards?.rates?.[0]?.min_size || '0',
-        maxSpread: market.rewards?.max_spread || market.rewards?.rates?.[0]?.max_spread || '0',
-        volume24h: market.volume_24hr || '0',
-        liquidity: market.liquidity || '0',
-      }));
 
-    logger.info(`Found ${rewardMarkets.length} markets with rewards`);
-    return rewardMarkets;
+    logger.info('rewards: gamma results', { count: rewardMarkets.length })
+    if (rewardMarkets.length > 0) return rewardMarkets
+
+    // Final fallback: return empty and let caller present link
+    logger.warn('rewards: no reward markets found from any source')
+    return []
   } catch (error) {
-    logger.error('Error fetching reward markets', error);
-    throw error;
+    logger.error('Error fetching reward markets', error)
+    throw error
   }
 }
 

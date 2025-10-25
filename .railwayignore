@@ -1,0 +1,16 @@
+# Ignore web app files (not needed for bot deployment)
+apps/web/
+
+# Ignore build artifacts
+.next/
+node_modules/
+*.log
+.DS_Store
+
+# Ignore git files
+.git/
+.gitignore
+
+# Ignore local env files (use Railway dashboard for env vars)
+.env.local
+.env.*.local

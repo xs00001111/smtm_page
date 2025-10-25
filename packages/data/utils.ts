@@ -2,6 +2,7 @@ import { gammaApi } from './clients/gamma-api';
 import { dataApi } from './clients/data-api';
 import { clobApi } from './clients/clob-api';
 import type { GammaMarket, Position } from './types';
+import Fuse from 'fuse.js';
 
 /**
  * Utility functions for common Polymarket data operations
@@ -95,8 +96,44 @@ export async function getTrendingWithPriceChanges(limit = 10) {
 }
 
 /**
+ * Search markets using fuzzy matching on active markets
+ * More accurate than Polymarket's built-in search API
+ */
+export async function findMarketFuzzy(query: string, limit = 5): Promise<GammaMarket[]> {
+  try {
+    // Fetch active markets by volume (top 100)
+    const markets = await gammaApi.getActiveMarkets(100, 'volume');
+
+    if (markets.length === 0) {
+      return [];
+    }
+
+    // Configure fuzzy search
+    const fuse = new Fuse(markets, {
+      keys: [
+        { name: 'question', weight: 0.7 },
+        { name: 'slug', weight: 0.2 },
+        { name: 'description', weight: 0.1 }
+      ],
+      threshold: 0.4, // 0 = exact match, 1 = match anything
+      includeScore: true,
+      ignoreLocation: true,
+      minMatchCharLength: 2
+    });
+
+    // Search
+    const results = fuse.search(query, { limit });
+
+    return results.map(r => r.item);
+  } catch (error) {
+    console.error('Fuzzy search failed:', error);
+    return [];
+  }
+}
+
+/**
  * Search for a market and get its full details
- * Helper that handles slug, condition ID, or search query
+ * Helper that handles slug, condition ID, or fuzzy search
  */
 export async function findMarket(query: string): Promise<GammaMarket | null> {
   try {
@@ -105,16 +142,20 @@ export async function findMarket(query: string): Promise<GammaMarket | null> {
       return await gammaApi.getMarket(query);
     }
 
-    // Try as slug
+    // Try as slug (exact match)
     try {
-      return await gammaApi.getMarketBySlug(query);
+      return await gammaApi.getMarketBySlug(query.toLowerCase());
     } catch {
-      // Fall through to search
+      // Fall through to fuzzy search
     }
 
-    // Try search
-    const results = await gammaApi.searchMarkets(query, 1);
-    return results.length > 0 ? results[0] : null;
+    // Try fuzzy search on active markets
+    const fuzzyResults = await findMarketFuzzy(query, 1);
+    if (fuzzyResults.length > 0) {
+      return fuzzyResults[0];
+    }
+
+    return null;
   } catch (error) {
     console.error('Failed to find market:', error);
     return null;
@@ -269,4 +310,38 @@ export function formatVolume(value?: string | number): string {
     return `$${(num / 1_000).toFixed(1)}K`;
   }
   return `$${num.toFixed(0)}`;
+}
+
+/**
+ * Search for whales (top traders) using fuzzy matching
+ */
+export async function findWhaleFuzzy(query: string, limit = 5): Promise<any[]> {
+  try {
+    // Fetch leaderboard
+    const leaderboard = await dataApi.getLeaderboard({ limit: 100 });
+
+    if (leaderboard.length === 0) {
+      return [];
+    }
+
+    // Configure fuzzy search
+    const fuse = new Fuse(leaderboard, {
+      keys: [
+        { name: 'user_name', weight: 0.8 },
+        { name: 'user_id', weight: 0.2 }
+      ],
+      threshold: 0.3,
+      includeScore: true,
+      ignoreLocation: true,
+      minMatchCharLength: 2
+    });
+
+    // Search
+    const results = fuse.search(query, { limit });
+
+    return results.map(r => r.item);
+  } catch (error) {
+    console.error('Whale fuzzy search failed:', error);
+    return [];
+  }
 }

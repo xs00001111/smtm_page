@@ -3,10 +3,11 @@ node_modules
 .next
 out
 dist
+apps/telegram-bot/data/*.csv
+apps/telegram-bot/data/*.json
 *.log
 .DS_Store
 
 # Env
 .env*
 !.env.example
-

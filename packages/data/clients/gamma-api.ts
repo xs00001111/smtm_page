@@ -33,6 +33,7 @@ export class GammaApiClient {
         active: params?.active,
         closed: params?.closed,
         archived: params?.archived,
+        // Allowed fields typically include 'volume', 'liquidity', 'end_date'
         order: params?.order || 'volume',
         ascending: params?.ascending || false,
         tag: params?.tag,
@@ -47,8 +48,19 @@ export class GammaApiClient {
    * @returns Market data
    */
   async getMarket(conditionId: string): Promise<GammaMarket> {
-    const { data } = await this.client.get<GammaMarket>(`/markets/${conditionId}`);
-    return data;
+    try {
+      const { data } = await this.client.get<GammaMarket>(`/markets/${conditionId}`);
+      return data;
+    } catch (err: any) {
+      // Some deployments don't accept path param lookup; fall back to query by condition_id
+      try {
+        const { data } = await this.client.get<GammaMarket[]>(`/markets`, {
+          params: { condition_id: conditionId, limit: 1 },
+        });
+        if (Array.isArray(data) && data.length > 0) return data[0];
+      } catch {}
+      throw err;
+    }
   }
 
   /**
@@ -88,7 +100,7 @@ export class GammaApiClient {
    */
   async getActiveMarkets(
     limit = 50,
-    order: 'liquidity' | 'volume' | 'volume_24hr' = 'volume'
+    order: 'liquidity' | 'volume' = 'volume'
   ): Promise<GammaMarket[]> {
     return this.getMarkets({
       active: true,
@@ -105,10 +117,11 @@ export class GammaApiClient {
    * @returns Array of trending markets
    */
   async getTrendingMarkets(limit = 20): Promise<GammaMarket[]> {
+    // Use total volume as a robust proxy for trending when 24h ordering isn't supported
     return this.getMarkets({
       active: true,
       limit,
-      order: 'volume_24hr',
+      order: 'volume',
       ascending: false,
     });
   }

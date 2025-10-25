@@ -6,6 +6,8 @@ import type {
   HoldersParams,
   UserValue,
   ClosedPosition,
+  LeaderboardEntry,
+  LeaderboardParams,
 } from '../types';
 
 /**
@@ -85,6 +87,21 @@ export class DataApiClient {
   async getUserValue(user: string): Promise<UserValue> {
     const { data } = await this.client.get<UserValue>('/value', {
       params: { user },
+    });
+    return data;
+  }
+
+  /**
+   * Get top traders from the Polymarket leaderboard
+   * @param params - Limit and offset for pagination
+   * @returns Array of leaderboard entries sorted by PnL
+   */
+  async getLeaderboard(params?: LeaderboardParams): Promise<LeaderboardEntry[]> {
+    const { data } = await this.client.get<LeaderboardEntry[]>('/leaderboard', {
+      params: {
+        limit: params?.limit || 50,
+        offset: params?.offset || 0,
+      },
     });
     return data;
   }

@@ -5,6 +5,8 @@ import { registerCommands } from './commands';
 import { startPriceMonitoring } from './services/price-monitor';
 import { WebSocketMonitorService } from './services/websocket-monitor';
 import { botConfig } from './config/bot';
+import { loadSubscriptions } from './services/subscriptions';
+import { whaleAggregator } from './services/whale-aggregator';
 
 const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
 
@@ -24,28 +26,36 @@ bot.catch((err, ctx) => {
 async function start() {
   try {
     logger.info('Starting Telegram bot...');
+    await whaleAggregator.load();
 
     // Set bot commands for menu
     await bot.telegram.setMyCommands([
       { command: 'start', description: 'Start the bot and see welcome message' },
-      { command: 'daily_tip', description: 'Get today\'s highest reward market from Polymarket' },
       { command: 'help', description: 'Show help and available commands' },
-      { command: 'price', description: 'Get current price for a market' },
-      { command: 'subscribe', description: 'Subscribe to real-time price alerts' },
-      { command: 'unsubscribe', description: 'Unsubscribe from alerts' },
-      { command: 'whale', description: 'Subscribe to whale trade alerts' },
-      { command: 'list', description: 'List your subscriptions' },
-      { command: 'markets', description: 'Browse popular markets' },
-      { command: 'status', description: 'Check WebSocket connection status' },
+      { command: 'markets', description: 'Browse hot markets' },
+      { command: 'search', description: 'Search markets or whales' },
+      { command: 'price', description: 'Get market price' },
+      { command: 'whales', description: 'Top traders leaderboard' },
+      { command: 'whales_top', description: 'Top whales over 24h/7d/30d' },
+      { command: 'follow', description: 'Follow market or wallet alerts' },
+      { command: 'unfollow', description: 'Stop following' },
+      { command: 'list', description: 'List your follows' },
+      { command: 'status', description: 'Check connection status' },
     ]);
 
-    // Start WebSocket monitoring if enabled
-    if (botConfig.websocket.enabled) {
+    // Restore subscriptions from CSV before deciding to start WS
+    await loadSubscriptions(wsMonitor);
+
+    // Only start WS if enabled and there are active subscriptions; otherwise lazy-start
+    const status = wsMonitor.getStatus();
+    if (botConfig.websocket.enabled && (status.marketSubscriptions > 0 || status.whaleSubscriptions > 0)) {
       logger.info('WebSocket monitoring enabled');
       await wsMonitor.start();
-    } else {
+    } else if (!botConfig.websocket.enabled) {
       logger.info('WebSocket monitoring disabled, using polling fallback');
       startPriceMonitoring(bot);
+    } else {
+      logger.info('No active subscriptions; WS will start on first subscription');
     }
 
     // Launch bot

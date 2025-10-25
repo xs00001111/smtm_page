@@ -25,7 +25,7 @@ export async function GET() {
     }
 
     // Helper function to fetch current file state
-    async function fetchCurrentFile() {
+    const fetchCurrentFile = async () => {
       const getRes = await fetch(
         `${apiBase}/repos/${repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`,
         { headers }
