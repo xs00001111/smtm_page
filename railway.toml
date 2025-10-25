@@ -1,11 +1,11 @@
 [build]
 builder = "nixpacks"
+buildCommand = "echo 'No build needed for bot - uses tsx runtime'"
 
 [deploy]
 startCommand = "npm run start:bot"
 restartPolicyType = "always"
-healthcheckPath = "/"
-healthcheckTimeout = 100
+restartPolicyMaxRetries = 10
 
 [env]
 # Railway will auto-inject DATABASE_URL, RAILWAY_ENVIRONMENT, etc.
