@@ -1,0 +1,17 @@
+services:
+  - type: worker
+    name: telegram-bot
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm run start:bot
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TIMEZONE
+        value: America/New_York
+      - key: WEBSOCKET_ENABLED
+        value: true
+      - key: PRICE_CHANGE_THRESHOLD
+        value: 5
+      - key: WHALE_TRADE_MIN_SIZE
+        value: 1000
