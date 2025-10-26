@@ -18,8 +18,23 @@ registerCommands(bot);
 
 // Error handling
 bot.catch((err, ctx) => {
-  logger.error('Bot error:', err);
-  ctx.reply('An error occurred. Please try again later.');
+  logger.error({ err, update: ctx.update }, 'Bot error');
+  console.error('Bot runtime error:', err);
+  try {
+    ctx.reply('An error occurred. Please try again later.').catch(() => {});
+  } catch {}
+});
+
+// Global error handlers
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error({ reason, promise }, 'Unhandled Promise Rejection');
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error({ err: error }, 'Uncaught Exception');
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
 });
 
 // Start the bot
@@ -73,7 +88,8 @@ async function start() {
       bot.stop('SIGTERM');
     });
   } catch (error) {
-    logger.error('Failed to start bot:', error);
+    logger.error({ err: error }, 'Failed to start bot');
+    console.error('Full error details:', error);
     process.exit(1);
   }
 }
