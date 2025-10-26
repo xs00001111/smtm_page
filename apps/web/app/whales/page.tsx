@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { CopyButton } from '@/components/copy-button'
+import { WhaleShareButton } from '@/components/whale-share-card'
 
 type GammaMarket = {
   condition_id: string
