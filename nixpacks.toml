@@ -2,7 +2,7 @@
 # Force Node.js provider instead of Next.js detection
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm"]
+nixPkgs = ["nodejs_20"]
 
 [phases.install]
 cmds = ["npm install"]
