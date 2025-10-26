@@ -1,9 +1,12 @@
 [build]
-  base = "apps/web"
-  command = "cd ../.. && npm install && cd apps/web && npm run build"
-  publish = ".next"
+  base = "."
+  command = "npm install && cd apps/web && npm run build"
+  publish = "apps/web/.next"
   # Skip builds for commits that include [skip netlify] in the message
   ignore = "bash -lc 'git log -1 --pretty=%B | grep -qi \"\\[skip netlify\\]\" && exit 0; exit 1'"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+  [plugins.inputs]
+    # Tell the plugin where the Next.js app is located
+    publish = "apps/web"
