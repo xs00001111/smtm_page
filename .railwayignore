@@ -3,9 +3,12 @@ apps/web/
 
 # Ignore build artifacts
 .next/
-node_modules/
+*.tsbuildinfo
 *.log
 .DS_Store
+
+# Don't ignore node_modules - we need package.json for install
+# node_modules/ will be installed fresh on Railway
 
 # Ignore git files
 .git/
