@@ -47,6 +47,7 @@ async function start() {
     await bot.telegram.setMyCommands([
       { command: 'start', description: 'Start the bot and see welcome message' },
       { command: 'help', description: 'Show help and available commands' },
+      { command: 'profile', description: 'View profile card' },
       { command: 'markets', description: 'Browse hot markets' },
       { command: 'search', description: 'Search markets or whales' },
       { command: 'price', description: 'Get market price' },

@@ -911,5 +911,69 @@ export function registerCommands(bot: Telegraf) {
     }
   });
 
+  // Profile command - Display user profile card
+  bot.command('profile', async (ctx) => {
+    logger.info('Profile command', { userId: ctx.from?.id });
+
+    try {
+      // Hardcoded profile data for now
+      const profile = {
+        name: 'Crypto Chad',
+        handle: 'cryptochad',
+        credibility: 84,
+        verified: true,
+        portfolioLinked: true,
+        stats: {
+          predictions: 52,
+          accuracy: 72,
+          tips: 87,
+          followers: 1248,
+          following: 93,
+          openPositions: 2,
+          resolved: 1,
+        },
+        badges: ['🏅 Top 10% Accuracy', '🎲 High Roller', '💸 Most Tipped'],
+      };
+
+      // Build HTML formatted message
+      const message =
+        `┏━━━━━━━━━━━━━━━━━━━━━━━━━┓\n` +
+        `┃  <b>${profile.name}</b> ${profile.verified ? '✅' : ''}\n` +
+        `┃  @${profile.handle}\n` +
+        `┃  <code>Credibility ${profile.credibility}</code>\n` +
+        `┗━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
+
+        `📊 <b>Stats</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  Predictions: <b>${profile.stats.predictions}</b>\n` +
+        `  Accuracy: <b>${profile.stats.accuracy}%</b>\n` +
+        `  Tips Earned: <b>$${profile.stats.tips}</b>\n\n` +
+
+        `👥 <b>Community</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  Followers: <b>${profile.stats.followers.toLocaleString()}</b>\n` +
+        `  Following: <b>${profile.stats.following}</b>\n` +
+        `  Open Positions: <b>${profile.stats.openPositions}</b>\n` +
+        `  Resolved: <b>${profile.stats.resolved}</b>\n\n` +
+
+        `🏆 <b>Badges</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        profile.badges.map(badge => `  ${badge}`).join('\n') + '\n\n' +
+
+        `🔐 <b>Trust Layer</b>\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `  🛡️ Reputation-first\n` +
+        `  🔗 Portfolio: ${profile.portfolioLinked ? 'Linked (Coinbase API)' : 'Not Linked'}\n\n` +
+
+        `━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `<i>Join SMTM to start tracking your predictions!</i>`;
+
+      await ctx.reply(message, { parse_mode: 'HTML' });
+    } catch (error) {
+      logger.error('Error in profile command', error);
+      await ctx.reply('❌ An error occurred while loading profile. Please try again.');
+    }
+  });
+
   logger.info('Commands registered');
 }
