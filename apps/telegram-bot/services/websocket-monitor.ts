@@ -39,8 +39,10 @@ export class WebSocketMonitorService {
   private pendingMarketSubscriptions: Map<string, MarketSubscription[]> = new Map(); // key: conditionId
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
-  private reconnectDelay = 5000; // Start with 5 seconds
+  private reconnectDelay = 10000; // Start with 10 seconds
   private isConnecting = false;
+  private isRateLimited = false;
+  private rateLimitCooldown = 60000; // 60 seconds cooldown after rate limit
 
   constructor(bot: Telegraf) {
     this.bot = bot;
@@ -585,7 +587,9 @@ export class WebSocketMonitorService {
    * Handle successful connection
    */
   private handleConnect(client: RealTimeDataClient): void {
-    logger.info('WebSocket connected, subscribing to topics');
+    logger.info('WebSocket connected successfully, subscribing to topics');
+    this.reconnectAttempts = 0; // Reset reconnection counter on successful connect
+    this.isRateLimited = false; // Clear rate limit flag
     this.updateSubscriptions();
   }
 
@@ -607,6 +611,13 @@ export class WebSocketMonitorService {
    */
   private handleError(error: Error): void {
     logger.error('WebSocket error', error);
+
+    // Check for rate limit error (429)
+    if (error.message && error.message.includes('429')) {
+      logger.warn('Rate limited by Polymarket API, entering cooldown period');
+      this.isRateLimited = true;
+      this.reconnectAttempts = Math.max(this.reconnectAttempts, 5); // Skip to longer delays
+    }
   }
 
   /**
@@ -694,17 +705,32 @@ export class WebSocketMonitorService {
    * Schedule reconnection attempt with exponential backoff
    */
   private scheduleReconnect(): void {
+    if (this.isConnecting) {
+      logger.warn('Connection attempt already in progress, skipping reconnect schedule');
+      return;
+    }
+
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
       logger.error('Max reconnection attempts reached, giving up');
       return;
     }
 
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
+    // Use longer delay if rate limited
+    let delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
+    if (this.isRateLimited) {
+      delay = Math.max(delay, this.rateLimitCooldown);
+      logger.info(`Rate limit detected, using cooldown period: ${delay}ms`);
+    }
+
+    // Cap maximum delay at 5 minutes
+    delay = Math.min(delay, 300000);
+
     this.reconnectAttempts++;
 
-    logger.info(`Scheduling reconnection attempt ${this.reconnectAttempts} in ${delay}ms`);
+    logger.info(`Scheduling reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${(delay / 1000).toFixed(0)}s`);
 
     setTimeout(() => {
+      this.isRateLimited = false; // Reset rate limit flag
       this.start();
     }, delay);
   }
