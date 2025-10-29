@@ -17,11 +17,12 @@ export function registerCommands(bot: Telegraf) {
         '• /search markets <query> — Find markets\n' +
         '• /search whales <name> — Find traders\n' +
         '• /price <market> — Get market price\n\n' +
-        '🔥 Alerts (IDs only):\n' +
-        '• /follow 0x<condition_id> — Market price alerts\n' +
-        '• /follow 0x<wallet> 0x<condition_id> — Whale alerts\n' +
+        '🔥 Alerts:\n' +
+        '• /follow 0x<market_id> — Market price alerts\n' +
+        '• /follow 0x<wallet> — Copy whale (all markets)\n' +
+        '• /follow 0x<wallet> 0x<market_id> — Whale on specific market\n' +
         '• /list — View your follows\n\n' +
-        '💡 Tip: Use /search to find markets by keywords!'
+        '💡 Tip: Use /markets to get market IDs!'
     );
   });
 
@@ -36,17 +37,18 @@ export function registerCommands(bot: Telegraf) {
         '/search whales <name> — Search traders\n' +
         '/price <market> — Get market price\n' +
         '/whales_top 24h|7d|30d — Top whales\n\n' +
-        '🔔 Alerts (IDs only):\n' +
-        '/follow 0x<condition_id> — Market price alerts\n' +
-        '/follow 0x<wallet> 0x<condition_id> — Whale alerts\n' +
+        '🔔 Alerts:\n' +
+        '/follow 0x<market_id> — Market price alerts\n' +
+        '/follow 0x<wallet> — Copy whale (all markets)\n' +
+        '/follow 0x<wallet> 0x<market_id> — Whale on specific market\n' +
         '/unfollow … — Stop follows\n' +
         '/list — View follows\n\n' +
         '⚙️ System:\n' +
         '/status — Connection status\n' +
         '/test_push — Test alerts\n\n' +
         '💡 Pro Tips:\n' +
-        '• Use /search to find markets naturally\n' +
-        '• IDs required for /follow (get from /search or /markets)'
+        '• Use /markets to get market IDs\n' +
+        '• Follow whales without market_id for copy trading all their moves!'
     );
   });
 
@@ -309,7 +311,7 @@ export function registerCommands(bot: Telegraf) {
 
   // Subscribe (deprecated) -> instruct to use /follow
   bot.command('subscribe', async (ctx) => {
-    await ctx.reply('This command is deprecated. Use /follow with IDs only.\nExamples:\n• /follow 0x<condition_id> (market price alerts)\n• /follow 0x<wallet> 0x<condition_id> (wallet whale alerts)')
+    await ctx.reply('This command is deprecated. Use /follow instead.\nExamples:\n• /follow 0x<market_id> (market price alerts)\n• /follow 0x<wallet> (copy whale all markets)\n• /follow 0x<wallet> 0x<market_id> (whale on specific market)')
   });
 
   // Unsubscribe command
@@ -387,9 +389,9 @@ export function registerCommands(bot: Telegraf) {
     }
   });
 
-  // Whale trade alerts command (deprecated) -> instruct to use /follow with IDs
+  // Whale trade alerts command (deprecated) -> instruct to use /follow
   bot.command('whale', async (ctx) => {
-    await ctx.reply('This command is deprecated. Use /follow with IDs only.\nExamples:\n• /follow 0x<condition_id> (market price alerts)\n• /follow 0x<wallet> 0x<condition_id> (wallet whale alerts)')
+    await ctx.reply('This command is deprecated. Use /follow instead.\nExamples:\n• /follow 0x<wallet> (copy whale all markets)\n• /follow 0x<wallet> 0x<market_id> (whale on specific market)')
   });
 
   // Whales leaderboard (aggregate or by market)
@@ -423,8 +425,8 @@ export function registerCommands(bot: Telegraf) {
             msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n\n`
           })
           msg += '💡 How to follow a whale:\n'
-          msg += '1. /markets — get a market condition id\n'
-          msg += '2. /follow <whale_address> <condition_id> — track whale trades'
+          msg += '• /follow <whale_address> — copy ALL their trades\n'
+          msg += '• /follow <whale_address> <market_id> — track on specific market'
           await ctx.reply(msg)
           return
         } catch (e: any) {
@@ -458,10 +460,10 @@ export function registerCommands(bot: Telegraf) {
       whales.forEach(([addr, bal], i) => {
         const short = addr.slice(0,6)+'...'+addr.slice(-4)
         msg += `${i+1}. ${short}  — balance: ${Math.round(bal)}\n`
-        msg += `   Follow: /follow ${addr} ${market.condition_id}\n`
+        msg += `   Follow all: /follow ${addr}\n`
+        msg += `   Follow here: /follow ${addr} ${market.condition_id}\n`
       })
-      msg += `\nSubscribe price alerts: /subscribe ${market.condition_id}\n`
-      msg += `Whale alerts: /whale ${market.condition_id}`
+      msg += `\n💡 Follow market price: /follow ${market.condition_id}`
       await ctx.reply(msg)
     } catch (err) {
       logger.error('Error in whales command', err)
@@ -478,19 +480,24 @@ export function registerCommands(bot: Telegraf) {
       const { getUserRows } = await import('../services/subscriptions')
       const rows = getUserRows(userId)
       if (rows.length === 0) {
-        await ctx.reply('📭 You have no follows.\nUse /markets to copy an id, then /follow 0x<condition_id>.')
+        await ctx.reply('📭 You have no follows.\nUse /markets to get a market ID, then /follow 0x<market_id>.')
         return
       }
       let i=0
-      let msg = '📋 Your Follows (IDs only)\n\n'
+      let msg = '📋 Your Follows\n\n'
       for (const r of rows) {
         i+=1
-        const cid = r.market_condition_id || '—'
+        const mid = r.market_condition_id || '—'
         if (r.type === 'market') {
-          msg += `${i}. 📈 ${r.market_name}\n   id: ${cid}\n   ➖ Unfollow: /unfollow ${cid}\n\n`
+          msg += `${i}. 📈 ${r.market_name}\n   Market ID: ${mid}\n   ➖ Unfollow: /unfollow ${mid}\n\n`
+        } else if (r.type === 'whale_all') {
+          const w = r.address_filter ? r.address_filter : 'wallet'
+          const short = w.length > 10 ? w.slice(0,6)+'...'+w.slice(-4) : w
+          msg += `${i}. 🐋 ${short} — ALL markets\n   ➖ Unfollow: /unfollow ${w}\n\n`
         } else {
           const w = r.address_filter ? r.address_filter : 'wallet'
-          msg += `${i}. 🐋 ${r.market_name}${r.address_filter?` — ${w}`:''}\n   id: ${cid}\n   ➖ Unfollow: /unfollow ${w} ${cid}\n\n`
+          const short = w.length > 10 ? w.slice(0,6)+'...'+w.slice(-4) : w
+          msg += `${i}. 🐋 ${r.market_name} — ${short}\n   Market ID: ${mid}\n   ➖ Unfollow: /unfollow ${w} ${mid}\n\n`
         }
       }
       await ctx.reply(msg)
@@ -715,14 +722,14 @@ export function registerCommands(bot: Telegraf) {
         if (cond) {
           message += `   ➕ Follow: /follow ${cond}\n\n`
         } else {
-          message += `   ➕ Follow: /follow <copy condition id from event>\n\n`
+          message += `   ➕ Follow: /follow <copy market id from event>\n\n`
         }
       }
 
       message +=
         '💡 How to follow:\n' +
         '• Tap a follow command above to insert it\n' +
-        '• Or copy a condition id (0x…) from the event\n' +
+        '• Or copy a market id (0x…) from the event\n' +
         '• Browse all: https://polymarket.com/markets';
 
       await ctx.reply(message, { parse_mode: 'Markdown' });
@@ -744,7 +751,7 @@ export function registerCommands(bot: Telegraf) {
 
       if (!priceSent && !whaleSent) {
         await ctx.reply(
-          'ℹ️ No active follows found.\n\nFollow examples (IDs only):\n• /follow 0x<condition_id>\n• /follow 0x<wallet> 0x<condition_id>'
+          'ℹ️ No active follows found.\n\nFollow examples:\n• /follow 0x<market_id> (price alerts)\n• /follow 0x<wallet> (copy whale)\n• /follow 0x<wallet> 0x<market_id> (whale on market)'
         )
         return
       }
@@ -759,64 +766,112 @@ export function registerCommands(bot: Telegraf) {
   })
 
   // Follow command (standardized):
-  // /follow 0x<condition_id> => market price alerts
-  // /follow 0x<wallet> 0x<condition_id> => wallet whale alerts in market
+  // /follow 0x<market_id> => market price alerts
+  // /follow 0x<wallet> => all whale trades (copy trading)
+  // /follow 0x<wallet> 0x<market_id> => wallet whale alerts in specific market
   bot.command('follow', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     const userId = ctx.from!.id
     const looksLikeAddress = (s: string) => /^0x[a-fA-F0-9]{40}$/.test(s)
     const looksLikeCond = (s: string) => /^0x[a-fA-F0-9]{64}$/.test(s)
 
+    // Case 1: Follow a market (price alerts)
     if (args.length === 1 && looksLikeCond(args[0])) {
-      const conditionId = args[0]
+      const marketId = args[0]
       try {
         await ctx.reply('🔍 Resolving market...')
-        const market = await gammaApi.getMarket(conditionId)
+        const market = await gammaApi.getMarket(marketId)
         const now = Date.now()
-        const endIso = (market as any)?.end_date_iso || (market as any)?.endDate || (market as any)?.end_date
+        const endIso = (market as any)?.end_date_iso || (market as any)?.endDateIso || (market as any)?.endDate || (market as any)?.end_date
         const endTime = endIso ? Date.parse(endIso) : NaN
-        const activeOk = (market as any)?.active === true && !(market as any)?.closed && !(market as any)?.resolved && Number.isFinite(endTime) && endTime > now
-        if (!activeOk) { await ctx.reply('⚠️ This market is not active. Use /markets to choose an active market.'); return }
+        // Only reject if explicitly closed/resolved or past end date
+        const isClosed = (market as any)?.closed === true
+        const isResolved = (market as any)?.resolved === true
+        const isArchived = (market as any)?.archived === true
+        const isPastEnd = Number.isFinite(endTime) && endTime < now
+        if (isClosed || isResolved || isArchived || isPastEnd) {
+          await ctx.reply('⚠️ This market is not active. Use /markets to choose an active market.');
+          return
+        }
         let tokenId = market?.tokens?.[0]?.token_id as string | undefined
         if (!tokenId) { await ctx.reply('❌ Unable to resolve token for this market right now. Try again shortly.'); return }
         const ok = wsMonitor.subscribeToMarket(userId, tokenId, market.question, botConfig.websocket.priceChangeThreshold)
         if (!ok) { await ctx.reply('⚠️ You are already following this market.'); return }
         const { addMarketSubscription } = await import('../services/subscriptions')
-        await addMarketSubscription(userId, tokenId, market.question, conditionId, botConfig.websocket.priceChangeThreshold)
+        await addMarketSubscription(userId, tokenId, market.question, marketId, botConfig.websocket.priceChangeThreshold)
         await ctx.reply(`✅ Following market: ${market.question}`)
       } catch (e: any) {
-        logger.error('follow market failed', { conditionId, error: e?.message })
-        await ctx.reply('❌ Failed to follow market. Use /follow 0x<condition_id>.')
+        logger.error('follow market failed', { marketId, error: e?.message })
+        await ctx.reply('❌ Failed to follow market. Use /follow 0x<market_id>.')
       }
       return
     }
 
+    // Case 2: Follow a whale across ALL markets (copy trading)
+    if (args.length === 1 && looksLikeAddress(args[0])) {
+      const wallet = args[0]
+      try {
+        await ctx.reply('🔍 Setting up whale alerts...')
+        // Subscribe to all whale trades (no specific market filter)
+        const ok = wsMonitor.subscribeToWhaleTradesAll(userId, wallet, botConfig.websocket.whaleTrademinSize)
+        if (!ok) {
+          await ctx.reply('⚠️ You are already following this whale across all markets.');
+          return
+        }
+        const { addWhaleSubscriptionAll } = await import('../services/subscriptions')
+        await addWhaleSubscriptionAll(userId, wallet, botConfig.websocket.whaleTrademinSize)
+        const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
+        await ctx.reply(`✅ Following whale ${shortAddr} across ALL markets!\n\nYou'll get alerts whenever they make trades on any market.`)
+      } catch (e: any) {
+        logger.error('follow whale all failed', { wallet, error: e?.message })
+        await ctx.reply('❌ Failed to follow whale. Use: /follow 0x<wallet_address>.')
+      }
+      return
+    }
+
+    // Case 3: Follow a whale on a specific market
     if (args.length === 2 && looksLikeAddress(args[0]) && looksLikeCond(args[1])) {
       const wallet = args[0]
-      const conditionId = args[1]
+      const marketId = args[1]
       try {
         await ctx.reply('🔍 Resolving market...')
-        const market = await gammaApi.getMarket(conditionId)
-        const now2 = Date.now()
-        const endIso2 = (market as any)?.end_date_iso || (market as any)?.endDate || (market as any)?.end_date
-        const endTime2 = endIso2 ? Date.parse(endIso2) : NaN
-        const activeOk2 = (market as any)?.active === true && !(market as any)?.closed && !(market as any)?.resolved && Number.isFinite(endTime2) && endTime2 > now2
-        if (!activeOk2) { await ctx.reply('⚠️ This market is not active. Use /markets to choose an active market.'); return }
+        const market = await gammaApi.getMarket(marketId)
+        const now = Date.now()
+        const endIso = (market as any)?.end_date_iso || (market as any)?.endDateIso || (market as any)?.endDate || (market as any)?.end_date
+        const endTime = endIso ? Date.parse(endIso) : NaN
+        // Only reject if explicitly closed/resolved or past end date
+        const isClosed = (market as any)?.closed === true
+        const isResolved = (market as any)?.resolved === true
+        const isArchived = (market as any)?.archived === true
+        const isPastEnd = Number.isFinite(endTime) && endTime < now
+        if (isClosed || isResolved || isArchived || isPastEnd) {
+          await ctx.reply('⚠️ This market is not active. Use /markets to choose an active market.');
+          return
+        }
         let tokenId = market?.tokens?.[0]?.token_id as string | undefined
         if (!tokenId) { await ctx.reply('❌ Unable to resolve token for this market right now. Try again shortly.'); return }
         const ok = wsMonitor.subscribeToWhaleTrades(userId, tokenId, market.question, botConfig.websocket.whaleTrademinSize, wallet)
         if (!ok) { await ctx.reply('⚠️ You are already following this wallet in this market.'); return }
         const { addWhaleSubscription } = await import('../services/subscriptions')
-        await addWhaleSubscription(userId, tokenId, market.question, botConfig.websocket.whaleTrademinSize, wallet, conditionId)
-        await ctx.reply(`✅ Following wallet ${wallet} in: ${market.question}`)
+        await addWhaleSubscription(userId, tokenId, market.question, botConfig.websocket.whaleTrademinSize, wallet, marketId)
+        const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
+        await ctx.reply(`✅ Following whale ${shortAddr} in: ${market.question}`)
       } catch (e: any) {
-        logger.error('follow wallet failed', { conditionId, error: e?.message })
-        await ctx.reply('❌ Failed to follow wallet. Use: /follow 0x<wallet> 0x<condition_id>.')
+        logger.error('follow wallet failed', { marketId, error: e?.message })
+        await ctx.reply('❌ Failed to follow whale on this market. Use: /follow 0x<wallet> 0x<market_id>.')
       }
       return
     }
 
-    await ctx.reply('Usage:\n• /follow 0x<condition_id> — follow market (price alerts)\n• /follow 0x<wallet> 0x<condition_id> — follow wallet in market (whale alerts)\nIDs only. Use /markets to copy an id.')
+    await ctx.reply(
+      '📖 Follow Command Usage:\n\n' +
+      '🔔 Market price alerts:\n' +
+      '• /follow 0x<market_id>\n\n' +
+      '🐋 Copy whale trades:\n' +
+      '• /follow 0x<wallet> — ALL markets\n' +
+      '• /follow 0x<wallet> 0x<market_id> — specific market\n\n' +
+      '💡 Get market IDs from /markets'
+    )
   })
 
   // Unfollow (standardized)
@@ -826,52 +881,80 @@ export function registerCommands(bot: Telegraf) {
     const isAddr = (s:string)=>/^0x[a-fA-F0-9]{40}$/.test(s)
     const isCond = (s:string)=>/^0x[a-fA-F0-9]{64}$/.test(s)
 
+    // Case 1: Unfollow a market by market_id
     if (args.length===1 && isCond(args[0])) {
-      const conditionId = args[0]
+      const marketId = args[0]
       try {
         await ctx.reply('🔍 Resolving market...')
-        const m = await gammaApi.getMarket(conditionId)
+        const m = await gammaApi.getMarket(marketId)
         const tokenId = m?.tokens?.[0]?.token_id
         if (tokenId) {
           const ok = wsMonitor.unsubscribeFromMarket(userId, tokenId)
           const { removeMarketSubscription, removePendingMarketByCondition } = await import('../services/subscriptions')
           if (ok) await removeMarketSubscription(userId, tokenId)
-          await removePendingMarketByCondition(userId, conditionId)
-          await ctx.reply(`✅ Unfollowed market: ${m?.question || conditionId}`)
+          await removePendingMarketByCondition(userId, marketId)
+          await ctx.reply(`✅ Unfollowed market: ${m?.question || marketId}`)
         } else {
           const { removePendingMarketByCondition } = await import('../services/subscriptions')
-          const removed = await removePendingMarketByCondition(userId, conditionId)
-          await ctx.reply(removed>0 ? `✅ Unfollowed pending market: ${m?.question || conditionId}` : '⚠️ No follow found for this market.')
+          const removed = await removePendingMarketByCondition(userId, marketId)
+          await ctx.reply(removed>0 ? `✅ Unfollowed pending market: ${m?.question || marketId}` : '⚠️ No follow found for this market.')
         }
       } catch (e:any) {
-        logger.error('unfollow market failed', { conditionId, error: e?.message })
-        await ctx.reply('❌ Failed to unfollow. Ensure format: /unfollow 0x<condition_id>.')
+        logger.error('unfollow market failed', { marketId, error: e?.message })
+        await ctx.reply('❌ Failed to unfollow. Ensure format: /unfollow 0x<market_id>.')
       }
       return
     }
 
+    // Case 2: Unfollow a whale from ALL markets
+    if (args.length===1 && isAddr(args[0])) {
+      const wallet = args[0]
+      try {
+        const ok = wsMonitor.unsubscribeFromWhaleTradesAll(userId, wallet)
+        const { removeWhaleSubscriptionAll } = await import('../services/subscriptions')
+        await removeWhaleSubscriptionAll(userId, wallet)
+        const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
+        if (ok) {
+          await ctx.reply(`✅ Unfollowed whale ${shortAddr} from ALL markets`)
+        } else {
+          await ctx.reply(`✅ Removed whale ${shortAddr} from follows`)
+        }
+      } catch (e:any) {
+        logger.error('unfollow whale all failed', { wallet, error: e?.message })
+        await ctx.reply('❌ Failed to unfollow. Ensure format: /unfollow 0x<wallet_address>.')
+      }
+      return
+    }
+
+    // Case 3: Unfollow a whale from a specific market
     if (args.length===2 && isAddr(args[0]) && isCond(args[1])) {
       const wallet = args[0]
-      const conditionId = args[1]
+      const marketId = args[1]
       try {
         await ctx.reply('🔍 Resolving market...')
-        const m = await gammaApi.getMarket(conditionId)
+        const m = await gammaApi.getMarket(marketId)
         const tokenId = m?.tokens?.[0]?.token_id
         const { removeWhaleSubscription, removePendingWhaleByCondition } = await import('../services/subscriptions')
         if (tokenId) {
           const ok = wsMonitor.unsubscribeFromWhaleTrades(userId, tokenId)
           if (ok) await removeWhaleSubscription(userId, tokenId)
         }
-        await removePendingWhaleByCondition(userId, conditionId, wallet)
-        await ctx.reply(`✅ Unfollowed wallet ${wallet} in: ${m?.question || conditionId}`)
+        await removePendingWhaleByCondition(userId, marketId, wallet)
+        const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
+        await ctx.reply(`✅ Unfollowed whale ${shortAddr} in: ${m?.question || marketId}`)
       } catch (e:any) {
-        logger.error('unfollow wallet failed', { conditionId, error: e?.message })
-        await ctx.reply('❌ Failed to unfollow. Ensure format: /unfollow 0x<wallet> 0x<condition_id>.')
+        logger.error('unfollow wallet failed', { marketId, error: e?.message })
+        await ctx.reply('❌ Failed to unfollow. Ensure format: /unfollow 0x<wallet> 0x<market_id>.')
       }
       return
     }
 
-    await ctx.reply('Usage:\n• /unfollow 0x<condition_id> — stop market price alerts\n• /unfollow 0x<wallet> 0x<condition_id> — stop wallet whale alerts')
+    await ctx.reply(
+      '📖 Unfollow Command Usage:\n\n' +
+      '• /unfollow 0x<market_id> — stop market price alerts\n' +
+      '• /unfollow 0x<wallet> — stop whale alerts (all markets)\n' +
+      '• /unfollow 0x<wallet> 0x<market_id> — stop whale alerts (specific market)'
+    )
   })
 
   // Daily tip command - Get daily rewards from Polymarket

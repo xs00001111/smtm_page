@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useMemo, useState, useRef, useEffect } from 'react'
-import { CheckCircle2, Link2, Shield, Share2, Download, Image as ImageIcon } from 'lucide-react'
+import { useCallback, useState, useRef, useEffect } from 'react'
+import { Share2, Download, Image as ImageIcon } from 'lucide-react'
 
 interface ProfileCardProps {
   userId?: string | null
@@ -12,24 +12,14 @@ export function ProfileCard({ userId }: ProfileCardProps) {
   const profile = {
     name: 'Crypto Chad',
     handle: 'cryptochad',
-    credibility: 84,
-    verified: true,
-    portfolioLinked: true,
-    stats: {
-      predictions: 52,
-      accuracy: 72,
-      tips: 87,
-      followers: 1248,
-      following: 93,
-      openPositions: 2,
-      resolved: 1,
-    },
-    badges: ['🏅 Top 10% Accuracy', '🎲 High Roller', '💸 Most Tipped'],
+    balance: 12450.50,
+    pnl: 3245.20,
+    pnlPercent: 35.2,
+    followers: 1248,
   }
 
   const [copied, setCopied] = useState(false)
   const [shareModalOpen, setShareModalOpen] = useState(false)
-  const [followerCount] = useState(profile.stats.followers)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const onShareLink = useCallback(async () => {
@@ -43,15 +33,13 @@ export function ProfileCard({ userId }: ProfileCardProps) {
     }
   }, [userId])
 
-  const accuracySeries = useMemo(() => [62, 65, 61, 68, 70, 72, 71, 74, 73, 75], [])
-
   // Generate shareable card image
   useEffect(() => {
     if (!shareModalOpen) return
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const W = 800, H = 600
+    const W = 800, H = 700
     canvas.width = W
     canvas.height = H
     const ctx = canvas.getContext('2d')!
@@ -64,7 +52,7 @@ export function ProfileCard({ userId }: ProfileCardProps) {
     ctx.fillRect(0, 0, W, H)
 
     // Accent glow
-    const glowGrad = ctx.createRadialGradient(W/2, 100, 0, W/2, 100, 300)
+    const glowGrad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, 400)
     glowGrad.addColorStop(0, 'rgba(0,229,255,0.15)')
     glowGrad.addColorStop(1, 'transparent')
     ctx.fillStyle = glowGrad
@@ -72,78 +60,51 @@ export function ProfileCard({ userId }: ProfileCardProps) {
 
     // Header
     ctx.fillStyle = '#FFFFFF'
-    ctx.font = 'bold 48px system-ui'
-    ctx.fillText(profile.name, 50, 70)
-
-    if (profile.verified) {
-      ctx.fillStyle = '#00E5FF'
-      ctx.font = '32px system-ui'
-      ctx.fillText('✓', ctx.measureText(profile.name).width + 60, 70)
-    }
+    ctx.font = 'bold 32px system-ui'
+    ctx.fillText(profile.name, 50, 60)
 
     ctx.fillStyle = '#9CA3AF'
-    ctx.font = '24px system-ui'
-    ctx.fillText(`@${profile.handle}`, 50, 110)
+    ctx.font = '18px system-ui'
+    ctx.fillText(`@${profile.handle}`, 50, 90)
 
-    // Credibility badge
-    ctx.fillStyle = 'rgba(0,229,255,0.2)'
-    roundRect(ctx, W - 180, 40, 130, 50, 25)
-    ctx.fill()
+    // Balance (HERO)
     ctx.fillStyle = '#00E5FF'
-    ctx.font = 'bold 24px system-ui'
-    const credText = `${profile.credibility}`
-    ctx.fillText(credText, W - 150, 75)
+    ctx.font = 'bold 110px system-ui'
+    ctx.textAlign = 'center'
+    ctx.fillText(`$${profile.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W / 2, 230)
 
-    // Hero Stats - Large and Prominent
-    const statY = 200
+    ctx.fillStyle = '#6B7280'
+    ctx.font = 'bold 18px system-ui'
+    ctx.fillText('BALANCE', W / 2, 270)
 
-    // Predictions
-    drawHeroStat(ctx, 50, statY, '52', 'Predictions', '#00E5FF')
+    // PNL (Secondary)
+    const pnlColor = profile.pnl >= 0 ? '#B6FF00' : '#FF4444'
+    ctx.fillStyle = pnlColor
+    ctx.font = 'bold 80px system-ui'
+    const pnlText = `${profile.pnl >= 0 ? '+' : ''}${profile.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ctx.fillText(pnlText, W / 2, 380)
 
-    // Accuracy - Most Prominent (center)
-    drawHeroStat(ctx, 280, statY, '72%', 'Accuracy', '#B6FF00', true)
+    ctx.fillStyle = pnlColor
+    ctx.font = 'bold 36px system-ui'
+    ctx.fillText(`(${profile.pnl >= 0 ? '+' : ''}${profile.pnlPercent}%)`, W / 2, 430)
 
-    // Tips
-    drawHeroStat(ctx, 540, statY, '$87', 'Tips Earned', '#00E5FF')
-
-    // Secondary Stats
-    const secY = 410
     ctx.fillStyle = '#6B7280'
     ctx.font = 'bold 16px system-ui'
-    ctx.fillText('COMMUNITY', 50, secY)
+    ctx.fillText('PNL', W / 2, 465)
 
+    // Followers
     ctx.fillStyle = '#FFFFFF'
-    ctx.font = '24px system-ui'
-    ctx.fillText(`${profile.stats.followers.toLocaleString()} Followers`, 50, secY + 35)
-    ctx.fillText(`${profile.stats.following} Following`, 50, secY + 70)
+    ctx.font = 'bold 48px system-ui'
+    ctx.fillText(profile.followers.toLocaleString(), W / 2, 555)
 
-    ctx.fillText(`${profile.stats.openPositions} Open`, 400, secY + 35)
-    ctx.fillText(`${profile.stats.resolved} Resolved`, 400, secY + 70)
-
-    // Badges
     ctx.fillStyle = '#6B7280'
-    ctx.font = 'bold 14px system-ui'
-    ctx.fillText('ACHIEVEMENTS', 50, secY + 120)
-
-    let badgeX = 50
-    profile.badges.forEach(badge => {
-      ctx.fillStyle = 'rgba(255,255,255,0.05)'
-      ctx.font = '16px system-ui'
-      const badgeWidth = ctx.measureText(badge).width + 30
-      roundRect(ctx, badgeX, secY + 135, badgeWidth, 35, 8)
-      ctx.fill()
-      ctx.strokeStyle = 'rgba(255,255,255,0.1)'
-      ctx.lineWidth = 1
-      ctx.stroke()
-      ctx.fillStyle = '#E5E7EB'
-      ctx.fillText(badge, badgeX + 15, secY + 158)
-      badgeX += badgeWidth + 10
-    })
+    ctx.font = 'bold 16px system-ui'
+    ctx.fillText('FOLLOWERS', W / 2, 590)
 
     // Footer
     ctx.fillStyle = '#6B7280'
-    ctx.font = '18px system-ui'
-    ctx.fillText('smtm.ai • Track predictions & whales', 50, H - 30)
+    ctx.font = '16px system-ui'
+    ctx.fillText('smtm.ai', W / 2, H - 40)
 
   }, [shareModalOpen, profile])
 
@@ -159,7 +120,6 @@ export function ProfileCard({ userId }: ProfileCardProps) {
         return
       }
     } catch {
-      // Fallback to download
       downloadImage()
     }
   }, [])
@@ -175,107 +135,80 @@ export function ProfileCard({ userId }: ProfileCardProps) {
   }, [])
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="rounded-2xl border-2 border-white/20 p-6 md:p-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center gap-6 mb-8">
-          <div className="flex items-center gap-4 flex-1">
-            <div
-              className="w-[72px] h-[72px] rounded-xl grid place-items-center text-2xl md:text-3xl font-bold border border-white/10"
-              style={avatarStyle(profile.handle)}
-            >
-              {profile.name.charAt(0)}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-display text-2xl md:text-3xl font-extrabold leading-tight">
-                  {profile.name}
-                </h2>
-                {profile.verified && (
-                  <span className="inline-flex items-center gap-1 text-teal text-sm">
-                    <CheckCircle2 className="h-4 w-4" /> Verified
-                  </span>
-                )}
-              </div>
-              <div className="text-muted">@{profile.handle}</div>
-            </div>
-          </div>
+    <div className="mx-auto max-w-md">
+      <div className="rounded-2xl border-2 border-white/20 p-6 relative overflow-hidden">
+        {/* Subtle Background */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-10 right-5 w-48 h-48 bg-teal/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-10 left-5 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl" />
+        </div>
 
-          <div className="inline-flex items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-teal/10 text-teal text-sm px-3 py-1.5 border border-teal/30 font-semibold">
-              Credibility {profile.credibility}
-            </span>
+        {/* Header */}
+        <div className="relative flex items-center gap-3 mb-8">
+          <div
+            className="w-12 h-12 rounded-xl grid place-items-center text-lg font-bold border border-white/10"
+            style={avatarStyle(profile.handle)}
+          >
+            {profile.name.charAt(0)}
+          </div>
+          <div>
+            <h2 className="text-base font-bold">{profile.name}</h2>
+            <div className="text-sm text-white/50">@{profile.handle}</div>
           </div>
         </div>
 
-        {/* Hero Stats - Prominent Display */}
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <HeroStat label="Predictions" value={`${profile.stats.predictions}`} />
-          <HeroStat label="Accuracy" value={`${profile.stats.accuracy}%`} highlight series={accuracySeries} />
-          <HeroStat label="Tips Earned" value={`$${profile.stats.tips}`} />
+        {/* Balance & PNL - Most Prominent */}
+        <div className="relative text-center py-8 space-y-6">
+          {/* Balance */}
+          <div>
+            <div className="text-6xl font-extrabold bg-gradient-to-r from-teal to-lime-400 bg-clip-text text-transparent leading-none">
+              ${profile.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-xs text-white/40 uppercase tracking-wider mt-2">
+              Balance
+            </div>
+          </div>
+
+          {/* PNL */}
+          <div>
+            <div className={`text-5xl font-extrabold leading-none ${profile.pnl >= 0 ? 'text-lime-400' : 'text-red-400'}`}>
+              {profile.pnl >= 0 ? '+' : ''}{profile.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className={`text-2xl font-bold mt-1 ${profile.pnl >= 0 ? 'text-lime-400/70' : 'text-red-400/70'}`}>
+              ({profile.pnl >= 0 ? '+' : ''}{profile.pnlPercent}%)
+            </div>
+            <div className="text-xs text-white/40 uppercase tracking-wider mt-2">
+              PNL
+            </div>
+          </div>
+        </div>
+
+        {/* Follower Count */}
+        <div className="relative text-center py-4 border-t border-white/10">
+          <div className="text-3xl font-bold text-white/90">
+            {profile.followers.toLocaleString()}
+          </div>
+          <div className="text-xs text-white/40 uppercase tracking-wider mt-1">
+            Followers
+          </div>
         </div>
 
         {/* Share Buttons */}
-        <div className="flex gap-2 mb-8">
+        <div className="relative flex gap-2 mt-6">
           <button
             onClick={onShareLink}
-            className="flex-1 h-12 px-4 rounded-lg border border-white/10 bg-white/[0.03] text-sm font-semibold hover:bg-white/[0.06] transition inline-flex items-center justify-center gap-2"
+            className="flex-1 h-11 px-4 rounded-lg border border-white/10 bg-white/[0.03] text-sm font-semibold hover:bg-white/[0.06] transition inline-flex items-center justify-center gap-2"
           >
             <Share2 className="h-4 w-4" />
-            {copied ? 'Link Copied!' : 'Share Link'}
+            {copied ? 'Copied!' : 'Share'}
           </button>
           <button
             onClick={() => setShareModalOpen(true)}
-            className="flex-1 h-12 px-4 rounded-lg border border-teal/30 bg-teal/10 text-teal text-sm font-semibold hover:bg-teal/20 transition inline-flex items-center justify-center gap-2"
+            className="flex-1 h-11 px-4 rounded-lg border border-teal/30 bg-teal/10 text-teal text-sm font-semibold hover:bg-teal/20 transition inline-flex items-center justify-center gap-2"
           >
             <ImageIcon className="h-4 w-4" />
-            Share Image
+            Image
           </button>
-        </div>
-
-        {/* Community Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          <Strip label="Followers" value={followerCount.toLocaleString()} />
-          <Strip label="Following" value={profile.stats.following.toLocaleString()} />
-          <Strip label="Open Positions" value={profile.stats.openPositions.toString()} />
-          <Strip label="Resolved" value={profile.stats.resolved.toString()} />
-        </div>
-
-        {/* Badges */}
-        <div className="pt-6 border-t border-white/10">
-          <div className="text-xs text-white/60 mb-3 font-semibold">ACHIEVEMENTS</div>
-          <div className="flex flex-wrap gap-2">
-            {profile.badges.map((badge, i) => (
-              <span key={i} className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80 text-sm">
-                {badge}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Trust Info */}
-        <div className="mt-6 pt-6 border-t border-white/10 flex flex-wrap gap-3 text-sm">
-          <span className="inline-flex items-center gap-2 text-white/60">
-            <Shield className="h-4 w-4 text-teal" />
-            Trust Layer: Reputation-first
-          </span>
-          <span className="inline-flex items-center gap-2 text-white/60">
-            <Link2 className="h-4 w-4 text-teal" />
-            Portfolio: {profile.portfolioLinked ? 'Linked (Coinbase API)' : 'Not Linked'}
-          </span>
-        </div>
-
-        {/* Footer */}
-        <div className="mt-6 pt-4 border-t border-white/10 text-center text-sm text-muted">
-          Track predictions and whales with{' '}
-          <a
-            href="https://t.me/smtmbot"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-teal hover:underline"
-          >
-            @SMTMBot
-          </a>
         </div>
       </div>
 
@@ -314,66 +247,7 @@ export function ProfileCard({ userId }: ProfileCardProps) {
   )
 }
 
-function HeroStat({
-  label,
-  value,
-  highlight,
-  series,
-}: {
-  label: string
-  value: string
-  highlight?: boolean
-  series?: number[]
-}) {
-  const path = useMemo(() => {
-    if (!series) return ''
-    return sparklinePath(series, 100, 30)
-  }, [series])
-
-  return (
-    <div
-      className={`rounded-xl border p-6 text-center transition-all ${
-        highlight
-          ? 'border-teal/30 bg-teal/5 shadow-[0_0_20px_rgba(0,229,255,0.15)]'
-          : 'border-white/10 bg-white/5'
-      }`}
-    >
-      <div className="text-xs text-white/60 mb-2 font-semibold uppercase">{label}</div>
-      <div className={`font-extrabold mb-2 ${highlight ? 'text-5xl text-teal' : 'text-4xl text-white/90'}`}>
-        {value}
-      </div>
-      {series && path && (
-        <svg width="100" height="30" viewBox="0 0 100 30" className="mx-auto">
-          <path d={path} fill="none" stroke="#00E5FF" strokeWidth="2" />
-        </svg>
-      )}
-    </div>
-  )
-}
-
-function Strip({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3">
-      <div className="text-xs text-muted">{label}</div>
-      <div className="text-lg font-semibold">{value}</div>
-    </div>
-  )
-}
-
-function sparklinePath(data: number[], width: number, height: number) {
-  if (data.length === 0) return ''
-  const step = width / (data.length - 1 || 1)
-  return data
-    .map((v, i) => {
-      const x = i * step
-      const y = height - (v / 100) * height
-      return `${i === 0 ? 'M' : 'L'}${x},${y}`
-    })
-    .join(' ')
-}
-
 function avatarStyle(seed: string): React.CSSProperties {
-  // Simple deterministic HSL gradient based on seed hash
   let h = 0
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360
   const h2 = (h + 40) % 360
@@ -381,55 +255,4 @@ function avatarStyle(seed: string): React.CSSProperties {
     background: `linear-gradient(135deg, hsl(${h} 70% 20%), hsl(${h2} 70% 15%))`,
     color: 'white',
   }
-}
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  if (w < 2 * r) r = w / 2
-  if (h < 2 * r) r = h / 2
-  ctx.beginPath()
-  ctx.moveTo(x + r, y)
-  ctx.arcTo(x + w, y, x + w, y + h, r)
-  ctx.arcTo(x + w, y + h, x, y + h, r)
-  ctx.arcTo(x, y + h, x, y, r)
-  ctx.arcTo(x, y, x + w, y, r)
-  ctx.closePath()
-}
-
-function drawHeroStat(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  value: string,
-  label: string,
-  color: string,
-  highlight?: boolean
-) {
-  const boxW = 210
-  const boxH = 140
-
-  // Box background
-  if (highlight) {
-    ctx.fillStyle = 'rgba(0,229,255,0.1)'
-    ctx.strokeStyle = 'rgba(0,229,255,0.3)'
-  } else {
-    ctx.fillStyle = 'rgba(255,255,255,0.05)'
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)'
-  }
-  ctx.lineWidth = 2
-  roundRect(ctx, x, y, boxW, boxH, 12)
-  ctx.fill()
-  ctx.stroke()
-
-  // Label
-  ctx.fillStyle = '#9CA3AF'
-  ctx.font = 'bold 14px system-ui'
-  ctx.textAlign = 'center'
-  ctx.fillText(label.toUpperCase(), x + boxW / 2, y + 30)
-
-  // Value
-  ctx.fillStyle = highlight ? '#B6FF00' : color
-  ctx.font = `bold ${highlight ? '56px' : '48px'} system-ui`
-  ctx.fillText(value, x + boxW / 2, y + 90)
-
-  ctx.textAlign = 'start' // Reset
 }

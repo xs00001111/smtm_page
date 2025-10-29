@@ -29,11 +29,18 @@ interface WhaleTradeSubscription {
   addressFilter?: string; // Optional wallet address to follow
 }
 
+interface WhaleAllSubscription {
+  userId: number;
+  addressFilter: string; // Wallet address to follow across all markets
+  minTradeSize: number;
+}
+
 export class WebSocketMonitorService {
   private client: RealTimeDataClient | null = null;
   private bot: Telegraf;
   private marketSubscriptions: Map<string, MarketSubscription[]> = new Map();
   private whaleSubscriptions: Map<string, WhaleTradeSubscription[]> = new Map();
+  private whaleAllSubscriptions: Map<string, WhaleAllSubscription[]> = new Map(); // key: wallet address (lowercase)
   private pendingWhaleSubscriptions: Map<string, Array<{ userId: number; marketName: string; minTradeSize: number; addressFilter?: string }>> = new Map();
   private observerTokenIds: Set<string> = new Set();
   private pendingMarketSubscriptions: Map<string, MarketSubscription[]> = new Map(); // key: conditionId
@@ -49,7 +56,7 @@ export class WebSocketMonitorService {
   }
 
   private hasSubscriptions(): boolean {
-    return this.marketSubscriptions.size > 0 || this.whaleSubscriptions.size > 0;
+    return this.marketSubscriptions.size > 0 || this.whaleSubscriptions.size > 0 || this.whaleAllSubscriptions.size > 0;
   }
 
   /**
@@ -323,6 +330,61 @@ export class WebSocketMonitorService {
   }
 
   /**
+   * Subscribe user to whale alerts across ALL markets (copy trading)
+   */
+  subscribeToWhaleTradesAll(
+    userId: number,
+    addressFilter: string,
+    minTradeSize: number = 1000
+  ): boolean {
+    const walletKey = addressFilter.toLowerCase();
+    const existing = this.whaleAllSubscriptions
+      .get(walletKey)
+      ?.find((sub) => sub.userId === userId);
+
+    if (existing) {
+      logger.info('User already subscribed to whale-all', { userId, wallet: walletKey });
+      return false;
+    }
+
+    const subscription: WhaleAllSubscription = {
+      userId,
+      addressFilter: walletKey,
+      minTradeSize,
+    };
+
+    const subs = this.whaleAllSubscriptions.get(walletKey) || [];
+    subs.push(subscription);
+    this.whaleAllSubscriptions.set(walletKey, subs);
+
+    logger.info('Added whale-all subscription', { userId, wallet: walletKey });
+    return true;
+  }
+
+  /**
+   * Unsubscribe user from whale alerts across ALL markets
+   */
+  unsubscribeFromWhaleTradesAll(userId: number, addressFilter: string): boolean {
+    const walletKey = addressFilter.toLowerCase();
+    const subs = this.whaleAllSubscriptions.get(walletKey);
+    if (!subs) return false;
+
+    const index = subs.findIndex((sub) => sub.userId === userId);
+    if (index === -1) return false;
+
+    subs.splice(index, 1);
+
+    if (subs.length === 0) {
+      this.whaleAllSubscriptions.delete(walletKey);
+    } else {
+      this.whaleAllSubscriptions.set(walletKey, subs);
+    }
+
+    logger.info('Removed whale-all subscription', { userId, wallet: walletKey });
+    return true;
+  }
+
+  /**
    * Get all user subscriptions
    */
   getUserSubscriptions(userId: number): {
@@ -460,15 +522,29 @@ export class WebSocketMonitorService {
     const makerAddr = (payload.maker_address || payload.maker || '').toLowerCase()
     whaleAggregator.recordTrade(makerAddr, tokenId, tradeValue, Date.now())
 
+    // Check market-specific whale subscriptions
     const subscriptions = this.whaleSubscriptions.get(tokenId);
-    if (!subscriptions || subscriptions.length === 0) return;
+    if (subscriptions && subscriptions.length > 0) {
+      for (const sub of subscriptions) {
+        if (tradeValue >= sub.minTradeSize) {
+          // If following a specific wallet, filter by maker address
+          const maker = (payload.maker_address || payload.maker || '').toLowerCase();
+          if (sub.addressFilter && maker !== sub.addressFilter) continue;
+          await this.notifyWhaleTrade(sub, payload, tradeValue);
+        }
+      }
+    }
 
-    for (const sub of subscriptions) {
-      if (tradeValue >= sub.minTradeSize) {
-        // If following a specific wallet, filter by maker address
-        const maker = (payload.maker_address || payload.maker || '').toLowerCase();
-        if (sub.addressFilter && maker !== sub.addressFilter) continue;
-        await this.notifyWhaleTrade(sub, payload, tradeValue);
+    // Check whale-all subscriptions (following wallet across all markets)
+    const maker = (payload.maker_address || payload.maker || '').toLowerCase();
+    if (maker) {
+      const whaleAllSubs = this.whaleAllSubscriptions.get(maker);
+      if (whaleAllSubs && whaleAllSubs.length > 0) {
+        for (const sub of whaleAllSubs) {
+          if (tradeValue >= sub.minTradeSize) {
+            await this.notifyWhaleTradeAll(sub, payload, tradeValue, tokenId);
+          }
+        }
       }
     }
   }
@@ -539,6 +615,58 @@ export class WebSocketMonitorService {
       });
     } catch (error) {
       logger.error('Failed to send whale trade notification', {
+        userId: subscription.userId,
+        error,
+      });
+    }
+  }
+
+  /**
+   * Send whale-all trade notification to user
+   */
+  private async notifyWhaleTradeAll(
+    subscription: WhaleAllSubscription,
+    trade: any,
+    tradeValue: number,
+    tokenId: string
+  ): Promise<void> {
+    const maker = trade.maker_address || trade.maker || 'Unknown';
+    const side = trade.side || (trade.type === 'buy' ? 'BUY' : 'SELL');
+    const emoji = side === 'BUY' ? '💰' : '💸';
+    const shortAddr = formatAddress(maker, 6);
+
+    // Try to get market name from our subscriptions or fetch it
+    let marketName = 'Unknown Market';
+
+    // Check if we have this market in our subscriptions
+    const marketSubs = this.marketSubscriptions.get(tokenId);
+    if (marketSubs && marketSubs.length > 0) {
+      marketName = marketSubs[0].marketName;
+    } else {
+      const whaleSubs = this.whaleSubscriptions.get(tokenId);
+      if (whaleSubs && whaleSubs.length > 0) {
+        marketName = whaleSubs[0].marketName;
+      }
+    }
+
+    const message =
+      `🐋 **Copy Trade Alert**\n\n` +
+      `Whale: \`${shortAddr}\`\n` +
+      `Market: ${marketName}\n\n` +
+      `${emoji} **${side}** ${formatVolume(tradeValue)}\n` +
+      `Price: ${formatPrice(parseFloat(trade.price || '0'))}`;
+
+    try {
+      await this.bot.telegram.sendMessage(subscription.userId, message, {
+        parse_mode: 'Markdown',
+      });
+      logger.info('Sent whale-all trade notification', {
+        userId: subscription.userId,
+        wallet: subscription.addressFilter,
+        tradeValue,
+      });
+    } catch (error) {
+      logger.error('Failed to send whale-all trade notification', {
         userId: subscription.userId,
         error,
       });

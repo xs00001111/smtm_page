@@ -7,7 +7,7 @@ import { WebSocketMonitorService } from './websocket-monitor'
 type StoredRow = {
   created_at: string
   user_id: number
-  type: 'market' | 'whale'
+  type: 'market' | 'whale' | 'whale_all'
   token_id: string
   market_condition_id?: string | null
   market_name: string
@@ -83,6 +83,11 @@ export async function loadSubscriptions(ws: WebSocketMonitorService) {
           }
         } else {
           ws.subscribeToMarket(row.user_id, row.token_id, row.market_name, row.threshold ?? 5)
+        }
+      } else if (row.type === 'whale_all') {
+        // Whale following across all markets
+        if (row.address_filter) {
+          ws.subscribeToWhaleTradesAll(row.user_id, row.address_filter, row.min_trade_size ?? 1000)
         }
       } else {
         if (!row.token_id && row.market_condition_id) {
@@ -202,4 +207,26 @@ export async function updateWhaleToken(userId: number, conditionId: string, toke
   })
   if (updated) await save()
   return updated
+}
+
+export async function addWhaleSubscriptionAll(
+  userId: number,
+  addressFilter: string,
+  minTradeSize: number
+) {
+  rows.push({
+    created_at: new Date().toISOString(),
+    user_id: userId,
+    type: 'whale_all',
+    token_id: '',
+    market_name: 'All Markets',
+    min_trade_size: minTradeSize,
+    address_filter: addressFilter,
+  })
+  await save()
+}
+
+export async function removeWhaleSubscriptionAll(userId: number, addressFilter: string) {
+  rows = rows.filter((r) => !(r.type === 'whale_all' && r.user_id === userId && (r.address_filter || '').toLowerCase() === addressFilter.toLowerCase()))
+  await save()
 }
