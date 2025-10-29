@@ -96,38 +96,42 @@ export async function getTrendingWithPriceChanges(limit = 10) {
 }
 
 /**
- * Search markets using fuzzy matching on active markets
- * More accurate than Polymarket's built-in search API
+ * Search markets using Polymarket's native search API
+ * More comprehensive than local fuzzy search on limited markets
  */
 export async function findMarketFuzzy(query: string, limit = 5): Promise<GammaMarket[]> {
   try {
-    // Fetch active markets by volume (top 100)
-    const markets = await gammaApi.getActiveMarkets(100, 'volume');
+    // Use Polymarket's native search API which searches all markets
+    const markets = await gammaApi.searchMarkets(query, limit);
+    return markets;
+  } catch (error) {
+    console.error('Market search failed:', error);
+    // Fallback to fuzzy search on active markets if native search fails
+    try {
+      const activeMarkets = await gammaApi.getActiveMarkets(500, 'volume');
 
-    if (markets.length === 0) {
+      if (activeMarkets.length === 0) {
+        return [];
+      }
+
+      const fuse = new Fuse(activeMarkets, {
+        keys: [
+          { name: 'question', weight: 0.7 },
+          { name: 'slug', weight: 0.2 },
+          { name: 'description', weight: 0.1 }
+        ],
+        threshold: 0.4,
+        includeScore: true,
+        ignoreLocation: true,
+        minMatchCharLength: 2
+      });
+
+      const results = fuse.search(query, { limit });
+      return results.map(r => r.item);
+    } catch (fallbackError) {
+      console.error('Fallback fuzzy search also failed:', fallbackError);
       return [];
     }
-
-    // Configure fuzzy search
-    const fuse = new Fuse(markets, {
-      keys: [
-        { name: 'question', weight: 0.7 },
-        { name: 'slug', weight: 0.2 },
-        { name: 'description', weight: 0.1 }
-      ],
-      threshold: 0.4, // 0 = exact match, 1 = match anything
-      includeScore: true,
-      ignoreLocation: true,
-      minMatchCharLength: 2
-    });
-
-    // Search
-    const results = fuse.search(query, { limit });
-
-    return results.map(r => r.item);
-  } catch (error) {
-    console.error('Fuzzy search failed:', error);
-    return [];
   }
 }
 
