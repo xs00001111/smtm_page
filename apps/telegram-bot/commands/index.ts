@@ -234,6 +234,7 @@ export function registerCommands(bot: Telegraf) {
         results.forEach((market, i) => {
           const title = market.question || 'Untitled';
           const conditionId = market.condition_id || market.conditionId;
+          const slug = market.slug || market.market_slug;
 
           // Parse price
           let priceStr = 'N/A';
@@ -250,6 +251,9 @@ export function registerCommands(bot: Telegraf) {
 
           message += `${i + 1}. ${title.slice(0, 80)}${title.length > 80 ? '...' : ''}\n`;
           message += `   Price: ${priceStr}\n`;
+          if (slug) {
+            message += `   🔗 https://polymarket.com/event/${slug}\n`;
+          }
           if (conditionId) {
             message += `   /price ${conditionId}\n`;
           }
@@ -288,7 +292,8 @@ export function registerCommands(bot: Telegraf) {
 
           message += `${i + 1}. ${name} (${short})\n`;
           message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`;
-          message += `   Rank: #${whale.rank}\n\n`;
+          message += `   Rank: #${whale.rank}\n`;
+          message += `   🔗 https://polymarket.com/user/${whale.user_id}\n\n`;
         });
 
         message += '💡 Use /whales to see full leaderboard';
@@ -422,7 +427,8 @@ export function registerCommands(bot: Telegraf) {
             const pnl = entry.pnl > 0 ? `+$${Math.round(entry.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(entry.pnl)).toLocaleString()}`
             const vol = `$${Math.round(entry.vol).toLocaleString()}`
             msg += `${i+1}. ${name} (${short})\n`
-            msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n\n`
+            msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+            msg += `   🔗 https://polymarket.com/user/${entry.user_id}\n\n`
           })
           msg += '💡 How to follow a whale:\n'
           msg += '• /follow <whale_address> — copy ALL their trades\n'
@@ -456,10 +462,16 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply('❌ No whales found for this market.')
         return
       }
-      let msg = `🐋 Whales — ${market.question}\n\n`
+      const marketSlug = market.slug || market.market_slug;
+      let msg = `🐋 Whales — ${market.question}\n`;
+      if (marketSlug) {
+        msg += `🔗 https://polymarket.com/event/${marketSlug}\n`;
+      }
+      msg += '\n';
       whales.forEach(([addr, bal], i) => {
         const short = addr.slice(0,6)+'...'+addr.slice(-4)
         msg += `${i+1}. ${short}  — balance: ${Math.round(bal)}\n`
+        msg += `   🔗 https://polymarket.com/user/${addr}\n`
         msg += `   Follow all: /follow ${addr}\n`
         msg += `   Follow here: /follow ${addr} ${market.condition_id}\n`
       })
@@ -725,10 +737,14 @@ export function registerCommands(bot: Telegraf) {
           } catch {}
         }
 
+        const slug = market?.slug || market?.market_slug;
         message += `${idx}. ${title}\n`
         message += `   📊 Price: ${price}%\n`
         message += `   💰 Volume: $${volM}M\n`
         message += `   🧊 Liquidity: $${liqM}M\n`
+        if (slug) {
+          message += `   🔗 https://polymarket.com/event/${slug}\n`
+        }
         if (cond) {
           message += `   ➕ Follow: /follow ${cond}\n\n`
         } else {
