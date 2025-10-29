@@ -171,7 +171,7 @@ export function registerCommands(bot: Telegraf) {
       message += `\n📈 Volume: ${volume}\n`;
       message += `🧊 Liquidity: ${liquidity}\n`;
       message += `📅 Ends: ${endDate}\n\n`;
-      message += `🔗 Trade: https://polymarket.com/event/${market.slug || market.market_slug || ''}\n`;
+      message += `🔗 Trade: https://polymarket.com/event/${market.market_slug || market.slug || ''}\n`;
 
       if (conditionId) {
         message += `\n💡 Follow price alerts:\n/follow ${conditionId}`;
@@ -234,7 +234,7 @@ export function registerCommands(bot: Telegraf) {
         results.forEach((market, i) => {
           const title = market.question || 'Untitled';
           const conditionId = market.condition_id || market.conditionId;
-          const slug = market.slug || market.market_slug;
+          const slug = market.market_slug || market.slug;
 
           // Parse price
           let priceStr = 'N/A';
@@ -462,7 +462,7 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply('❌ No whales found for this market.')
         return
       }
-      const marketSlug = market.slug || market.market_slug;
+      const marketSlug = market.market_slug || market.slug;
       let msg = `🐋 Whales — ${market.question}\n`;
       if (marketSlug) {
         msg += `🔗 https://polymarket.com/event/${marketSlug}\n`;
@@ -732,12 +732,12 @@ export function registerCommands(bot: Telegraf) {
         let cond: string | null = market?.conditionId || market?.condition_id || null
         if (!cond) {
           try {
-            const via = market?.slug || market?.market_slug || title
+            const via = market?.market_slug || market?.slug || title
             cond = await gammaApi.findConditionId(String(via))
           } catch {}
         }
 
-        const slug = market?.slug || market?.market_slug;
+        const slug = market?.market_slug || market?.slug;
         message += `${idx}. ${title}\n`
         message += `   📊 Price: ${price}%\n`
         message += `   💰 Volume: $${volM}M\n`
