@@ -13,6 +13,8 @@ export function ProfileCard({ userId }: ProfileCardProps) {
     name: 'Crypto Chad',
     handle: 'cryptochad',
     balance: 12450.50,
+    balanceChange24h: 125.30,
+    balanceChangePercent24h: 1.02,
     pnl: 3245.20,
     pnlPercent: 35.2,
     followers: 1248,
@@ -58,53 +60,101 @@ export function ProfileCard({ userId }: ProfileCardProps) {
     ctx.fillStyle = glowGrad
     ctx.fillRect(0, 0, W, H)
 
-    // Header
+    // Header - User info top left, SMTM branding top right
+    ctx.textAlign = 'left'
     ctx.fillStyle = '#FFFFFF'
-    ctx.font = 'bold 32px system-ui'
+    ctx.font = 'bold 24px system-ui'
     ctx.fillText(profile.name, 50, 60)
 
     ctx.fillStyle = '#9CA3AF'
-    ctx.font = '18px system-ui'
-    ctx.fillText(`@${profile.handle}`, 50, 90)
+    ctx.font = '15px system-ui'
+    ctx.fillText(`@${profile.handle}`, 50, 88)
 
-    // Balance (HERO)
-    ctx.fillStyle = '#00E5FF'
-    ctx.font = 'bold 110px system-ui'
-    ctx.textAlign = 'center'
-    ctx.fillText(`$${profile.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, W / 2, 230)
-
+    // SMTM branding top right (fallback text)
+    ctx.textAlign = 'right'
     ctx.fillStyle = '#6B7280'
-    ctx.font = 'bold 18px system-ui'
-    ctx.fillText('BALANCE', W / 2, 270)
+    ctx.font = 'bold 16px system-ui'
+    ctx.fillText('SMTM', W - 50, 60)
+    // Try to draw logo image if available
+    try {
+      const logo = new Image()
+      logo.crossOrigin = 'anonymous'
+      logo.onload = () => {
+        const size = 24
+        const x = W - 50 - size - 8
+        const y = 60 - size / 2 - 4
+        ctx.globalAlpha = 0.8
+        ctx.drawImage(logo, x, y, size, size)
+        ctx.globalAlpha = 1
+      }
+      logo.src = '/logo-1024.png'
+    } catch {}
 
-    // PNL (Secondary)
-    const pnlColor = profile.pnl >= 0 ? '#B6FF00' : '#FF4444'
+    // Hero PNL - centered without background
+    ctx.textAlign = 'center'
+    const pnlColor = profile.pnl >= 0 ? '#4ADE80' : '#EF4444'
     ctx.fillStyle = pnlColor
-    ctx.font = 'bold 80px system-ui'
-    const pnlText = `${profile.pnl >= 0 ? '+' : ''}${profile.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    ctx.fillText(pnlText, W / 2, 380)
+    ctx.font = 'black 110px system-ui'
+    const pnlValue = Math.abs(profile.pnl).toFixed(0)
+    const pnlText = `${profile.pnl >= 0 ? '+' : ''}$${pnlValue}`
+    ctx.fillText(pnlText, W / 2, 220)
 
+    // Large percentage
     ctx.fillStyle = pnlColor
     ctx.font = 'bold 36px system-ui'
-    ctx.fillText(`(${profile.pnl >= 0 ? '+' : ''}${profile.pnlPercent}%)`, W / 2, 430)
+    ctx.fillText(`${profile.pnl >= 0 ? '+' : ''}${profile.pnlPercent}%`, W / 2, 270)
 
-    ctx.fillStyle = '#6B7280'
-    ctx.font = 'bold 16px system-ui'
-    ctx.fillText('PNL', W / 2, 465)
-
-    // Followers
-    ctx.fillStyle = '#FFFFFF'
-    ctx.font = 'bold 48px system-ui'
-    ctx.fillText(profile.followers.toLocaleString(), W / 2, 555)
-
-    ctx.fillStyle = '#6B7280'
-    ctx.font = 'bold 16px system-ui'
-    ctx.fillText('FOLLOWERS', W / 2, 590)
-
-    // Footer
+    // Make label more prominent
     ctx.fillStyle = '#6B7280'
     ctx.font = '16px system-ui'
-    ctx.fillText('smtm.ai', W / 2, H - 40)
+    ctx.fillText('ALL-TIME P&L', W / 2, 300)
+
+    // Secondary metrics row
+    const row1Y = 360
+    const row2Y = 395
+    const spacing = 240
+
+    ctx.font = '13px system-ui'
+    ctx.fillStyle = '#6B7280'
+    // Portfolio
+    ctx.fillText('Portfolio', W / 2 - spacing / 2, row1Y)
+    ctx.fillStyle = '#FFFFFF'
+    ctx.font = 'bold 28px system-ui'
+    ctx.fillText(`$${(profile.balance / 1000).toFixed(1)}K`, W / 2 - spacing / 2, row2Y)
+
+    // Today change
+    ctx.font = '13px system-ui'
+    ctx.fillStyle = '#6B7280'
+    ctx.fillText('Today', W / 2 + spacing / 2, row1Y)
+    const todayColor = profile.balanceChange24h >= 0 ? '#4ADE80' : '#EF4444'
+    ctx.fillStyle = todayColor
+    ctx.font = 'bold 28px system-ui'
+    ctx.fillText(`${profile.balanceChange24h >= 0 ? '+' : ''}$${Math.abs(profile.balanceChange24h).toFixed(0)}`, W / 2 + spacing / 2, row2Y)
+
+    // Divider
+    ctx.strokeStyle = '#374151'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(W / 2, row1Y - 10)
+    ctx.lineTo(W / 2, row2Y + 5)
+    ctx.stroke()
+
+    // Divider line
+    ctx.strokeStyle = '#374151'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(80, 440)
+    ctx.lineTo(W - 80, 440)
+    ctx.stroke()
+
+    // Footer CTA
+    ctx.textAlign = 'center'
+    ctx.fillStyle = '#6B7280'
+    ctx.font = '13px system-ui'
+    ctx.fillText('Track your trades', W / 2, 620)
+    ctx.fillStyle = '#00E5FF'
+    ctx.font = 'bold 15px system-ui'
+    ctx.fillText('Join @SMTMBot →', W / 2, 650)
 
   }, [shareModalOpen, profile])
 
@@ -137,64 +187,79 @@ export function ProfileCard({ userId }: ProfileCardProps) {
   return (
     <div className="mx-auto max-w-md">
       <div className="rounded-2xl border-2 border-white/20 p-6 relative overflow-hidden">
-        {/* Subtle Background */}
+        {/* Premium Background */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-10 right-5 w-48 h-48 bg-teal/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-10 left-5 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl" />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-teal/20 via-purple-500/10 to-transparent rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-56 h-56 bg-gradient-to-tr from-lime-400/15 via-teal/10 to-transparent rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-teal/5 rounded-full blur-3xl" />
         </div>
 
-        {/* Header */}
-        <div className="relative flex items-center gap-3 mb-8">
-          <div
-            className="w-12 h-12 rounded-xl grid place-items-center text-lg font-bold border border-white/10"
-            style={avatarStyle(profile.handle)}
-          >
-            {profile.name.charAt(0)}
-          </div>
-          <div>
-            <h2 className="text-base font-bold">{profile.name}</h2>
-            <div className="text-sm text-white/50">@{profile.handle}</div>
-          </div>
-        </div>
-
-        {/* Balance & PNL - Most Prominent */}
-        <div className="relative text-center py-8 space-y-6">
-          {/* Balance */}
-          <div>
-            <div className="text-6xl font-extrabold bg-gradient-to-r from-teal to-lime-400 bg-clip-text text-transparent leading-none">
-              ${profile.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        {/* Header with Branding */}
+        <div className="relative flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-12 h-12 rounded-xl grid place-items-center text-lg font-bold border border-white/10"
+              style={avatarStyle(profile.handle)}
+            >
+              {profile.name.charAt(0)}
             </div>
-            <div className="text-xs text-white/40 uppercase tracking-wider mt-2">
-              Balance
+            <div>
+              <h2 className="text-base font-bold">{profile.name}</h2>
+              <div className="text-sm text-white/50">@{profile.handle}</div>
             </div>
           </div>
-
-          {/* PNL */}
-          <div>
-            <div className={`text-5xl font-extrabold leading-none ${profile.pnl >= 0 ? 'text-lime-400' : 'text-red-400'}`}>
-              {profile.pnl >= 0 ? '+' : ''}{profile.pnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div className={`text-2xl font-bold mt-1 ${profile.pnl >= 0 ? 'text-lime-400/70' : 'text-red-400/70'}`}>
-              ({profile.pnl >= 0 ? '+' : ''}{profile.pnlPercent}%)
-            </div>
-            <div className="text-xs text-white/40 uppercase tracking-wider mt-2">
-              PNL
-            </div>
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo-1024.png"
+              alt="SMTM logo"
+              className="h-5 w-5 opacity-70 relative top-[1px]"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none'
+              }}
+            />
+            <div className="text-xs font-bold text-white/40 tracking-wider">SMTM</div>
           </div>
         </div>
 
-        {/* Follower Count */}
-        <div className="relative text-center py-4 border-t border-white/10">
-          <div className="text-3xl font-bold text-white/90">
-            {profile.followers.toLocaleString()}
-          </div>
-          <div className="text-xs text-white/40 uppercase tracking-wider mt-1">
-            Followers
+        {/* Hero PNL - Most Prominent */}
+        <div className="relative py-8">
+          <div className="text-center">
+            {/* Massive PNL */}
+            <div className={`whitespace-nowrap text-6xl md:text-7xl font-black leading-none mb-3 ${profile.pnl >= 0 ? 'text-green-400' : 'text-red-500'}`}>
+              {profile.pnl >= 0 ? '+' : ''}${Math.abs(profile.pnl).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </div>
+
+            {/* Large Percentage */}
+            <div className={`text-2xl font-bold mb-2 ${profile.pnl >= 0 ? 'text-green-400/80' : 'text-red-500/80'}`}>
+              {profile.pnl >= 0 ? '+' : ''}{profile.pnlPercent}%
+            </div>
+
+            <div className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-8">All-Time P&L</div>
+
+            {/* Secondary Metrics */}
+            <div className="flex items-center justify-center gap-8">
+              <div className="text-center">
+                <div className="text-xs text-white/40 mb-1">Portfolio</div>
+                <div className="text-xl font-bold text-white">
+                  ${(profile.balance / 1000).toFixed(1)}K
+                </div>
+              </div>
+              <div className="w-px h-12 bg-white/10" />
+              <div className="text-center">
+                <div className="text-xs text-white/40 mb-1">Today</div>
+                <div className={`text-xl font-bold ${profile.balanceChange24h >= 0 ? 'text-green-400' : 'text-red-500'}`}>
+                  {profile.balanceChange24h >= 0 ? '+' : ''}${Math.abs(profile.balanceChange24h).toFixed(0)}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Simplified: followers and 24h change removed for now */}
 
         {/* Share Buttons */}
-        <div className="relative flex gap-2 mt-6">
+        <div className="relative flex gap-2">
           <button
             onClick={onShareLink}
             className="flex-1 h-11 px-4 rounded-lg border border-white/10 bg-white/[0.03] text-sm font-semibold hover:bg-white/[0.06] transition inline-flex items-center justify-center gap-2"
@@ -209,6 +274,19 @@ export function ProfileCard({ userId }: ProfileCardProps) {
             <ImageIcon className="h-4 w-4" />
             Image
           </button>
+        </div>
+
+        {/* Footer CTA */}
+        <div className="relative mt-6 pt-4 border-t border-white/10 text-center">
+          <div className="text-xs text-white/40 mb-2">Track your trades</div>
+          <a
+            href="https://t.me/smtmbot"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm font-medium text-teal hover:text-teal/80 transition"
+          >
+            Join @SMTMBot →
+          </a>
         </div>
       </div>
 
