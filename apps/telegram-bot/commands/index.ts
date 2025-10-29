@@ -542,12 +542,22 @@ export function registerCommands(bot: Telegraf) {
     try {
       const status = wsMonitor.getStatus();
 
+      const eta = !status.connected && status.nextReconnectInMs != null
+        ? `${Math.ceil(status.nextReconnectInMs/1000)}s`
+        : null
+
       const message =
         '🔌 WebSocket Status\n\n' +
         `Connection: ${status.connected ? '✅ Connected' : '❌ Disconnected'}\n` +
         `Active market subscriptions: ${status.marketSubscriptions}\n` +
         `Active whale subscriptions: ${status.whaleSubscriptions}\n` +
-        `Total users monitoring: ${status.totalUsers}\n\n` +
+        `Total users monitoring: ${status.totalUsers}\n` +
+        (!status.connected
+          ? `Reconnect attempt: ${status.reconnectAttempts}/${10}\n`
+          : '') +
+        (!status.connected && eta ? `Next reconnect in: ${eta}\n` : '') +
+        (!status.connected && status.rateLimited ? 'Rate limit cooldown active ⏳\n' : '') +
+        '\n' +
         (status.connected ? 'All systems operational! 🚀' : 'Attempting to reconnect...');
 
       await ctx.reply(message);

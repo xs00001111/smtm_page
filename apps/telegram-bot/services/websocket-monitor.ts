@@ -49,7 +49,8 @@ export class WebSocketMonitorService {
   private reconnectDelay = 10000; // Start with 10 seconds
   private isConnecting = false;
   private isRateLimited = false;
-  private rateLimitCooldown = 60000; // 60 seconds cooldown after rate limit
+  private rateLimitCooldown = 180000; // 3 minutes cooldown after rate limit
+  private nextReconnectAt: number | null = null;
 
   constructor(bot: Telegraf) {
     this.bot = bot;
@@ -83,11 +84,15 @@ export class WebSocketMonitorService {
         onDisconnect: this.handleDisconnect.bind(this),
         onError: this.handleError.bind(this),
       });
+      // Disable the client's built-in immediate auto-reconnect. We'll manage
+      // reconnection with backoff to avoid 429 rate limits.
+      // @ts-ignore - property exists at runtime in the packaged client
+      this.client.autoReconnect = false;
 
       await this.client.connect();
+      // Do not mark as not-connecting yet; wait for onConnect callback to fire.
       this.reconnectAttempts = 0;
-      this.isConnecting = false;
-      logger.info('WebSocket connection established');
+      logger.info('WebSocket connect initiated');
 
       // Attempt resolving any pending market subscriptions
       this.resolvePendingMarkets().catch(()=>{})
@@ -718,6 +723,7 @@ export class WebSocketMonitorService {
     logger.info('WebSocket connected successfully, subscribing to topics');
     this.reconnectAttempts = 0; // Reset reconnection counter on successful connect
     this.isRateLimited = false; // Clear rate limit flag
+    this.isConnecting = false;
     this.updateSubscriptions();
   }
 
@@ -727,6 +733,7 @@ export class WebSocketMonitorService {
   private handleDisconnect(): void {
     logger.warn('WebSocket disconnected');
     this.client = null;
+    this.isConnecting = false;
     if (this.hasSubscriptions()) {
       this.scheduleReconnect();
     } else {
@@ -745,6 +752,13 @@ export class WebSocketMonitorService {
       logger.warn('Rate limited by Polymarket API, entering cooldown period');
       this.isRateLimited = true;
       this.reconnectAttempts = Math.max(this.reconnectAttempts, 5); // Skip to longer delays
+      // Ensure we don't let the underlying client spin reconnects rapidly
+      if (this.client) {
+        // @ts-ignore
+        this.client.autoReconnect = false;
+      }
+      // Schedule a reconnect with cooldown if disconnected state
+      this.scheduleReconnect();
     }
   }
 
@@ -850,8 +864,12 @@ export class WebSocketMonitorService {
       logger.info(`Rate limit detected, using cooldown period: ${delay}ms`);
     }
 
-    // Cap maximum delay at 5 minutes
+    // Cap maximum delay at 5 minutes and add small jitter to avoid thundering herd
     delay = Math.min(delay, 300000);
+    const jitter = 0.2; // 20% jitter
+    const factor = 1 + (Math.random() * 2 - 1) * jitter;
+    delay = Math.floor(delay * factor);
+    this.nextReconnectAt = Date.now() + delay;
 
     this.reconnectAttempts++;
 
@@ -859,6 +877,7 @@ export class WebSocketMonitorService {
 
     setTimeout(() => {
       this.isRateLimited = false; // Reset rate limit flag
+      this.nextReconnectAt = null;
       this.start();
     }, delay);
   }
@@ -871,6 +890,9 @@ export class WebSocketMonitorService {
     marketSubscriptions: number;
     whaleSubscriptions: number;
     totalUsers: number;
+    reconnectAttempts: number;
+    nextReconnectInMs: number | null;
+    rateLimited: boolean;
   } {
     const uniqueUsers = new Set<number>();
 
@@ -887,6 +909,9 @@ export class WebSocketMonitorService {
       marketSubscriptions: this.marketSubscriptions.size,
       whaleSubscriptions: this.whaleSubscriptions.size,
       totalUsers: uniqueUsers.size,
+      reconnectAttempts: this.reconnectAttempts,
+      nextReconnectInMs: this.nextReconnectAt ? Math.max(0, this.nextReconnectAt - Date.now()) : null,
+      rateLimited: this.isRateLimited,
     };
   }
 }
