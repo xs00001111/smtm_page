@@ -59,7 +59,7 @@ export function registerCommands(bot: Telegraf) {
       await ctx.reply(
         'Usage:\n' +
         '• /price <market_slug> — e.g., /price trump-2024\n' +
-        '• /price 0x<condition_id> — direct market lookup\n' +
+        '• /price 0x<market_id> — direct market lookup\n' +
         '• /price <search_term> — search by keywords\n\n' +
         'Tip: Use /markets to find market slugs'
       );
@@ -101,7 +101,7 @@ export function registerCommands(bot: Telegraf) {
           'Try:\n' +
           '• Use /markets to browse active markets\n' +
           '• Search with different keywords\n' +
-          '• Use the full condition ID (0x...)'
+          '• Use the full market ID (0x...)'
         );
         return;
       }
@@ -256,7 +256,7 @@ export function registerCommands(bot: Telegraf) {
           message += '\n';
         });
 
-        message += '💡 Use /price <condition_id> for details';
+        message += '💡 Use /price <market_id> for details';
 
         await ctx.reply(message);
 
@@ -411,7 +411,7 @@ export function registerCommands(bot: Telegraf) {
           logger.info('whales: leaderboard returned', { count: leaderboard.length })
 
           if (leaderboard.length === 0) {
-            await ctx.reply('❌ No whales found. Try a specific market: `/whales 0x<condition_id>`', { parse_mode: 'Markdown' })
+            await ctx.reply('❌ No whales found. Try a specific market: `/whales 0x<market_id>`', { parse_mode: 'Markdown' })
             return
           }
 
@@ -431,7 +431,7 @@ export function registerCommands(bot: Telegraf) {
           return
         } catch (e: any) {
           logger.error('whales: leaderboard failed', { error: e?.message })
-          await ctx.reply('❌ Failed to fetch leaderboard. Try a specific market: `/whales 0x<condition_id>`', { parse_mode: 'Markdown' })
+          await ctx.reply('❌ Failed to fetch leaderboard. Try a specific market: `/whales 0x<market_id>`', { parse_mode: 'Markdown' })
           return
         }
       }
@@ -442,7 +442,7 @@ export function registerCommands(bot: Telegraf) {
       const first = args[0]
       const market = looksLikeCond(first) ? await gammaApi.getMarket(first) : await findMarket(q)
       if (!market) {
-        await ctx.reply('❌ Could not resolve the market. Try using 0x<condition_id>.')
+        await ctx.reply('❌ Could not resolve the market. Try using 0x<market_id>.')
         return
       }
       const holders = await dataApi.getTopHolders({ market: market.condition_id, limit: 20, minBalance })
@@ -519,14 +519,14 @@ export function registerCommands(bot: Telegraf) {
       const { whaleAggregator } = await import('../services/whale-aggregator')
       const res = whaleAggregator.getTop(windowMs, 10)
       if (!res.list.length) {
-        await ctx.reply('❌ No whales observed in this window yet. Try again later or subscribe to whale alerts for a specific market with /whale 0x<condition_id>.')
+        await ctx.reply('❌ No whales observed in this window yet. Try again later or subscribe to whale alerts for a specific market with /whale 0x<market_id>.')
         return
       }
       let msg = `🐋 Top whales (${label})\n` + `Observed markets: ${res.markets}\nUpdated: ${new Date(res.updatedAt).toUTCString()}\n\n`
       res.list.forEach(([addr, val], i) => {
         const short = addr.slice(0,6)+'...'+addr.slice(-4)
         msg += `${i+1}. ${short} — $${Math.round(val)}\n`
-        msg += `   Follow: /follow ${addr} 0x<condition_id>\n`
+        msg += `   Follow: /follow ${addr} <market_id>\n`
       })
       await ctx.reply(msg)
     } catch (e) {
