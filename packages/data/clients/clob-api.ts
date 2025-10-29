@@ -206,6 +206,16 @@ export class ClobApiClient {
     await Promise.all(promises);
     return results;
   }
+
+  /**
+   * Get market by condition ID
+   * @param conditionId - Market condition ID (0x...)
+   * @returns Market data
+   */
+  async getMarket(conditionId: string): Promise<any> {
+    const { data } = await this.client.get(`/markets/${conditionId}`);
+    return data;
+  }
 }
 
 // Export singleton instance

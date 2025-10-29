@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import type { GammaMarket, MarketsQueryParams } from '../types';
+import { clobApi } from './clob-api';
 
 /**
  * Polymarket Gamma Markets API Client
@@ -52,14 +53,15 @@ export class GammaApiClient {
       const { data } = await this.client.get<GammaMarket>(`/markets/${conditionId}`);
       return data;
     } catch (err: any) {
-      // Some deployments don't accept path param lookup; fall back to query by condition_id
+      // Gamma API path param lookup fails, use CLOB API instead
+      // CLOB API /markets/${conditionId} works correctly
       try {
-        const { data } = await this.client.get<GammaMarket[]>(`/markets`, {
-          params: { condition_id: conditionId, limit: 1 },
-        });
-        if (Array.isArray(data) && data.length > 0) return data[0];
-      } catch {}
-      throw err;
+        const market = await clobApi.getMarket(conditionId);
+        return market as GammaMarket;
+      } catch (clobErr) {
+        // If CLOB also fails, throw original error
+        throw err;
+      }
     }
   }
 
