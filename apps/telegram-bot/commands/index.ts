@@ -5,6 +5,23 @@ import { findMarket, findMarketFuzzy, findWhaleFuzzy, gammaApi, dataApi } from '
 import { wsMonitor } from '../index';
 import { botConfig } from '../config/bot';
 
+/**
+ * Generate Polymarket profile URL for a whale/trader
+ * @param username - User's display name (e.g., "Car")
+ * @param address - User's wallet address (fallback if no username)
+ * @returns Formatted profile URL
+ */
+function getPolymarketProfileUrl(username: string | null | undefined, address: string): string {
+  // If we have a real username (not "Anonymous"), use the profile format
+  if (username && username !== 'Anonymous') {
+    const encodedName = encodeURIComponent(username);
+    const lowerName = encodeURIComponent(username.toLowerCase());
+    return `https://polymarket.com/profile/%40${encodedName}?via=user%2F${lowerName}`;
+  }
+  // Fallback to address format for anonymous or address-only cases
+  return `https://polymarket.com/profile/${address}`;
+}
+
 export function registerCommands(bot: Telegraf) {
   // Start command
   bot.command('start', async (ctx) => {
@@ -300,11 +317,12 @@ export function registerCommands(bot: Telegraf) {
             ? `+$${Math.round(whale.pnl).toLocaleString()}`
             : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`;
           const vol = `$${Math.round(whale.vol).toLocaleString()}`;
+          const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id);
 
           message += `${i + 1}. ${name} (${short})\n`;
           message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`;
           message += `   Rank: #${whale.rank}\n`;
-          message += `   🔗 https://polymarket.com/user/${whale.user_id}\n\n`;
+          message += `   🔗 ${profileUrl}\n\n`;
         });
 
         message += '💡 Use /whales to see full leaderboard';
@@ -437,9 +455,10 @@ export function registerCommands(bot: Telegraf) {
             const name = entry.user_name || 'Anonymous'
             const pnl = entry.pnl > 0 ? `+$${Math.round(entry.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(entry.pnl)).toLocaleString()}`
             const vol = `$${Math.round(entry.vol).toLocaleString()}`
+            const profileUrl = getPolymarketProfileUrl(entry.user_name, entry.user_id)
             msg += `${i+1}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
-            msg += `   🔗 https://polymarket.com/user/${entry.user_id}\n\n`
+            msg += `   🔗 ${profileUrl}\n\n`
           })
           msg += '💡 How to follow a whale:\n'
           msg += '• /follow <whale_address> — copy ALL their trades\n'
@@ -484,8 +503,9 @@ export function registerCommands(bot: Telegraf) {
       msg += '\n';
       whales.forEach(([addr, bal], i) => {
         const short = addr.slice(0,6)+'...'+addr.slice(-4)
+        const profileUrl = getPolymarketProfileUrl(null, addr)
         msg += `${i+1}. ${short}  — balance: ${Math.round(bal)}\n`
-        msg += `   🔗 https://polymarket.com/user/${addr}\n`
+        msg += `   🔗 ${profileUrl}\n`
         msg += `   Follow all: /follow ${addr}\n`
         msg += `   Follow here: /follow ${addr} ${market.condition_id}\n`
       })
