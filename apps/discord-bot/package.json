@@ -1,0 +1,15 @@
+{
+  "name": "@smtm/discord-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "dev": "tsx apps/discord-bot/index.ts",
+    "start": "tsx apps/discord-bot/index.ts"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3"
+  }
+}
+

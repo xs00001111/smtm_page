@@ -6,6 +6,7 @@ dotenv.config();
 const envSchema = z.object({
   TIMEZONE: z.string().default('America/New_York'),
   TELEGRAM_BOT_TOKEN: z.string(),
+  DISCORD_BOT_TOKEN: z.string().optional(),
   POLYMARKET_MARKETS_URL: z.string().url().default('https://gamma-api.polymarket.com/markets'),
   POLYMARKET_PRICES_URL: z.string().url().default('https://clob.polymarket.com/prices-history'),
   // Optional CLOB API credentials (only needed for clob_user topic)
@@ -23,6 +24,7 @@ const envSchema = z.object({
 export const env = envSchema.parse({
   TIMEZONE: process.env.TIMEZONE || 'America/New_York',
   TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+  DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
   POLYMARKET_MARKETS_URL: process.env.POLYMARKET_MARKETS_URL || 'https://gamma-api.polymarket.com/markets',
   POLYMARKET_PRICES_URL: process.env.POLYMARKET_PRICES_URL || 'https://clob.polymarket.com/prices-history',
   POLYMARKET_API_KEY: process.env.POLYMARKET_API_KEY,
