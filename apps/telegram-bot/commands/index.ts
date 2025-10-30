@@ -822,7 +822,7 @@ export function registerCommands(bot: Telegraf) {
     if (args.length === 1 && looksLikeCond(args[0])) {
       const marketId = args[0]
       try {
-        await ctx.reply('🔍 Resolving market...')
+        await ctx.reply('⏳ Setting up price alerts...')
         const market = await gammaApi.getMarket(marketId)
         const now = Date.now()
         const endIso = (market as any)?.end_date_iso || (market as any)?.endDateIso || (market as any)?.endDate || (market as any)?.end_date
@@ -877,7 +877,7 @@ export function registerCommands(bot: Telegraf) {
       const wallet = args[0]
       const marketId = args[1]
       try {
-        await ctx.reply('🔍 Resolving market...')
+        await ctx.reply('⏳ Setting up whale alerts...')
         const market = await gammaApi.getMarket(marketId)
         const now = Date.now()
         const endIso = (market as any)?.end_date_iso || (market as any)?.endDateIso || (market as any)?.endDate || (market as any)?.end_date
@@ -928,7 +928,7 @@ export function registerCommands(bot: Telegraf) {
     if (args.length===1 && isCond(args[0])) {
       const marketId = args[0]
       try {
-        await ctx.reply('🔍 Resolving market...')
+        await ctx.reply('🔍 Looking up market...')
         const m = await gammaApi.getMarket(marketId)
         const tokenId = m?.tokens?.[0]?.token_id
         if (tokenId) {
@@ -974,7 +974,7 @@ export function registerCommands(bot: Telegraf) {
       const wallet = args[0]
       const marketId = args[1]
       try {
-        await ctx.reply('🔍 Resolving market...')
+        await ctx.reply('🔍 Looking up market...')
         const m = await gammaApi.getMarket(marketId)
         const tokenId = m?.tokens?.[0]?.token_id
         const { removeWhaleSubscription, removePendingWhaleByCondition } = await import('../services/subscriptions')
