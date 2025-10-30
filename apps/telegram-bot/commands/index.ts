@@ -171,7 +171,11 @@ export function registerCommands(bot: Telegraf) {
       message += `\n📈 Volume: ${volume}\n`;
       message += `🧊 Liquidity: ${liquidity}\n`;
       message += `📅 Ends: ${endDate}\n\n`;
-      message += `🔗 Trade: https://polymarket.com/event/${market.market_slug || market.slug || ''}\n`;
+      // Use slug for URL (Gamma has slug, CLOB has market_slug with numeric suffix)
+      const urlSlug = market.slug || (market.market_slug ? market.market_slug.replace(/-\d+$/, '') : '');
+      if (urlSlug) {
+        message += `🔗 Trade: https://polymarket.com/markets/${urlSlug}\n`;
+      }
 
       if (conditionId) {
         message += `\n💡 Follow price alerts:\n/follow ${conditionId}`;
@@ -234,7 +238,6 @@ export function registerCommands(bot: Telegraf) {
         results.forEach((market, i) => {
           const title = market.question || 'Untitled';
           const conditionId = market.condition_id || market.conditionId;
-          const slug = market.market_slug || market.slug;
 
           // Parse price
           let priceStr = 'N/A';
@@ -251,8 +254,10 @@ export function registerCommands(bot: Telegraf) {
 
           message += `${i + 1}. ${title.slice(0, 80)}${title.length > 80 ? '...' : ''}\n`;
           message += `   Price: ${priceStr}\n`;
+          // Use slug for URL (Gamma has slug, CLOB has market_slug with numeric suffix)
+          const slug = market.slug || (market.market_slug ? market.market_slug.replace(/-\d+$/, '') : '');
           if (slug) {
-            message += `   🔗 https://polymarket.com/event/${slug}\n`;
+            message += `   🔗 https://polymarket.com/markets/${slug}\n`;
           }
           if (conditionId) {
             message += `   /price ${conditionId}\n`;
@@ -462,10 +467,11 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply('❌ No whales found for this market.')
         return
       }
-      const marketSlug = market.market_slug || market.slug;
+      // Use slug for URL (Gamma has slug, CLOB has market_slug with numeric suffix)
+      const marketSlug = market.slug || (market.market_slug ? market.market_slug.replace(/-\d+$/, '') : '');
       let msg = `🐋 Whales — ${market.question}\n`;
       if (marketSlug) {
-        msg += `🔗 https://polymarket.com/event/${marketSlug}\n`;
+        msg += `🔗 https://polymarket.com/markets/${marketSlug}\n`;
       }
       msg += '\n';
       whales.forEach(([addr, bal], i) => {
@@ -737,13 +743,14 @@ export function registerCommands(bot: Telegraf) {
           } catch {}
         }
 
-        const slug = market?.market_slug || market?.slug;
+        // Use slug for URL (Gamma has slug, CLOB has market_slug with numeric suffix)
+        const slug = market?.slug || (market?.market_slug ? market.market_slug.replace(/-\d+$/, '') : '');
         message += `${idx}. ${title}\n`
         message += `   📊 Price: ${price}%\n`
         message += `   💰 Volume: $${volM}M\n`
         message += `   🧊 Liquidity: $${liqM}M\n`
         if (slug) {
-          message += `   🔗 https://polymarket.com/event/${slug}\n`
+          message += `   🔗 https://polymarket.com/markets/${slug}\n`
         }
         if (cond) {
           message += `   ➕ Follow: /follow ${cond}\n\n`
