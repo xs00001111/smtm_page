@@ -71,7 +71,7 @@ export function registerCommands(bot: Telegraf) {
     logger.info('Price command', { userId, query });
 
     try {
-      await ctx.reply('🔍 Fetching market price...');
+      await ctx.reply('🔍 Loading market...');
 
       // Check if it's a condition ID
       const looksLikeCond = /^0x[a-fA-F0-9]{64}$/.test(query);
@@ -97,11 +97,11 @@ export function registerCommands(bot: Telegraf) {
 
       if (!market) {
         await ctx.reply(
-          `❌ Market not found: "${query}"\n\n` +
-          'Try:\n' +
-          '• Use /markets to browse active markets\n' +
-          '• Search with different keywords\n' +
-          '• Use the full market ID (0x...)'
+          `❌ No match for "${query}"\n\n` +
+          'Try instead:\n' +
+          '• /markets to browse trending\n' +
+          '• Different keywords (e.g., "election")\n' +
+          '• Full market ID (0x...)'
         );
         return;
       }
@@ -142,7 +142,7 @@ export function registerCommands(bot: Telegraf) {
       }
 
       if (outcomes.length === 0) {
-        await ctx.reply('⚠️ Market found but price data unavailable.');
+        await ctx.reply('⚠️ This market doesn\'t have price data yet. Try /markets for active markets.');
         return;
       }
 
@@ -189,7 +189,7 @@ export function registerCommands(bot: Telegraf) {
 
     } catch (error: any) {
       logger.error('Error in price command', { error: error?.message || error });
-      await ctx.reply('❌ An error occurred while fetching price data. Please try again.');
+      await ctx.reply('❌ Unable to load market data. Try another market or use /markets to browse.');
     }
   });
 
@@ -223,16 +223,16 @@ export function registerCommands(bot: Telegraf) {
     try {
       if (type === 'markets' || type === 'market') {
         // Search markets
-        await ctx.reply('🔍 Searching markets...');
+        await ctx.reply('🔍 Searching...');
 
         const results = await findMarketFuzzy(query, 5);
 
         if (results.length === 0) {
           await ctx.reply(
-            `❌ No markets found for "${query}"\n\n` +
+            `❌ No matches for "${query}"\n\n` +
             'Try:\n' +
-            '• Different keywords\n' +
-            '• /markets to browse hot markets'
+            '• Different keywords (e.g., "election", "crypto")\n' +
+            '• /markets to browse trending'
           );
           return;
         }
@@ -277,16 +277,16 @@ export function registerCommands(bot: Telegraf) {
 
       } else if (type === 'whales' || type === 'whale') {
         // Search whales
-        await ctx.reply('🔍 Searching whales...');
+        await ctx.reply('🔍 Searching...');
 
         const results = await findWhaleFuzzy(query, 5);
 
         if (results.length === 0) {
           await ctx.reply(
-            `❌ No whales found for "${query}"\n\n` +
+            `❌ No traders match "${query}"\n\n` +
             'Try:\n' +
-            '• Different name or address\n' +
-            '• /whales to see top traders'
+            '• Different search terms\n' +
+            '• /whales for leaderboard'
           );
           return;
         }
@@ -321,7 +321,7 @@ export function registerCommands(bot: Telegraf) {
 
     } catch (error: any) {
       logger.error('Error in search command', { error: error?.message || error });
-      await ctx.reply('❌ Search failed. Please try again later.');
+      await ctx.reply('❌ Search unavailable. Try /markets to browse instead.');
     }
   });
 
@@ -349,7 +349,7 @@ export function registerCommands(bot: Telegraf) {
     logger.info('Unsubscribe command', { userId, query });
 
     try {
-      await ctx.reply('🔍 Searching for market...');
+      await ctx.reply('🔍 Looking up market...');
 
       // Resolve market id or search with logs
       let market: any = null
@@ -379,7 +379,7 @@ export function registerCommands(bot: Telegraf) {
 
       const tokenId = market.tokens?.[0]?.token_id;
       if (!tokenId) {
-        await ctx.reply('❌ This market does not have tradable tokens.');
+        await ctx.reply('❌ This market isn\'t ready for alerts yet. Try /markets for active markets.');
         return;
       }
 
@@ -401,7 +401,7 @@ export function registerCommands(bot: Telegraf) {
       await removeMarketSubscription(userId, tokenId)
     } catch (error) {
       logger.error('Error in unsubscribe command', error);
-      await ctx.reply('❌ An error occurred. Please try again later.');
+      await ctx.reply('❌ Unable to unsubscribe. Try /list to see your follows, then /unfollow instead.');
     }
   });
 
@@ -420,7 +420,7 @@ export function registerCommands(bot: Telegraf) {
     try {
       if (args.length === 0) {
         // Use Polymarket leaderboard API for top whales (much faster!)
-        await ctx.reply('🔍 Fetching top whales from Polymarket leaderboard...')
+        await ctx.reply('🔍 Loading top traders...')
         try {
           logger.info('whales: fetching leaderboard')
           const leaderboard = await dataApi.getLeaderboard({ limit: 10 })
@@ -448,18 +448,18 @@ export function registerCommands(bot: Telegraf) {
           return
         } catch (e: any) {
           logger.error('whales: leaderboard failed', { error: e?.message })
-          await ctx.reply('❌ Failed to fetch leaderboard. Try a specific market: `/whales 0x<market_id>`', { parse_mode: 'Markdown' })
+          await ctx.reply('❌ Unable to load leaderboard. Try a specific market: `/whales 0x<market_id>`', { parse_mode: 'Markdown' })
           return
         }
       }
 
       // By market
       const q = args.join(' ')
-      await ctx.reply('🔍 Finding whales for market...')
+      await ctx.reply('🔍 Loading market whales...')
       const first = args[0]
       const market = looksLikeCond(first) ? await gammaApi.getMarket(first) : await findMarket(q)
       if (!market) {
-        await ctx.reply('❌ Could not resolve the market. Try using 0x<market_id>.')
+        await ctx.reply('❌ Market not found. Try /markets to browse or use full market ID (0x...).')
         return
       }
       const holders = await dataApi.getTopHolders({ market: market.condition_id, limit: 20, minBalance })
@@ -493,7 +493,7 @@ export function registerCommands(bot: Telegraf) {
       await ctx.reply(msg)
     } catch (err) {
       logger.error('Error in whales command', err)
-      await ctx.reply('❌ Failed to fetch whales. Please try again later.')
+      await ctx.reply('❌ Unable to load whales. Try /markets for active markets or check your connection.')
     }
   })
 
@@ -506,7 +506,7 @@ export function registerCommands(bot: Telegraf) {
       const { getUserRows } = await import('../services/subscriptions')
       const rows = getUserRows(userId)
       if (rows.length === 0) {
-        await ctx.reply('📭 You have no follows.\nUse /markets to get a market ID, then /follow 0x<market_id>.')
+        await ctx.reply('📭 No follows yet! Get started:\n\n• /markets — Browse markets\n• /whales — Find top traders\n• /follow <market_id> — Set up alerts')
         return
       }
       let i=0
@@ -529,7 +529,7 @@ export function registerCommands(bot: Telegraf) {
       await ctx.reply(msg)
     } catch (error) {
       logger.error('Error in list command', error);
-      await ctx.reply('❌ An error occurred. Please try again later.');
+      await ctx.reply('❌ Unable to load your follows. Please try again or contact support if this persists.');
     }
   });
 
@@ -557,7 +557,7 @@ export function registerCommands(bot: Telegraf) {
       await ctx.reply(msg)
     } catch (e) {
       logger.error('whales_top error', e)
-      await ctx.reply('❌ Failed to compute whales top. Please try again later.')
+      await ctx.reply('❌ Unable to load top whales. Try /whales for the leaderboard instead.')
     }
   })
 
@@ -589,7 +589,7 @@ export function registerCommands(bot: Telegraf) {
       await ctx.reply(message);
     } catch (error) {
       logger.error('Error in status command', error);
-      await ctx.reply('❌ An error occurred. Please try again later.');
+      await ctx.reply('❌ Unable to check status. Please try again.');
     }
   });
 
@@ -599,7 +599,7 @@ export function registerCommands(bot: Telegraf) {
     logger.info('Markets command', { userId });
 
     try {
-      await ctx.reply('🔍 Fetching trending markets...');
+      await ctx.reply('🔍 Loading markets...');
 
       // Primary: active markets by volume
       let markets: any[] = []
@@ -710,7 +710,7 @@ export function registerCommands(bot: Telegraf) {
       }
 
       if (markets.length === 0) {
-        await ctx.reply('❌ No markets found at the moment.');
+        await ctx.reply('❌ No active markets right now. Try /search markets <query> to find specific markets.');
         return;
       }
 
@@ -794,7 +794,7 @@ export function registerCommands(bot: Telegraf) {
 
       if (!priceSent && !whaleSent) {
         await ctx.reply(
-          'ℹ️ No active follows found.\n\nFollow examples:\n• /follow 0x<market_id> (price alerts)\n• /follow 0x<wallet> (copy whale)\n• /follow 0x<wallet> 0x<market_id> (whale on market)'
+          '⚠️ Can\'t send test - no active follows!\n\nTo test alerts:\n1. /markets to find a market\n2. /follow <market_id> to enable alerts\n3. /test_push to test'
         )
         return
       }
@@ -837,12 +837,12 @@ export function registerCommands(bot: Telegraf) {
           return
         }
         let tokenId = market?.tokens?.[0]?.token_id as string | undefined
-        if (!tokenId) { await ctx.reply('❌ Unable to resolve token for this market right now. Try again shortly.'); return }
+        if (!tokenId) { await ctx.reply('❌ This market isn\'t ready for alerts yet. Try /markets for active markets.'); return }
         const ok = wsMonitor.subscribeToMarket(userId, tokenId, market.question, botConfig.websocket.priceChangeThreshold)
         if (!ok) { await ctx.reply('⚠️ You are already following this market.'); return }
         const { addMarketSubscription } = await import('../services/subscriptions')
         await addMarketSubscription(userId, tokenId, market.question, marketId, botConfig.websocket.priceChangeThreshold)
-        await ctx.reply(`✅ Following market: ${market.question}`)
+        await ctx.reply(`✅ Price alerts enabled! 🔔\n\nMarket: ${market.question}\n\nYou'll get notified when prices change significantly.`)
       } catch (e: any) {
         logger.error('follow market failed', { marketId, error: e?.message })
         await ctx.reply('❌ Failed to follow market. Use /follow 0x<market_id>.')
@@ -864,7 +864,7 @@ export function registerCommands(bot: Telegraf) {
         const { addWhaleSubscriptionAll } = await import('../services/subscriptions')
         await addWhaleSubscriptionAll(userId, wallet, botConfig.websocket.whaleTrademinSize)
         const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
-        await ctx.reply(`✅ Following whale ${shortAddr} across ALL markets!\n\nYou'll get alerts whenever they make trades on any market.`)
+        await ctx.reply(`✅ Following whale ${shortAddr} on all markets! 🔔\n\nYou'll get alerts on every trade they make.`)
       } catch (e: any) {
         logger.error('follow whale all failed', { wallet, error: e?.message })
         await ctx.reply('❌ Failed to follow whale. Use: /follow 0x<wallet_address>.')
@@ -898,7 +898,7 @@ export function registerCommands(bot: Telegraf) {
         const { addWhaleSubscription } = await import('../services/subscriptions')
         await addWhaleSubscription(userId, tokenId, market.question, botConfig.websocket.whaleTrademinSize, wallet, marketId)
         const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
-        await ctx.reply(`✅ Following whale ${shortAddr} in: ${market.question}`)
+        await ctx.reply(`✅ Following whale ${shortAddr} on this market! 🔔\n\nMarket: ${market.question}\n\nYou'll get alerts when they trade.`)
       } catch (e: any) {
         logger.error('follow wallet failed', { marketId, error: e?.message })
         await ctx.reply('❌ Failed to follow whale on this market. Use: /follow 0x<wallet> 0x<market_id>.')
@@ -936,11 +936,11 @@ export function registerCommands(bot: Telegraf) {
           const { removeMarketSubscription, removePendingMarketByCondition } = await import('../services/subscriptions')
           if (ok) await removeMarketSubscription(userId, tokenId)
           await removePendingMarketByCondition(userId, marketId)
-          await ctx.reply(`✅ Unfollowed market: ${m?.question || marketId}`)
+          await ctx.reply(`✅ Price alerts disabled.\n\nMarket: ${m?.question || marketId}`)
         } else {
           const { removePendingMarketByCondition } = await import('../services/subscriptions')
           const removed = await removePendingMarketByCondition(userId, marketId)
-          await ctx.reply(removed>0 ? `✅ Unfollowed pending market: ${m?.question || marketId}` : '⚠️ No follow found for this market.')
+          await ctx.reply(removed>0 ? `✅ Alerts disabled for pending market: ${m?.question || marketId}` : '⚠️ No follow found for this market. Use /list to see active follows.')
         }
       } catch (e:any) {
         logger.error('unfollow market failed', { marketId, error: e?.message })
@@ -958,9 +958,9 @@ export function registerCommands(bot: Telegraf) {
         await removeWhaleSubscriptionAll(userId, wallet)
         const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
         if (ok) {
-          await ctx.reply(`✅ Unfollowed whale ${shortAddr} from ALL markets`)
+          await ctx.reply(`✅ Stopped following whale ${shortAddr} on all markets.`)
         } else {
-          await ctx.reply(`✅ Removed whale ${shortAddr} from follows`)
+          await ctx.reply(`✅ Removed whale ${shortAddr} from pending follows.`)
         }
       } catch (e:any) {
         logger.error('unfollow whale all failed', { wallet, error: e?.message })
@@ -984,7 +984,7 @@ export function registerCommands(bot: Telegraf) {
         }
         await removePendingWhaleByCondition(userId, marketId, wallet)
         const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
-        await ctx.reply(`✅ Unfollowed whale ${shortAddr} in: ${m?.question || marketId}`)
+        await ctx.reply(`✅ Stopped following whale ${shortAddr}.\n\nMarket: ${m?.question || marketId}`)
       } catch (e:any) {
         logger.error('unfollow wallet failed', { marketId, error: e?.message })
         await ctx.reply('❌ Failed to unfollow. Ensure format: /unfollow 0x<wallet> 0x<market_id>.')
@@ -1005,7 +1005,7 @@ export function registerCommands(bot: Telegraf) {
     logger.info('Daily_tip command', { userId: ctx.from?.id });
 
     try {
-      await ctx.reply('🔍 Fetching today\'s highest reward market from Polymarket...');
+      await ctx.reply('🔍 Loading today\'s top reward...');
 
       const topReward = await getTopRewardMarket();
 
@@ -1062,7 +1062,7 @@ export function registerCommands(bot: Telegraf) {
       );
     } catch (error) {
       logger.error('Error in profile command', error);
-      await ctx.reply('❌ An error occurred while loading profile. Please try again.');
+      await ctx.reply('❌ Unable to load profile. Please try again or contact support if this persists.');
     }
   });
 
