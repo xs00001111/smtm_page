@@ -59,6 +59,16 @@ export interface Token {
   winner?: boolean;
 }
 
+export interface MarketEvent {
+  id: string;
+  slug: string;
+  title?: string;
+  description?: string;
+  active?: boolean;
+  closed?: boolean;
+  archived?: boolean;
+}
+
 export interface GammaMarket {
   condition_id: string;
   question: string;
@@ -66,6 +76,8 @@ export interface GammaMarket {
   image?: string;
   icon?: string;
   market_slug?: string;
+  slug?: string;
+  events?: MarketEvent[];
   end_date_iso?: string;
   game_start_time?: string;
   seconds_delay?: number;

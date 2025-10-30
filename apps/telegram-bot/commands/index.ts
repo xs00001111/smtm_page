@@ -1,9 +1,10 @@
 import { Telegraf } from 'telegraf';
 import { logger } from '../utils/logger';
 import { getTopRewardMarket, formatRewardInfo } from '../services/rewards';
-import { findMarket, findMarketFuzzy, findWhaleFuzzy, gammaApi, dataApi } from '@smtm/data';
+import { findMarket, findMarketFuzzy, findWhaleFuzzy, gammaApi, dataApi, clobApi } from '@smtm/data';
 import { wsMonitor } from '../index';
 import { botConfig } from '../config/bot';
+import { linkPolymarketAddress, linkPolymarketUsername, linkKalshiUsername, unlinkAll, getLinks, parsePolymarketProfile } from '../services/links';
 
 /**
  * Generate Polymarket profile URL for a whale/trader
@@ -22,6 +23,61 @@ function getPolymarketProfileUrl(username: string | null | undefined, address: s
   return `https://polymarket.com/profile/${address}`;
 }
 
+/**
+ * Generate Polymarket market URL from API response
+ * Uses events[0].slug from API response (most reliable)
+ * @param market - Market object from Gamma API
+ * @returns Formatted market URL or null if no slug available
+ */
+function getPolymarketMarketUrl(market: any): string | null {
+  // Prefer events[0].slug from API (most reliable)
+  if (market.events && Array.isArray(market.events) && market.events.length > 0) {
+    const eventSlug = market.events[0].slug;
+    if (eventSlug) {
+      return `https://polymarket.com/event/${eventSlug}`;
+    }
+  }
+
+  // Fallback to direct slug field
+  if (market.slug) {
+    return `https://polymarket.com/event/${market.slug}`;
+  }
+
+  return null;
+}
+
+// Parse a market input which may be:
+// - condition id (0x...)
+// - polymarket event URL
+// - slug or free text
+async function resolveMarketFromInput(input: string): Promise<any | null> {
+  const looksLikeCond = /^0x[a-fA-F0-9]{64}$/
+  const looksLikeUrl = /^https?:\/\//i
+  try {
+    if (looksLikeCond.test(input)) {
+      return await gammaApi.getMarket(input)
+    }
+    if (looksLikeUrl.test(input)) {
+      try {
+        const u = new URL(input)
+        const parts = u.pathname.split('/').filter(Boolean)
+        // Expect /event/<slug>
+        const idx = parts.findIndex(p=>p==='event')
+        if (idx >= 0 && parts[idx+1]) {
+          const slug = decodeURIComponent(parts[idx+1])
+          const m = await findMarket(slug)
+          if (m) return m
+        }
+      } catch {}
+    }
+    // Fallback to search/slug resolution
+    return await findMarket(input)
+  } catch (e) {
+    logger.error('resolveMarketFromInput failed', { input, error: (e as any)?.message })
+    return null
+  }
+}
+
 export function registerCommands(bot: Telegraf) {
   // Start command
   bot.command('start', async (ctx) => {
@@ -33,7 +89,15 @@ export function registerCommands(bot: Telegraf) {
         '• /whales — Top traders leaderboard\n' +
         '• /search markets <query> — Find markets\n' +
         '• /search whales <name> — Find traders\n' +
-        '• /price <market> — Get market price\n\n' +
+        '• /price <market> — Get market price\n' +
+        '• /net <market> — Net positions by user\n' +
+        '• /overview <market> — Sides, totals, pricing\n' +
+        '• /card_profile — Shareable profile image\n' +
+        '• /card_trade — Shareable trade receipt\n\n' +
+        '👤 Profile:\n' +
+        '• /link <id|url|username> — Link Polymarket or Kalshi\n' +
+        '• /unlink — Remove links\n' +
+        '• /stats <id|url|username> — Show stats\n\n' +
         '🔥 Alerts:\n' +
         '• /follow 0x<market_id> — Market price alerts\n' +
         '• /follow 0x<wallet> — Copy whale (all markets)\n' +
@@ -53,7 +117,15 @@ export function registerCommands(bot: Telegraf) {
         '/search markets <query> — Search markets\n' +
         '/search whales <name> — Search traders\n' +
         '/price <market> — Get market price\n' +
+        '/net <market_url|id|slug> — Net positions by user\n' +
+        '/overview <market_url|id|slug> — Sides, totals, pricing\n' +
+        '/card_profile [id|@user|url] — Shareable profile image\n' +
+        '/card_trade <market> <yes|no> <stake_$> [entry_%] [current_%] — Shareable receipt\n' +
         '/whales_top 24h|7d|30d — Top whales\n\n' +
+        '👤 Profile Links:\n' +
+        '/link <id|url|username> — Link Polymarket address or Kalshi username\n' +
+        '/unlink — Unlink all connected profiles\n' +
+        '/stats <id|url|username> — Show stats (no verification)\n\n' +
         '🔔 Alerts:\n' +
         '/follow 0x<market_id> — Market price alerts\n' +
         '/follow 0x<wallet> — Copy whale (all markets)\n' +
@@ -68,6 +140,244 @@ export function registerCommands(bot: Telegraf) {
         '• Follow whales without market_id for copy trading all their moves!'
     );
   });
+
+  // Link command — link Polymarket address or Kalshi username
+  bot.command('link', async (ctx) => {
+    const args = ctx.message.text.split(' ').slice(1)
+    const userId = ctx.from!.id
+    if (args.length === 0) {
+      await ctx.reply(
+        '🔗 Link a profile to your Telegram account.\n\n' +
+        'Usage:\n' +
+        '• /link 0x<polymarket_address>\n' +
+        '• /link https://polymarket.com/profile/<address|@username>\n' +
+        '• /link <kalshi_username>\n\n' +
+        'Note: PnL-in-nickname applies where supported. No verification for now.'
+      )
+      return
+    }
+
+    const input = args.join(' ').trim()
+    const isAddress = /^0x[a-fA-F0-9]{40}$/.test(input)
+    const looksLikeUrl = /^https?:\/\//i.test(input)
+
+    try {
+      if (isAddress) {
+        await linkPolymarketAddress(userId, input)
+        await ctx.reply('✅ Linked Polymarket address! Your PnL can be shown alongside your name where supported.')
+        return
+      }
+      if (looksLikeUrl) {
+        const parsed = parsePolymarketProfile(input)
+        if (parsed?.address) {
+          await linkPolymarketAddress(userId, parsed.address)
+          await ctx.reply('✅ Linked Polymarket address from profile URL!')
+          return
+        }
+        if (parsed?.username) {
+          await linkPolymarketUsername(userId, parsed.username)
+          await ctx.reply(`✅ Linked Polymarket username @${parsed.username}!`)
+          return
+        }
+        // Unknown URL — fall back to treating as Kalshi if looks like a simple username in URL is not parseable
+      }
+      // If not an address or recognized Polymarket URL, treat as Kalshi username
+      const kalshiUser = input.replace(/^@/, '')
+      await linkKalshiUsername(userId, kalshiUser)
+      await ctx.reply(`✅ Linked Kalshi username ${kalshiUser}!`)
+    } catch (e:any) {
+      logger.error('link command failed', { error: e?.message })
+      await ctx.reply('❌ Failed to link. Please check the format and try again.')
+    }
+  })
+
+  // Unlink command — remove all linked profiles
+  bot.command('unlink', async (ctx) => {
+    const userId = ctx.from!.id
+    try {
+      const removed = await unlinkAll(userId)
+      if (removed > 0) {
+        await ctx.reply('✅ Unlinked all profiles and reset your link settings.')
+      } else {
+        await ctx.reply('ℹ️ You had no linked profiles.')
+      }
+    } catch (e:any) {
+      logger.error('unlink command failed', { error: e?.message })
+      await ctx.reply('❌ Failed to unlink. Please try again.')
+    }
+  })
+
+  // Stats command — show full profile for Polymarket; Kalshi placeholder
+  bot.command('stats', async (ctx) => {
+    const args = ctx.message.text.split(' ').slice(1)
+    const userId = ctx.from!.id
+    const inputRaw = args.join(' ').trim()
+
+    const replyUsage = async () => {
+      await ctx.reply(
+        '📊 Stats\n\n' +
+        'Usage:\n' +
+        '• /stats 0x<polymarket_address>\n' +
+        '• /stats https://polymarket.com/profile/<address|@username>\n' +
+        '• /stats <polymarket_username>\n' +
+        '• /stats <kalshi_username> (limited)\n\n' +
+        'Tip: /link saves your profile so you can run /stats without arguments.'
+      )
+    }
+
+    try {
+      let mode: 'poly_address'|'poly_username'|'kalshi'|null = null
+      let polyAddress: string | undefined
+      let polyUsername: string | undefined
+      let kalshiUser: string | undefined
+
+      if (!inputRaw) {
+        const linked = getLinks(userId)
+        if (!linked) { await replyUsage(); return }
+        if (linked.polymarket_address) { mode = 'poly_address'; polyAddress = linked.polymarket_address }
+        else if (linked.polymarket_username) { mode = 'poly_username'; polyUsername = linked.polymarket_username }
+        else if (linked.kalshi_username) { mode = 'kalshi'; kalshiUser = linked.kalshi_username }
+        else { await replyUsage(); return }
+      } else {
+        const input = inputRaw
+        if (/^0x[a-fA-F0-9]{40}$/.test(input)) { mode = 'poly_address'; polyAddress = input }
+        else if (/^https?:\/\//i.test(input)) {
+          const parsed = parsePolymarketProfile(input)
+          if (parsed?.address) { mode = 'poly_address'; polyAddress = parsed.address }
+          else if (parsed?.username) { mode = 'poly_username'; polyUsername = parsed.username }
+          else { mode = 'kalshi'; kalshiUser = input }
+        } else if (/^[a-zA-Z0-9_\-]+$/.test(input)) {
+          // Username; default to Polymarket username first
+          polyUsername = input.replace(/^@/, '')
+          mode = 'poly_username'
+        } else {
+          await replyUsage(); return
+        }
+      }
+
+      if (mode === 'kalshi') {
+        const { getKalshiUserStats } = await import('../services/kalshi')
+        const stats = await getKalshiUserStats(kalshiUser!)
+        if (!stats) {
+          await ctx.reply('ℹ️ Kalshi user stats require an authenticated API and are not available without a key. Your link is saved for future features.')
+          return
+        }
+        // If a public API becomes available, format and return here
+      }
+
+      // Resolve username -> address via leaderboard fuzzy search
+      if (mode === 'poly_username' && polyUsername) {
+        const results = await findWhaleFuzzy(polyUsername, 1)
+        if (results.length && results[0]?.user_id) {
+          polyAddress = results[0].user_id
+        }
+      }
+
+      if (!polyAddress && (mode === 'poly_address' || mode === 'poly_username')) {
+        // Try fuzzy search on whales by inputRaw as fallback
+        const results = await findWhaleFuzzy(polyUsername || inputRaw, 1)
+        if (results.length && results[0]?.user_id) {
+          polyAddress = results[0].user_id
+        }
+      }
+
+      if (!polyAddress) {
+        await ctx.reply('❌ Could not resolve a Polymarket address from the input. Try an address or profile URL.')
+        return
+      }
+
+      await ctx.reply('⏳ Fetching profile...')
+
+      // Fetch value, open and closed positions
+      const [value, openPositions, closed] = await Promise.all([
+        dataApi.getUserValue(polyAddress),
+        dataApi.getUserPositions({ user: polyAddress, limit: 200 }),
+        dataApi.getClosedPositions(polyAddress, 200)
+      ])
+
+      // Realized PnL from closed positions
+      let realizedPnl = 0
+      for (const p of closed) {
+        const n = parseFloat(p.pnl || '0')
+        if (!isNaN(n)) realizedPnl += n
+      }
+
+      // Unrealized PnL on opens (best-effort)
+      let openInitial = 0
+      let openCurrent = 0
+      for (const p of openPositions) {
+        const cur = parseFloat(p.value || '0')
+        const init = parseFloat(p.initial_value || '0')
+        if (!isNaN(cur)) openCurrent += cur
+        if (!isNaN(init)) openInitial += init
+      }
+      const unrealizedPnl = openCurrent - openInitial
+
+      // Top positions by current value
+      const byValue = [...openPositions].sort((a,b)=>parseFloat(b.value||'0')-parseFloat(a.value||'0')).slice(0,5)
+
+      // Resolve market titles/links for top positions
+      const uniqueMarkets = Array.from(new Set(byValue.map(p=>p.market))).slice(0,5)
+      const marketMap = new Map<string, any>()
+      for (const m of uniqueMarkets) {
+        try {
+          const mk = await gammaApi.getMarket(m as any)
+          marketMap.set(m, mk)
+        } catch {}
+      }
+
+      // Try to enrich from leaderboard
+      let leaderboardLine = ''
+      try {
+        const lb = await findWhaleFuzzy(polyAddress, 1)
+        if (lb.length) {
+          const e = lb[0]
+          const pnlNum = Math.round(e.pnl)
+          leaderboardLine = `Rank: #${e.rank}  •  Leaderboard PnL: ${pnlNum >= 0 ? '+' : '-'}$${Math.abs(pnlNum).toLocaleString()}\n`
+        }
+      } catch {}
+
+      const short = polyAddress.slice(0,6)+'...'+polyAddress.slice(-4)
+      const profileUrl = getPolymarketProfileUrl(undefined, polyAddress)
+      const valNum = parseFloat(value.value || '0')
+      const realized = Math.round(realizedPnl)
+      const unrealized = Math.round(unrealizedPnl)
+      const realizedStr = `${realized >= 0 ? '+' : '-'}$${Math.abs(realized).toLocaleString()}`
+      const unrealizedStr = `${unrealized >= 0 ? '+' : '-'}$${Math.abs(unrealized).toLocaleString()}`
+      const roiStr = openInitial > 0 ? `${(((openCurrent - openInitial)/openInitial)*100).toFixed(1)}%` : '—'
+
+      let msg = `👤 Polymarket Profile\n` +
+        `Address: ${short}\n` +
+        `🔗 ${profileUrl}\n\n` +
+        (leaderboardLine ? leaderboardLine + '\n' : '') +
+        `Portfolio Value: $${Math.round(valNum).toLocaleString()}\n` +
+        `Open Positions: ${openPositions.length}  •  Closed: ${closed.length}\n` +
+        `Unrealized PnL: ${unrealizedStr}  •  ROI: ${roiStr}\n` +
+        `Realized PnL: ${realizedStr}\n\n`
+
+      if (byValue.length) {
+        msg += 'Top Positions:\n'
+        for (const p of byValue) {
+          const mk = marketMap.get(p.market)
+          const title = mk?.question ? mk.question.slice(0,90) + (mk.question.length>90?'...':'') : p.market
+          const url = mk ? getPolymarketMarketUrl(mk) : null
+          const v = Math.round(parseFloat(p.value||'0'))
+          const iv = Math.round(parseFloat(p.initial_value||'0') || 0)
+          const upnl = v - iv
+          const upnlStr = `${upnl>=0?'+':'-'}$${Math.abs(upnl).toLocaleString()}`
+          msg += `• ${title}\n   Value: $${v.toLocaleString()}  •  uPnL: ${upnlStr}${url?`\n   🔗 ${url}`:''}\n`
+        }
+        msg += '\n'
+      }
+
+      msg += '💡 Link your profile with /link to reuse it here.'
+
+      await ctx.reply(msg)
+    } catch (e:any) {
+      logger.error('stats command failed', { error: e?.message })
+      await ctx.reply('❌ Failed to fetch stats. Please try again with an address or profile URL.')
+    }
+  })
 
   // Price command
   bot.command('price', async (ctx) => {
@@ -188,14 +498,11 @@ export function registerCommands(bot: Telegraf) {
       message += `\n📈 Volume: ${volume}\n`;
       message += `🧊 Liquidity: ${liquidity}\n`;
       message += `📅 Ends: ${endDate}\n\n`;
-      // Build URL - strip date suffixes for grouped markets and numeric suffixes
-      let urlSlug = market.slug || market.market_slug || '';
-      // Remove date patterns like -october-31, -november-5, etc. (for market groups)
-      urlSlug = urlSlug.replace(/-(january|february|march|april|may|june|july|august|september|october|november|december)-\d+$/i, '');
-      // Remove numeric suffixes like -493
-      urlSlug = urlSlug.replace(/-\d+$/, '');
-      if (urlSlug) {
-        message += `🔗 Trade: https://polymarket.com/event/${urlSlug}\n`;
+
+      // Add market URL from API
+      const marketUrl = getPolymarketMarketUrl(market);
+      if (marketUrl) {
+        message += `🔗 Trade: ${marketUrl}\n`;
       }
 
       if (conditionId) {
@@ -275,13 +582,13 @@ export function registerCommands(bot: Telegraf) {
 
           message += `${i + 1}. ${title.slice(0, 80)}${title.length > 80 ? '...' : ''}\n`;
           message += `   Price: ${priceStr}\n`;
-          // Build URL - strip date suffixes for grouped markets and numeric suffixes
-          let slug = market.slug || market.market_slug || '';
-          slug = slug.replace(/-(january|february|march|april|may|june|july|august|september|october|november|december)-\d+$/i, '');
-          slug = slug.replace(/-\d+$/, '');
-          if (slug) {
-            message += `   🔗 https://polymarket.com/event/${slug}\n`;
+
+          // Add market URL from API
+          const marketUrl = getPolymarketMarketUrl(market);
+          if (marketUrl) {
+            message += `   🔗 ${marketUrl}\n`;
           }
+
           if (conditionId) {
             message += `   /price ${conditionId}\n`;
           }
@@ -514,6 +821,139 @@ export function registerCommands(bot: Telegraf) {
     } catch (err) {
       logger.error('Error in whales command', err)
       await ctx.reply('❌ Unable to load whales. Try /markets for active markets or check your connection.')
+    }
+  })
+
+  // Net positions by user for a market
+  bot.command('net', async (ctx) => {
+    const args = ctx.message.text.split(' ').slice(1)
+    if (args.length === 0) {
+      await ctx.reply('Usage: /net <market_url|id|slug> — shows per-user net positions (top holders sample).')
+      return
+    }
+    const query = args.join(' ')
+    try {
+      await ctx.reply('🔍 Loading market and holders...')
+      const market = await resolveMarketFromInput(query)
+      if (!market) { await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.'); return }
+      const conditionId = market.condition_id || market.conditionId
+      const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 10 })
+      if (!holdersRes?.length) { await ctx.reply('❌ No holder data available for this market.'); return }
+
+      // Build address -> outcome balances
+      type AddrPos = { [outcome: string]: number }
+      const byAddr = new Map<string, AddrPos>()
+      const outcomeNames = new Map<string,string>() // token -> outcome
+      for (const t of market.tokens || []) outcomeNames.set(t.token_id, t.outcome || '')
+      holdersRes.forEach((token) => {
+        const out = market.tokens?.find((t:any)=>t.token_id===token.token)
+        const outcome = out?.outcome || token.token
+        token.holders.forEach((h)=>{
+          const bal = parseFloat(h.balance || '0')
+          if (isNaN(bal) || bal===0) return
+          const cur = byAddr.get(h.address) || {}
+          cur[outcome] = (cur[outcome] || 0) + bal
+          byAddr.set(h.address, cur)
+        })
+      })
+
+      // Compute net = largest - sum(others)
+      const scored: Array<{ addr: string; net: number; dominant: string; breakdown: string }>=[]
+      for (const [addr, pos] of byAddr.entries()) {
+        const entries = Object.entries(pos)
+        if (!entries.length) continue
+        entries.sort((a,b)=>b[1]-a[1])
+        const top = entries[0]
+        const others = entries.slice(1).reduce((s,[,v])=>s+v,0)
+        const net = top[1] - others
+        const breakdown = entries.map(([k,v])=>`${k}:${Math.round(v)}`).join(' ')
+        scored.push({ addr, net, dominant: top[0], breakdown })
+      }
+      scored.sort((a,b)=>Math.abs(b.net)-Math.abs(a.net))
+      const topN = scored.slice(0,10)
+
+      const url = getPolymarketMarketUrl(market)
+      let msg = `🧮 Net Positions — ${market.question}\n`
+      if (url) msg += `🔗 ${url}\n`
+      msg += `Sampled top holders across outcomes.\n\n`
+      if (!topN.length) { msg += 'No holder positions to display.'; await ctx.reply(msg); return }
+      topN.forEach((r,i)=>{
+        const short = r.addr.slice(0,6)+'...'+r.addr.slice(-4)
+        const prof = getPolymarketProfileUrl(null, r.addr)
+        msg += `${i+1}. ${short} — Net ${r.net>=0?'+':''}${Math.round(r.net)} (${r.dominant})\n   ${r.breakdown}\n   🔗 ${prof}\n`
+      })
+      await ctx.reply(msg)
+    } catch (e) {
+      logger.error('net command failed', e)
+      await ctx.reply('❌ Failed to load net positions. Try again later.')
+    }
+  })
+
+  // Overview: positions by side with pricing + orderbook summary (public data)
+  bot.command('overview', async (ctx) => {
+    const args = ctx.message.text.split(' ').slice(1)
+    if (args.length === 0) {
+      await ctx.reply('Usage: /overview <market_url|id|slug> — shows totals per side, holders, and current pricing.')
+      return
+    }
+    const query = args.join(' ')
+    try {
+      await ctx.reply('🔍 Loading market overview...')
+      const market = await resolveMarketFromInput(query)
+      if (!market) { await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.'); return }
+      const conditionId = market.condition_id || market.conditionId
+      const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 10 })
+      if (!holdersRes?.length) { await ctx.reply('❌ No holder data available for this market.'); return }
+
+      // Build outcome totals and holders
+      type Side = { outcome: string; tokenId: string; holders: number; totalBalance: number; price: number|null; bid?: number|null; ask?: number|null; spread?: number|null; depthBid?: number; depthAsk?: number }
+      const sides: Side[] = []
+      for (const token of market.tokens || []) {
+        const set = holdersRes.find(h=>h.token===token.token_id)
+        const holdersCount = set ? set.holders.length : 0
+        const totalBalance = set ? set.holders.reduce((s,h)=>s + (parseFloat(h.balance||'0')||0), 0) : 0
+        let price: number|null = null
+        let bid: number|null = null
+        let ask: number|null = null
+        let spread: number|null = null
+        let depthBid = 0
+        let depthAsk = 0
+        try {
+          const book = await clobApi.getOrderbook(token.token_id)
+          bid = book.bids?.length ? parseFloat(book.bids[0].price) : null
+          ask = book.asks?.length ? parseFloat(book.asks[0].price) : null
+          spread = bid!=null && ask!=null ? ask - bid : null
+          // Sum top-5 depth (shares)
+          depthBid = (book.bids || []).slice(0,5).reduce((s,l)=>s + (parseFloat(l.size||'0')||0), 0)
+          depthAsk = (book.asks || []).slice(0,5).reduce((s,l)=>s + (parseFloat(l.size||'0')||0), 0)
+          if (bid!=null && ask!=null) price = (bid+ask)/2
+        } catch {}
+        if (price==null) {
+          const p = parseFloat(token.price || 'NaN'); if (!isNaN(p)) price = p
+        }
+        sides.push({ outcome: token.outcome || token.token_id, tokenId: token.token_id, holders: holdersCount, totalBalance, price, bid, ask, spread, depthBid, depthAsk })
+      }
+
+      const url = getPolymarketMarketUrl(market)
+      let msg = `📘 Market Overview — ${market.question}\n`
+      if (url) msg += `🔗 ${url}\n`
+      msg += `Based on top holders sample; totals are approximate.\n\n`
+
+      for (const s of sides) {
+        const val = (s.price!=null) ? Math.round(s.totalBalance * s.price) : null
+        const spreadPct = (s.spread!=null && s.price!=null) ? `${((s.spread/s.price)*100).toFixed(2)}%` : '—'
+        const bidStr = s.bid!=null ? `${(s.bid*100).toFixed(1)}%` : '—'
+        const askStr = s.ask!=null ? `${(s.ask*100).toFixed(1)}%` : '—'
+        msg += `• ${s.outcome}: holders ${s.holders}, shares ~${Math.round(s.totalBalance)}${s.price!=null?`, mid ${(s.price*100).toFixed(1)}%`:''}${val!=null?`, value ~$${val.toLocaleString()}`:''}\n`
+        msg += `   OB: bid ${bidStr} (${Math.round(s.depthBid||0)} sh) | ask ${askStr} (${Math.round(s.depthAsk||0)} sh) | spread ${s.spread!=null?(s.spread*100).toFixed(1)+'%':'—'} (${spreadPct})\n`
+      }
+
+      msg += '\nAverage entry & realized PnL for all users are not public. Summary uses order book data and top-holder aggregates.'
+
+      await ctx.reply(msg)
+    } catch (e) {
+      logger.error('overview command failed', e)
+      await ctx.reply('❌ Failed to load overview. Try again later.')
     }
   })
 
@@ -771,17 +1211,13 @@ export function registerCommands(bot: Telegraf) {
           } catch {}
         }
 
-        // Build URL - strip date suffixes for grouped markets and numeric suffixes
-        let slug = market?.slug || market?.market_slug || '';
-        slug = slug.replace(/-(january|february|march|april|may|june|july|august|september|october|november|december)-\d+$/i, '');
-        slug = slug.replace(/-\d+$/, '');
+        // Build market URL from API data (prefer events[0].slug)
+        const url = getPolymarketMarketUrl(market)
         message += `${idx}. ${title}\n`
         message += `   📊 Price: ${price}%\n`
         message += `   💰 Volume: $${volM}M\n`
         message += `   🧊 Liquidity: $${liqM}M\n`
-        if (slug) {
-          message += `   🔗 https://polymarket.com/event/${slug}\n`
-        }
+        if (url) { message += `   🔗 ${url}\n` }
         if (cond) {
           message += `   ➕ Follow: /follow ${cond}\n\n`
         } else {
@@ -1085,6 +1521,121 @@ export function registerCommands(bot: Telegraf) {
       await ctx.reply('❌ Unable to load profile. Please try again or contact support if this persists.');
     }
   });
+
+  // Card: Profile — generate a shareable image and send it
+  bot.command('card_profile', async (ctx) => {
+    const args = ctx.message.text.split(' ').slice(1)
+    const userId = ctx.from!.id
+    try {
+      // Reuse stats resolution for address
+      let input = args.join(' ').trim()
+      let address: string | undefined
+      if (!input) {
+        const linked = getLinks(userId)
+        if (linked?.polymarket_address) address = linked.polymarket_address
+        else if (linked?.polymarket_username) {
+          const res = await findWhaleFuzzy(linked.polymarket_username, 1)
+          address = res[0]?.user_id
+        }
+      } else if (/^0x[a-fA-F0-9]{40}$/.test(input)) {
+        address = input
+      } else if (/^https?:\/\//i.test(input)) {
+        const parsed = parsePolymarketProfile(input)
+        address = parsed?.address
+        if (!address && parsed?.username) {
+          const res = await findWhaleFuzzy(parsed.username, 1)
+          address = res[0]?.user_id
+        }
+      } else {
+        const res = await findWhaleFuzzy(input.replace(/^@/, ''), 1)
+        address = res[0]?.user_id
+      }
+      if (!address) { await ctx.reply('❌ Could not resolve a Polymarket address.'); return }
+
+      await ctx.reply('⏳ Building profile card...')
+
+      const [value, positions, closed, lb] = await Promise.all([
+        dataApi.getUserValue(address),
+        dataApi.getUserPositions({ user: address, limit: 200 }),
+        dataApi.getClosedPositions(address, 200),
+        findWhaleFuzzy(address, 1)
+      ])
+
+      let realized = 0
+      for (const p of closed) { const n = parseFloat(p.pnl||'0'); if (!isNaN(n)) realized += n }
+      let openInitial = 0, openCurrent = 0
+      for (const p of positions) {
+        const cur = parseFloat(p.value||'0') || 0
+        const init = parseFloat(p.initial_value||'0') || 0
+        openInitial += init; openCurrent += cur
+      }
+      const unrealized = openCurrent - openInitial
+      const roi = openInitial>0 ? (((openCurrent-openInitial)/openInitial)*100).toFixed(1)+'%' : '—'
+      const rank = lb.length ? String(lb[0].rank) : ''
+      const pnlLb = lb.length ? ((lb[0].pnl>=0?'+':'-')+'$'+Math.abs(Math.round(lb[0].pnl)).toLocaleString()) : ''
+
+      const base = 'https://smtm.ai'
+      const short = address.slice(0,6)+'...'+address.slice(-4)
+      const url = `${base}/api/og/profile?address=${encodeURIComponent(short)}&title=${encodeURIComponent('Polymarket Profile')}`+
+        `&value=${encodeURIComponent(value.value||'0')}&realized=${encodeURIComponent((realized>=0?'+':'-')+'$'+Math.abs(Math.round(realized)).toLocaleString())}`+
+        `&unrealized=${encodeURIComponent((unrealized>=0?'+':'-')+'$'+Math.abs(Math.round(unrealized)).toLocaleString())}`+
+        `&roi=${encodeURIComponent(roi)}&rank=${encodeURIComponent(rank)}&pnlLb=${encodeURIComponent(pnlLb)}`
+
+      await ctx.replyWithPhoto({ url }, { caption: `👤 Profile — ${short}\nView: https://polymarket.com/profile/${address}` })
+    } catch (e) {
+      logger.error('card_profile failed', e)
+      await ctx.reply('❌ Failed to create profile card.')
+    }
+  })
+
+  // Card: Whale (alias to profile with whale flair later)
+  bot.command('card_whale', async (ctx) => {
+    await ctx.reply('ℹ️ Using profile card for whales for now. Try /card_profile <address>.')
+  })
+
+  // Card: Trade (user crafts a flex card)
+  // Usage: /card_trade <market> <yes|no> <stake_$> [entry_%] [current_%]
+  bot.command('card_trade', async (ctx) => {
+    const args = ctx.message.text.split(' ').slice(1)
+    if (args.length < 3) {
+      await ctx.reply('Usage: /card_trade <market> <yes|no> <stake_$> [entry_%] [current_%]')
+      return
+    }
+    try {
+      const side = args[1].toLowerCase()
+      const stakeStr = args[2].replace(/[$,]/g,'')
+      const stake = Number(stakeStr)
+      if (!Number.isFinite(stake) || stake<=0) { await ctx.reply('❌ Invalid stake.'); return }
+      const marketInput = args[0]
+      const market = await resolveMarketFromInput(marketInput)
+      if (!market) { await ctx.reply('❌ Market not found.'); return }
+      let entry = args[3] ? Number(args[3].replace(/[%]/g,''))/100 : NaN
+      let exit = args[4] ? Number(args[4].replace(/[%]/g,''))/100 : NaN
+      if (!Number.isFinite(exit)) {
+        // try current mid
+        const tokenId = market.tokens?.[0]?.token_id
+        if (tokenId) { const mid = await clobApi.getCurrentPrice(tokenId); if (mid!=null) exit = mid }
+      }
+      if (!Number.isFinite(entry)) entry = exit // if only one provided, use same
+      const pnl = Number.isFinite(entry) && Number.isFinite(exit) ? Math.round((exit-entry)*stake) : 0
+      const roi = Number.isFinite(entry) && Number.isFinite(exit) && entry!==0 ? (((exit-entry)/entry)*100).toFixed(1)+'%' : '—'
+
+      const base = 'https://smtm.ai'
+      const title = (market.question || 'Trade').slice(0, 110)
+      const url = `${base}/api/og/trade?title=${encodeURIComponent(title)}&side=${encodeURIComponent(side)}`+
+        `&stake=${encodeURIComponent('$'+Math.round(stake).toLocaleString())}`+
+        `&entry=${encodeURIComponent(Number.isFinite(entry)?(entry*100).toFixed(1)+'%':'—')}`+
+        `&exit=${encodeURIComponent(Number.isFinite(exit)?(exit*100).toFixed(1)+'%':'—')}`+
+        `&pnl=${encodeURIComponent((pnl>=0?'+':'-')+'$'+Math.abs(pnl).toLocaleString())}`+
+        `&roi=${encodeURIComponent(roi)}`
+
+      const marketUrl = getPolymarketMarketUrl(market)
+      await ctx.replyWithPhoto({ url }, { caption: `🧾 Trade — ${title}\n${marketUrl ? '🔗 '+marketUrl : ''}` })
+    } catch (e) {
+      logger.error('card_trade failed', e)
+      await ctx.reply('❌ Failed to create trade card.')
+    }
+  })
 
   logger.info('Commands registered');
 }

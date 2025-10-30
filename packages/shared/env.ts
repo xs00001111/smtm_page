@@ -17,6 +17,7 @@ const envSchema = z.object({
   PRICE_CHANGE_THRESHOLD: z.string().default('5'),
   WHALE_TRADE_MIN_SIZE: z.string().default('1000'),
   TELEGRAM_SUBSCRIPTIONS_FILE: z.string().default('apps/telegram-bot/data/subscriptions.csv'),
+  TELEGRAM_LINKS_FILE: z.string().default('apps/telegram-bot/data/links.csv'),
 });
 
 export const env = envSchema.parse({
@@ -31,4 +32,5 @@ export const env = envSchema.parse({
   PRICE_CHANGE_THRESHOLD: process.env.PRICE_CHANGE_THRESHOLD || '5',
   WHALE_TRADE_MIN_SIZE: process.env.WHALE_TRADE_MIN_SIZE || '1000',
   TELEGRAM_SUBSCRIPTIONS_FILE: process.env.TELEGRAM_SUBSCRIPTIONS_FILE || 'apps/telegram-bot/data/subscriptions.csv',
+  TELEGRAM_LINKS_FILE: process.env.TELEGRAM_LINKS_FILE || 'apps/telegram-bot/data/links.csv',
 });

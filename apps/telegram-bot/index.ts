@@ -6,6 +6,7 @@ import { startPriceMonitoring } from './services/price-monitor';
 import { WebSocketMonitorService } from './services/websocket-monitor';
 import { botConfig } from './config/bot';
 import { loadSubscriptions } from './services/subscriptions';
+import { loadLinks } from './services/links';
 import { whaleAggregator } from './services/whale-aggregator';
 
 const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
@@ -47,10 +48,18 @@ async function start() {
     await bot.telegram.setMyCommands([
       { command: 'start', description: 'Start the bot and see welcome message' },
       { command: 'help', description: 'Show help and available commands' },
+      { command: 'link', description: 'Link Polymarket address or Kalshi username' },
+      { command: 'unlink', description: 'Unlink all connected profiles' },
+      { command: 'stats', description: 'Show stats for an address or profile' },
       { command: 'profile', description: 'View profile card' },
+      { command: 'card_profile', description: 'Generate shareable profile image' },
+      { command: 'card_trade', description: 'Generate shareable trade receipt' },
+      { command: 'card_whale', description: 'Generate shareable whale card' },
       { command: 'markets', description: 'Browse hot markets' },
       { command: 'search', description: 'Search markets or whales' },
       { command: 'price', description: 'Get market price' },
+      { command: 'net', description: 'Net positions by user for a market' },
+      { command: 'overview', description: 'Market sides, holders, pricing' },
       { command: 'whales', description: 'Top traders leaderboard' },
       { command: 'whales_top', description: 'Top whales over 24h/7d/30d' },
       { command: 'follow', description: 'Follow market or wallet alerts' },
@@ -59,7 +68,8 @@ async function start() {
       { command: 'status', description: 'Check connection status' },
     ]);
 
-    // Restore subscriptions from CSV before deciding to start WS
+    // Restore stored data before deciding to start WS
+    await loadLinks();
     await loadSubscriptions(wsMonitor);
 
     // Only start WS if enabled and there are active subscriptions; otherwise lazy-start
