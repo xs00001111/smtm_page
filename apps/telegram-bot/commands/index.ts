@@ -52,11 +52,6 @@ function esc(s: string) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// Escape HTML for safe Telegram 'HTML' parse_mode rendering
-function esc(s: string) {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
 // Parse a market input which may be:
 // - condition id (0x...)
 // - polymarket event URL
