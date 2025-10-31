@@ -9,7 +9,6 @@ import { Telegraf } from 'telegraf';
 import { logger } from '../utils/logger';
 import { gammaApi, dataApi } from '@smtm/data';
 import { updateMarketToken, updateWhaleToken } from './subscriptions';
-import { whaleAggregator } from './whale-aggregator';
 import { botConfig } from '../config/bot';
 import { formatPrice, formatVolume, formatAddress } from '@smtm/data';
 
@@ -522,10 +521,6 @@ export class WebSocketMonitorService {
       logger.warn('Invalid trade payload', payload);
       return;
     }
-
-    // Record into aggregator
-    const makerAddr = (payload.maker_address || payload.maker || '').toLowerCase()
-    whaleAggregator.recordTrade(makerAddr, tokenId, tradeValue, Date.now())
 
     // Check market-specific whale subscriptions
     const subscriptions = this.whaleSubscriptions.get(tokenId);

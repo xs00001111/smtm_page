@@ -7,7 +7,6 @@ import { WebSocketMonitorService } from './services/websocket-monitor';
 import { botConfig } from './config/bot';
 import { loadSubscriptions } from './services/subscriptions';
 import { loadLinks } from './services/links';
-import { whaleAggregator } from './services/whale-aggregator';
 
 const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
 
@@ -42,7 +41,6 @@ process.on('uncaughtException', (error) => {
 async function start() {
   try {
     logger.info('Starting Telegram bot...');
-    await whaleAggregator.load();
 
     // Set bot commands for menu
     await bot.telegram.setMyCommands([
@@ -60,7 +58,7 @@ async function start() {
       { command: 'price', description: 'Get market price' },
       { command: 'net', description: 'Net positions by user for a market' },
       { command: 'overview', description: 'Market sides, holders, pricing' },
-      { command: 'whales', description: 'Top whales (add 24h|7d|30d)' },
+      { command: 'whales', description: 'Top traders leaderboard' },
       { command: 'follow', description: 'Follow market or wallet alerts' },
       { command: 'unfollow', description: 'Stop following' },
       { command: 'list', description: 'List your follows' },

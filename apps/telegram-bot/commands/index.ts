@@ -92,7 +92,8 @@ export function registerCommands(bot: Telegraf) {
       'Welcome to SMTM Bot! 🎯\n\n' +
         '🔍 Discovery:\n' +
         '• /markets — Browse hot markets\n' +
-        '• /whales [24h|7d|30d] — Top whales (default: leaderboard)\n' +
+        '• /whales — Top traders leaderboard\n' +
+        '• /whales <market_id> — Whales for specific market\n' +
         '• /search markets <query> — Find markets\n' +
         '• /search whales <name> — Find traders\n' +
         '• /price <market> — Get market price\n' +
@@ -183,16 +184,15 @@ export function registerCommands(bot: Telegraf) {
       '📚 SMTM Bot Help\n\n' +
         '🔍 Discovery:\n' +
         '/markets — Browse hot markets\n' +
-        '/whales [24h|7d|30d] — Top whales (default: leaderboard)\n' +
+        '/whales — Top traders leaderboard\n' +
+        '/whales <market_id> — Whales for specific market\n' +
         '/search markets <query> — Search markets\n' +
         '/search whales <name> — Search traders\n' +
         '/price <market> — Get market price\n' +
         '/net <market_url|id|slug> — Net positions by user\n' +
         '/overview <market_url|id|slug> — Sides, totals, pricing\n' +
         '/card_profile [id|@user|url] — Shareable profile image\n' +
-        '/card_trade <market> <yes|no> <stake_$> [entry_%] [current_%] — Shareable receipt\n' +
-        // unified whales command
-        '/whales [24h|7d|30d] — Top whales\n\n' +
+        '/card_trade <market> <yes|no> <stake_$> [entry_%] [current_%] — Shareable receipt\n\n' +
         '👤 Profile Links:\n' +
         '/link <id|url|username> — Link Polymarket address or Kalshi username\n' +
         '/unlink — Unlink all connected profiles\n' +
@@ -811,7 +811,7 @@ export function registerCommands(bot: Telegraf) {
     await ctx.reply('This command is deprecated. Use /follow instead.\nExamples:\n• /follow 0x<wallet> (copy whale all markets)\n• /follow 0x<wallet> 0x<market_id> (whale on specific market)')
   });
 
-  // Whales leaderboard (leaderboard | 24h/7d/30d | by market)
+  // Whales leaderboard (global or by market)
   bot.command('whales', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     const looksLikeCond = (s: string) => /^0x[a-fA-F0-9]{64}$/.test(s)
@@ -819,47 +819,8 @@ export function registerCommands(bot: Telegraf) {
     let minBalance = minBalanceDefault
 
     try {
-      // Case A: time-window aggregate (24h|7d|30d)
-      const isTimeWindow = args.length === 1 && /^(24h|7d|30d)$/i.test(args[0])
-      if (isTimeWindow) {
-        const a = args[0].toLowerCase()
-        let windowMs = 24*60*60*1000
-        let label = 'last 24h'
-        if (a === '7d') { windowMs = 7*24*60*60*1000; label = 'last 7d' }
-        else if (a === '30d') { windowMs = 30*24*60*60*1000; label = 'last 30d' }
-
-        // Try local whale aggregator first
-        const { whaleAggregator } = await import('../services/whale-aggregator')
-        const res = whaleAggregator.getTop(windowMs, 10)
-
-        if (res.list.length > 0) {
-          // Have local data - show it
-          let msg = `🐋 Top Observed Whales (${label})\n` + `Tracked markets: ${res.markets}\nLast updated: ${new Date(res.updatedAt).toUTCString()}\n\n`
-          const keyboard: { text: string; callback_data: string }[][] = []
-          res.list.forEach(async ([addr, val], i) => {
-            const short = addr.slice(0,6)+'...'+addr.slice(-4)
-            const profileUrl = getPolymarketProfileUrl(null, addr)
-            msg += `${i+1}. ${short}\n`
-            msg += `   ID: ${addr}\n`
-            msg += `   Volume score: $${Math.round(val).toLocaleString()}\n`
-            msg += `   🔗 ${profileUrl}\n`
-            msg += `   ${'<code>'+esc(`/follow ${addr}`)+'</code>'}\n\n`
-            try {
-              const tok = await actionFollowWhaleAll(addr)
-              keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }])
-            } catch {}
-          })
-          msg += '\n💡 This shows whales tracked by SMTM bot. Use /whales for global leaderboard.'
-          await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
-          return
-        }
-
-        // No local data - show message and fall through to global leaderboard
-        await ctx.reply(`ℹ️ No locally tracked whales yet in this window. Showing global leaderboard instead...\n\n💡 To see time-window stats, follow some whales first to start tracking.`)
-      }
-
-      // Case B: no args OR fallback from time-window — global leaderboard
-      if (args.length === 0 || isTimeWindow) {
+      // Case A: no args — global leaderboard
+      if (args.length === 0) {
         // Use Polymarket leaderboard API for top whales (much faster!)
         await ctx.reply('🔍 Loading top traders...')
         try {
@@ -1147,12 +1108,9 @@ export function registerCommands(bot: Telegraf) {
     }
   });
 
-  // Top whales over time windows (24h, 7d, 30d)
+  // Deprecated command
   bot.command('whales_top', async (ctx) => {
-    // Deprecated in favor of unified /whales [24h|7d|30d]
-    const a = (ctx.message.text.split(' ').slice(1)[0] || '').trim()
-    const hint = a ? ` ${a}` : ''
-    await ctx.reply(`⚠️ This command is deprecated. Use /whales${hint} instead.`)
+    await ctx.reply(`⚠️ This command is deprecated. Use /whales to see the global leaderboard or /whales <market_id> to see whales for a specific market.`)
   })
 
   // Status command - Check WebSocket connection
