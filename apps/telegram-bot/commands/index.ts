@@ -99,8 +99,8 @@ export function registerCommands(bot: Telegraf) {
         '• /price <market> — Get market price\n' +
         '• /net <market> — Net positions by user\n' +
         '• /overview <market> — Sides, totals, pricing\n' +
-        '• /card_profile — Your shareable profile image\n' +
-        '• /card_trade — Shareable trade receipt\n\n' +
+        '• /card_profile — Create your profile card\n' +
+        '• /card_trade — Create a trade card\n\n' +
         '👤 Profile:\n' +
         '• /link <id|url|username> — Link your Polymarket address\n' +
         '• /unlink — Remove links\n' +
@@ -191,9 +191,9 @@ export function registerCommands(bot: Telegraf) {
         '/price <market> — Get market price\n' +
         '/net <market_url|id|slug> — Net positions by user\n' +
         '/overview <market_url|id|slug> — Sides, totals, pricing\n' +
-        '/card_profile — Generate your shareable profile card\n' +
-        '/card_profile <address|@user> — Generate card for any user\n' +
-        '/card_trade <market> <yes|no> <stake_$> [entry_%] [current_%] — Shareable receipt\n\n' +
+        '/card_profile — Create your profile card\n' +
+        '/card_profile <address|@user> — Create a profile card for anyone\n' +
+        '/card_trade <market> <yes|no> <stake_$> [entry_%] [current_%] — Create a trade card\n\n' +
         '👤 Profile Links:\n' +
         '/link <id|url|username> — Link your Polymarket address\n' +
         '/unlink — Unlink all connected profiles\n' +
@@ -236,19 +236,19 @@ export function registerCommands(bot: Telegraf) {
     try {
       if (isAddress) {
         await linkPolymarketAddress(userId, input)
-        await ctx.reply('✅ Linked Polymarket address!\n\n💡 Try /card_profile to generate your shareable profile card.')
+        await ctx.reply('✅ Linked Polymarket address!\n\n💡 Try /card_profile to create your profile card.')
         return
       }
       if (looksLikeUrl) {
         const parsed = parsePolymarketProfile(input)
         if (parsed?.address) {
           await linkPolymarketAddress(userId, parsed.address)
-          await ctx.reply('✅ Linked Polymarket address from profile URL!\n\n💡 Try /card_profile to generate your shareable profile card.')
+          await ctx.reply('✅ Linked Polymarket address from profile URL!\n\n💡 Try /card_profile to create your profile card.')
           return
         }
         if (parsed?.username) {
           await linkPolymarketUsername(userId, parsed.username)
-          await ctx.reply(`✅ Linked Polymarket username @${parsed.username}!\n\n💡 Try /card_profile to generate your shareable profile card.`)
+          await ctx.reply(`✅ Linked Polymarket username @${parsed.username}!\n\n💡 Try /card_profile to create your profile card.`)
           return
         }
         // Unknown URL — fall back to treating as Kalshi if looks like a simple username in URL is not parseable
@@ -1643,9 +1643,9 @@ export function registerCommands(bot: Telegraf) {
         if (!address) {
           await ctx.reply(
             '❌ No linked Polymarket address found.\n\n' +
-            'First link your address with:\n' +
+            'First link your address:\n' +
             '/link 0x<your_address>\n\n' +
-            'Or generate a card for any user:\n' +
+            'Or create a profile card for anyone:\n' +
             '/card_profile 0x<address>\n' +
             '/card_profile @username'
           )
@@ -1676,7 +1676,7 @@ export function registerCommands(bot: Telegraf) {
         return
       }
 
-      await ctx.reply('⏳ Building profile card...')
+      await ctx.reply('⏳ Creating your profile card...')
 
       const [value, positions, closed, lb] = await Promise.all([
         dataApi.getUserValue(address),
@@ -1728,7 +1728,7 @@ export function registerCommands(bot: Telegraf) {
 
   // Card: Whale (alias to profile with whale flair later)
   bot.command('card_whale', async (ctx) => {
-    await ctx.reply('ℹ️ Using profile card for whales for now. Try /card_profile <address>.')
+    await ctx.reply('ℹ️ Whale cards use the profile card format for now.\n\nTry: /card_profile <address>')
   })
 
   // Card: Trade (user crafts a flex card)
@@ -1736,7 +1736,12 @@ export function registerCommands(bot: Telegraf) {
   bot.command('card_trade', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     if (args.length < 3) {
-      await ctx.reply('Usage: /card_trade <market> <yes|no> <stake_$> [entry_%] [current_%]')
+      await ctx.reply(
+        'Create a trade card to flex your wins! 💪\n\n' +
+        'Usage: /card_trade <market> <yes|no> <stake_$> [entry_%] [current_%]\n\n' +
+        'Example:\n' +
+        '/card_trade 0x123... yes 1000 65 72'
+      )
       return
     }
     try {
@@ -1768,10 +1773,10 @@ export function registerCommands(bot: Telegraf) {
         `&roi=${encodeURIComponent(roi)}`
 
       const marketUrl = getPolymarketMarketUrl(market)
-      await ctx.replyWithPhoto({ url }, { caption: `🧾 Trade — ${title}\n${marketUrl ? '🔗 '+marketUrl : ''}` })
+      await ctx.replyWithPhoto({ url }, { caption: `🧾 Trade Card — ${title}\n${marketUrl ? '🔗 '+marketUrl : ''}` })
     } catch (e) {
       logger.error('card_trade failed', e)
-      await ctx.reply('❌ Failed to create trade card.')
+      await ctx.reply('❌ Failed to create your trade card. Please check your inputs and try again.')
     }
   })
 
