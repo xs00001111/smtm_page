@@ -820,41 +820,46 @@ export function registerCommands(bot: Telegraf) {
 
     try {
       // Case A: time-window aggregate (24h|7d|30d)
-      if (args.length === 1 && /^(24h|7d|30d)$/i.test(args[0])) {
+      const isTimeWindow = args.length === 1 && /^(24h|7d|30d)$/i.test(args[0])
+      if (isTimeWindow) {
         const a = args[0].toLowerCase()
         let windowMs = 24*60*60*1000
         let label = 'last 24h'
         if (a === '7d') { windowMs = 7*24*60*60*1000; label = 'last 7d' }
         else if (a === '30d') { windowMs = 30*24*60*60*1000; label = 'last 30d' }
 
+        // Try local whale aggregator first
         const { whaleAggregator } = await import('../services/whale-aggregator')
         const res = whaleAggregator.getTop(windowMs, 10)
-        if (!res.list.length) {
-          await ctx.reply('❌ No whales observed in this window yet. Try again later or follow a few wallets to start collecting.')
+
+        if (res.list.length > 0) {
+          // Have local data - show it
+          let msg = `🐋 Top Observed Whales (${label})\n` + `Tracked markets: ${res.markets}\nLast updated: ${new Date(res.updatedAt).toUTCString()}\n\n`
+          const keyboard: { text: string; callback_data: string }[][] = []
+          res.list.forEach(async ([addr, val], i) => {
+            const short = addr.slice(0,6)+'...'+addr.slice(-4)
+            const profileUrl = getPolymarketProfileUrl(null, addr)
+            msg += `${i+1}. ${short}\n`
+            msg += `   ID: ${addr}\n`
+            msg += `   Volume score: $${Math.round(val).toLocaleString()}\n`
+            msg += `   🔗 ${profileUrl}\n`
+            msg += `   ${'<code>'+esc(`/follow ${addr}`)+'</code>'}\n\n`
+            try {
+              const tok = await actionFollowWhaleAll(addr)
+              keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }])
+            } catch {}
+          })
+          msg += '\n💡 This shows whales tracked by SMTM bot. Use /whales for global leaderboard.'
+          await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
           return
         }
 
-        let msg = `🐋 Top whales (${label})\n` + `Observed markets: ${res.markets}\nUpdated: ${new Date(res.updatedAt).toUTCString()}\n\n`
-        const keyboard: { text: string; callback_data: string }[][] = []
-        res.list.forEach(async ([addr, val], i) => {
-          const short = addr.slice(0,6)+'...'+addr.slice(-4)
-          const profileUrl = getPolymarketProfileUrl(null, addr)
-          msg += `${i+1}. ${short}\n`
-          msg += `   ID: ${addr}\n`
-          msg += `   Volume score: $${Math.round(val).toLocaleString()}\n`
-          msg += `   🔗 ${profileUrl}\n`
-          msg += `   ${'<code>'+esc(`/follow ${addr}`)+'</code>'}\n\n`
-          try {
-            const tok = await actionFollowWhaleAll(addr)
-            keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }])
-          } catch {}
-        })
-        await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
-        return
+        // No local data - show message and fall through to global leaderboard
+        await ctx.reply(`ℹ️ No locally tracked whales yet in this window. Showing global leaderboard instead...\n\n💡 To see time-window stats, follow some whales first to start tracking.`)
       }
 
-      // Case B: no args — global leaderboard
-      if (args.length === 0) {
+      // Case B: no args OR fallback from time-window — global leaderboard
+      if (args.length === 0 || isTimeWindow) {
         // Use Polymarket leaderboard API for top whales (much faster!)
         await ctx.reply('🔍 Loading top traders...')
         try {
