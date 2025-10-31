@@ -1063,7 +1063,7 @@ export function registerCommands(bot: Telegraf) {
 
     try {
       const { getUserRows } = await import('../services/subscriptions')
-      const rows = getUserRows(userId)
+      const rows = await getUserRows(userId)
       if (rows.length === 0) {
         await ctx.reply('📭 No follows yet! Get started:\n\n• /markets — Browse markets\n• /whales — Find top traders\n• /follow <market_id> — Set up alerts')
         return

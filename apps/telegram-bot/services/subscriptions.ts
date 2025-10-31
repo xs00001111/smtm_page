@@ -233,7 +233,28 @@ export async function updateMarketToken(userId: number, conditionId: string, tok
   return updated
 }
 
-export function getUserRows(userId: number) {
+export async function getUserRows(userId: number): Promise<StoredRow[]> {
+  // Fetch fresh data from Supabase if available
+  if (supabaseAvailable()) {
+    try {
+      const data = await sb<any[]>(`tg_follows?user_id=eq.${userId}&select=*`)
+      return (data || []).map((r) => ({
+        created_at: r.created_at,
+        user_id: Number(r.user_id),
+        type: (r.kind === 'whale' || r.kind === 'whale_all') ? (r.kind as any) : 'market',
+        token_id: r.token_id || '',
+        market_condition_id: r.market_condition_id || undefined,
+        market_name: r.market_name || '',
+        threshold: r.threshold != null ? Number(r.threshold) : undefined,
+        min_trade_size: r.min_trade_size != null ? Number(r.min_trade_size) : undefined,
+        address_filter: r.address_filter || undefined,
+      }))
+    } catch (e) {
+      logger.error('Supabase getUserRows failed, falling back to in-memory', e)
+      // Fall back to in-memory
+    }
+  }
+  // Fall back to in-memory rows
   return rows.filter(r => r.user_id === userId)
 }
 
