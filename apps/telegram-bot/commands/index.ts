@@ -99,12 +99,12 @@ export function registerCommands(bot: Telegraf) {
         '• /price <market> — Get market price\n' +
         '• /net <market> — Net positions by user\n' +
         '• /overview <market> — Sides, totals, pricing\n' +
-        '• /card_profile — Shareable profile image\n' +
+        '• /card_profile — Your shareable profile image\n' +
         '• /card_trade — Shareable trade receipt\n\n' +
         '👤 Profile:\n' +
-        '• /link <id|url|username> — Link Polymarket or Kalshi\n' +
+        '• /link <id|url|username> — Link your Polymarket address\n' +
         '• /unlink — Remove links\n' +
-        '• /stats <id|url|username> — Show stats\n\n' +
+        '• /stats [id|url|username] — Show profile stats\n\n' +
         '🔥 Alerts:\n' +
         '• /follow 0x<market_id> — Market price alerts\n' +
         '• /follow 0x<wallet> — Copy whale (all markets)\n' +
@@ -191,12 +191,13 @@ export function registerCommands(bot: Telegraf) {
         '/price <market> — Get market price\n' +
         '/net <market_url|id|slug> — Net positions by user\n' +
         '/overview <market_url|id|slug> — Sides, totals, pricing\n' +
-        '/card_profile [id|@user|url] — Shareable profile image\n' +
+        '/card_profile — Generate your shareable profile card\n' +
+        '/card_profile <address|@user> — Generate card for any user\n' +
         '/card_trade <market> <yes|no> <stake_$> [entry_%] [current_%] — Shareable receipt\n\n' +
         '👤 Profile Links:\n' +
-        '/link <id|url|username> — Link Polymarket address or Kalshi username\n' +
+        '/link <id|url|username> — Link your Polymarket address\n' +
         '/unlink — Unlink all connected profiles\n' +
-        '/stats <id|url|username> — Show stats (no verification)\n\n' +
+        '/stats [id|url|username] — Show stats for any user\n\n' +
         '🔔 Alerts:\n' +
         '/follow 0x<market_id> — Market price alerts\n' +
         '/follow 0x<wallet> — Copy whale (all markets)\n' +
@@ -235,19 +236,19 @@ export function registerCommands(bot: Telegraf) {
     try {
       if (isAddress) {
         await linkPolymarketAddress(userId, input)
-        await ctx.reply('✅ Linked Polymarket address! Your PnL can be shown alongside your name where supported.')
+        await ctx.reply('✅ Linked Polymarket address!\n\n💡 Try /card_profile to generate your shareable profile card.')
         return
       }
       if (looksLikeUrl) {
         const parsed = parsePolymarketProfile(input)
         if (parsed?.address) {
           await linkPolymarketAddress(userId, parsed.address)
-          await ctx.reply('✅ Linked Polymarket address from profile URL!')
+          await ctx.reply('✅ Linked Polymarket address from profile URL!\n\n💡 Try /card_profile to generate your shareable profile card.')
           return
         }
         if (parsed?.username) {
           await linkPolymarketUsername(userId, parsed.username)
-          await ctx.reply(`✅ Linked Polymarket username @${parsed.username}!`)
+          await ctx.reply(`✅ Linked Polymarket username @${parsed.username}!\n\n💡 Try /card_profile to generate your shareable profile card.`)
           return
         }
         // Unknown URL — fall back to treating as Kalshi if looks like a simple username in URL is not parseable
@@ -1632,10 +1633,23 @@ export function registerCommands(bot: Telegraf) {
       let address: string | undefined
       if (!input) {
         const linked = getLinks(userId)
-        if (linked?.polymarket_address) address = linked.polymarket_address
-        else if (linked?.polymarket_username) {
+        if (linked?.polymarket_address) {
+          address = linked.polymarket_address
+        } else if (linked?.polymarket_username) {
           const res = await findWhaleFuzzy(linked.polymarket_username, 1)
           address = res[0]?.user_id
+        }
+
+        if (!address) {
+          await ctx.reply(
+            '❌ No linked Polymarket address found.\n\n' +
+            'First link your address with:\n' +
+            '/link 0x<your_address>\n\n' +
+            'Or generate a card for any user:\n' +
+            '/card_profile 0x<address>\n' +
+            '/card_profile @username'
+          )
+          return
         }
       } else if (/^0x[a-fA-F0-9]{40}$/.test(input)) {
         address = input
@@ -1650,7 +1664,17 @@ export function registerCommands(bot: Telegraf) {
         const res = await findWhaleFuzzy(input.replace(/^@/, ''), 1)
         address = res[0]?.user_id
       }
-      if (!address) { await ctx.reply('❌ Could not resolve a Polymarket address.'); return }
+
+      if (!address) {
+        await ctx.reply(
+          '❌ Could not resolve Polymarket address.\n\n' +
+          'Try:\n' +
+          '• /card_profile 0x<address>\n' +
+          '• /card_profile @username\n' +
+          '• /card_profile <profile_url>'
+        )
+        return
+      }
 
       await ctx.reply('⏳ Building profile card...')
 
@@ -1682,9 +1706,23 @@ export function registerCommands(bot: Telegraf) {
         `&roi=${encodeURIComponent(roi)}&rank=${encodeURIComponent(rank)}&pnlLb=${encodeURIComponent(pnlLb)}`
 
       await ctx.replyWithPhoto({ url }, { caption: `👤 Profile — ${short}\nView: https://polymarket.com/profile/${address}` })
-    } catch (e) {
+    } catch (e: any) {
       logger.error('card_profile failed', e)
-      await ctx.reply('❌ Failed to create profile card.')
+      const errorMsg = e?.message || String(e)
+      if (errorMsg.includes('not found') || errorMsg.includes('404')) {
+        await ctx.reply('❌ Profile not found. Make sure the address has activity on Polymarket.')
+      } else if (errorMsg.includes('timeout') || errorMsg.includes('ETIMEDOUT')) {
+        await ctx.reply('❌ Request timed out. Please try again in a moment.')
+      } else {
+        await ctx.reply(
+          '❌ Failed to create profile card.\n\n' +
+          'This may happen if:\n' +
+          '• The address has no Polymarket activity\n' +
+          '• Polymarket API is temporarily unavailable\n' +
+          '• The image generation service is down\n\n' +
+          'Please try again in a moment.'
+        )
+      }
     }
   })
 
