@@ -100,20 +100,20 @@ export function ProfileSample() {
   const accuracySeries = useMemo(() => [62, 65, 61, 68, 70, 72, 71, 74, 73, 75], [])
 
   return (
-    <div id="sample-profile" className="mx-auto max-w-6xl px-6">
+    <div id="sample-profile" className="mx-auto max-w-4xl px-6">
 
-      <div className="rounded-2xl border-2 border-white/20 p-6 md:p-8">
-        <div className="flex flex-col md:flex-row md:items-center gap-6">
-          <div className="flex items-center gap-4">
+      <div className="rounded-xl border border-white/20 p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="flex items-center gap-3">
             <div
-              className="w-[72px] h-[72px] rounded-xl grid place-items-center text-2xl md:text-3xl font-bold border border-white/10"
+              className="w-14 h-14 md:w-16 md:h-16 rounded-lg grid place-items-center text-xl md:text-2xl font-bold border border-white/10"
               style={avatarStyle(profile.handle)}
             >
               {profile.name.charAt(0)}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-display text-2xl md:text-3xl font-extrabold leading-tight">
+                <h2 className="font-display text-xl md:text-2xl font-extrabold leading-tight">
                   {profile.name}
                 </h2>
                 {profile.verified && (
@@ -130,44 +130,44 @@ export function ProfileSample() {
           </div>
 
           <div className="md:ml-auto inline-flex items-center gap-2 w-full md:w-auto">
-            <button onClick={onFollow} className="h-10 px-4 rounded-md bg-teal text-black text-sm font-semibold hover:opacity-90 transition w-full md:w-auto">
+            <button onClick={onFollow} className="h-9 px-3 rounded-md bg-teal text-black text-sm font-semibold hover:opacity-90 transition w-full md:w-auto">
               {isFollowing ? 'Following' : 'Follow'}
             </button>
-            <GhostButton className="h-10 px-4">⚔️ Challenge</GhostButton>
-            <GhostButton className="h-10 px-4" onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share'}</GhostButton>
+            <GhostButton className="h-9 px-3 text-xs md:text-sm">⚔️ Challenge</GhostButton>
+            <GhostButton className="h-9 px-3 text-xs md:text-sm" onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share'}</GhostButton>
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           <Stat label="Predictions" value={`${profile.stats.predictions}`} />
           <AccuracyCard value={`${profile.stats.accuracy}%`} series={accuracySeries} />
           <Stat label="Tips Earned" value={`$${profile.stats.tips}`} />
         </div>
 
-        <div className="mt-6 pt-4 border-t border-white/10 flex flex-wrap items-center gap-3 text-sm">
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">
-            <Shield className="h-4 w-4 text-teal" />
-            Trust Layer: Reputation-first
+        <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center gap-2 text-xs md:text-sm">
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-white/80">
+            <Shield className="h-3 w-3 text-teal" />
+            Reputation-first
           </span>
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">
-            <Link2 className="h-4 w-4 text-teal" />
-            Portfolio: {profile.portfolioLinked ? 'Linked (Coinbase API)' : 'Not Linked'}
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-white/80">
+            <Link2 className="h-3 w-3 text-teal" />
+            Portfolio Linked
           </span>
           {/* Badges */}
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">🏅 Top 10% Accuracy</span>
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">🎲 High Roller</span>
-          <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">💸 Most Tipped</span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-white/80">🏅 Top 10%</span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-white/80">🎲 High Roller</span>
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-white/80">💸 Most Tipped</span>
         </div>
-      
 
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
         <Strip label="Followers" value={followerCount.toLocaleString()} />
         <Strip label="Following" value={profile.stats.following.toLocaleString()} />
         <Strip label="Open Positions" value={predictions.filter(p=>p.status==='Open').length.toString()} />
         <Strip label="Resolved" value={predictions.filter(p=>p.status==='Resolved').length.toString()} />
       </div>
 
-      <nav className="mt-8 flex items-center gap-4 text-sm" role="tablist" aria-label="Profile sections">
+      <nav className="mt-6 flex items-center gap-3 text-sm" role="tablist" aria-label="Profile sections">
         <button
           role="tab"
           aria-selected={activeTab === 'predictions'}
@@ -211,32 +211,32 @@ export function ProfileSample() {
       </nav>
 
       {/* Weekly Challenge */}
-      <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-4">
-        <div className="flex items-start gap-3">
-          <div className="h-8 w-8 rounded-full bg-[linear-gradient(90deg,#00E5FF_0%,#B6FF00_100%)] grid place-items-center text-black font-bold">W</div>
+      <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+        <div className="flex items-start gap-2.5">
+          <div className="h-7 w-7 rounded-full bg-[linear-gradient(90deg,#00E5FF_0%,#B6FF00_100%)] grid place-items-center text-black font-bold text-sm">W</div>
           <div className="flex-1">
-            <div className="font-semibold">Weekly Challenge</div>
-            <div className="text-sm text-muted">Make 3 predictions this week to unlock the “On a Streak” badge.</div>
-            <div className="mt-2 h-2 rounded-full bg-white/10 overflow-hidden">
+            <div className="font-semibold text-sm">Weekly Challenge</div>
+            <div className="text-xs text-muted">Make 3 predictions to unlock "On a Streak" badge.</div>
+            <div className="mt-1.5 h-1.5 rounded-full bg-white/10 overflow-hidden">
               <div className="h-full bg-teal" style={{ width: '33%' }} />
             </div>
             <div className="mt-1 text-xs text-muted">1/3 completed</div>
           </div>
-          <button className="ml-auto rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm hover:bg-white/[0.06]">Start</button>
+          <button className="ml-auto rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-xs hover:bg-white/[0.06]">Start</button>
         </div>
       </div>
 
       {activeTab === 'predictions' && (
-        <div id="predictions" className="mt-4 space-y-3">
+        <div id="predictions" className="mt-3 space-y-2">
           {predictions.map((p) => (
-            <div key={p.id} className={`rounded-xl border border-white/10 bg-white/[0.02] p-4`}>
-              <div className="flex items-start gap-4">
-                <div className="h-10 w-10 rounded-lg bg-white/10 grid place-items-center">
+            <div key={p.id} className={`rounded-lg border border-white/10 bg-white/[0.02] p-3`}>
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-md bg-white/10 grid place-items-center shrink-0">
                   {assetTypeIcon(p.type)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold">{p.statement}</h3>
+                    <h3 className="font-semibold text-sm">{p.statement}</h3>
                     <span className="text-xs rounded-md border border-white/10 px-2 py-0.5 text-muted inline-flex items-center gap-1">
                       <TrendingUp className="h-3 w-3 text-teal" /> {p.side}
                     </span>
@@ -346,10 +346,9 @@ export function ProfileSample() {
 
 function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-xl border border-white/10 p-4 text-center transition-shadow ${highlight ? 'bg-white/5 shadow-glow' : 'bg-white/5 hover:bg-white/[0.08]'} hover:shadow-glow-soft grid grid-rows-[auto_auto_24px] items-center justify-items-center min-h-[140px]`}>
+    <div className={`rounded-lg border border-white/10 p-3 text-center transition-shadow ${highlight ? 'bg-white/5 shadow-glow' : 'bg-white/5 hover:bg-white/[0.08]'} hover:shadow-glow-soft`}>
       <div className="text-xs text-white/60">{label}</div>
-      <div className="text-2xl font-extrabold text-white/90">{value}</div>
-      <div className="h-6" aria-hidden />
+      <div className="text-xl md:text-2xl font-extrabold text-white/90 mt-1">{value}</div>
     </div>
   )
 }
@@ -375,10 +374,10 @@ function AccuracyCard({ value, series }: { value: string; series: number[] }) {
   const xLast = series.length > 1 ? ((series.length - 1) / (series.length - 1)) * 80 : 0
   const yLast = 24 - (last / 100) * 24
   return (
-    <div className="rounded-xl border border-white/10 p-4 text-center bg-white/5 transition-shadow hover:bg-white/[0.08] hover:shadow-glow-soft grid grid-rows-[auto_auto_24px] items-center justify-items-center min-h-[140px]">
+    <div className="rounded-lg border border-white/10 p-3 text-center bg-white/5 transition-shadow hover:bg-white/[0.08] hover:shadow-glow-soft">
       <div className="text-xs text-white/60">Accuracy</div>
-      <div className="text-2xl font-extrabold text-white/90">{value}</div>
-      <svg width="80" height="24" viewBox="0 0 80 24" className="mx-auto">
+      <div className="text-xl md:text-2xl font-extrabold text-white/90 mt-1">{value}</div>
+      <svg width="80" height="24" viewBox="0 0 80 24" className="mx-auto mt-2">
         <path d={path} fill="none" stroke="#00E5FF" strokeWidth="2" />
         <circle cx={xLast} cy={yLast} r="2" fill="#B6FF00" />
       </svg>
@@ -399,15 +398,15 @@ function sparklinePath(data: number[], width: number, height: number) {
 }
 
 function assetTypeIcon(_type: 'crypto' | 'stock' | 'macro') {
-  const common = 'h-5 w-5 text-teal'
+  const common = 'h-4 w-4 text-teal'
   return <LineChart className={common} />
 }
 
 function Strip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] px-4 py-3">
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
       <div className="text-xs text-muted">{label}</div>
-      <div className="text-lg font-semibold">{value}</div>
+      <div className="text-base md:text-lg font-semibold">{value}</div>
     </div>
   )
 }

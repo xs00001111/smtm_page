@@ -5,7 +5,7 @@ import { WaitlistForm } from '@/components/waitlist-form'
 import { Footer } from '@/components/footer'
 import { MockExperience } from '@/components/mock-experience'
 import { ProfileSample } from '@/components/profile-sample'
-import { BrainCircuit, TrendingUp, Share2, Send } from 'lucide-react'
+import { BrainCircuit, TrendingUp, Share2, Send, Bell, Search, Zap, Twitter, MessageSquare } from 'lucide-react'
 import { MarketTickerBar } from '@/components/market-ticker-bar'
 
 export default function HomePage() {
@@ -26,61 +26,53 @@ export default function HomePage() {
             <MarketTickerBar />
           </div>
           <div className="relative z-10 text-center w-full flex flex-col items-center pt-24">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-2 mb-6">
+              <span className="h-2 w-2 rounded-full bg-[#00E5FF] animate-pulse" />
+              <span className="text-xs sm:text-sm tracking-wide text-[#00E5FF] font-medium">NOW LIVE — Telegram Bot Available</span>
+            </div>
             <div className="text-xs sm:text-sm tracking-[0.2em] text-white/70 uppercase mb-3 sm:mb-4">
               Show Me The Money
             </div>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
-              Earn when you’re right. Lose nothing to lies.
+              Track markets. Follow whales. Never miss a move.
             </h1>
-            <p className="mt-6 sm:mt-7 text-lg text-white/80 max-w-[46ch]">
-              SMTM makes conviction profitable and hype worthless.
+            <p className="mt-6 sm:mt-7 text-lg text-white/80 max-w-[50ch]">
+              Real-time alerts for prediction markets, whale trades, and price changes. Research tools to find the smartest traders and hottest markets.
             </p>
             <div className="mt-10 sm:mt-12 flex flex-col sm:flex-row gap-4 sm:gap-6 items-center">
-              <a href="#waitlist" className="w-full sm:w-auto">
-                <button className="w-full sm:w-auto bg-gradient-to-r from-[#00E5FF] to-[#B6FF00] text-black font-semibold px-5 py-3 rounded-xl shadow-[0_0_40px_rgba(182,255,0,0.2)]">
-                  Join the Waitlist
-                </button>
-              </a>
-              <a href="#demo" className="w-full sm:w-auto">
-                <button className="w-full sm:w-auto border border-[#00E5FF] text-[#00E5FF] px-5 py-3 rounded-xl">
-                  Try the Demo
-                </button>
-              </a>
               <a
                 href="https://t.me/TradeWithSMTM_bot"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full sm:w-auto"
               >
-                <button className="w-full sm:w-auto bg-[#229ED9] hover:bg-[#1a8fc7] transition-colors text-white font-semibold px-5 py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg">
+                <button className="w-full sm:w-auto bg-gradient-to-r from-[#00E5FF] to-[#B6FF00] text-black font-semibold px-6 py-3.5 rounded-xl shadow-[0_0_40px_rgba(182,255,0,0.3)] hover:shadow-[0_0_50px_rgba(182,255,0,0.4)] transition-all flex items-center justify-center gap-2">
                   <Send size={20} className="rotate-45" />
-                  Start Bot
+                  Start Free on Telegram
+                </button>
+              </a>
+              <a href="#features" className="w-full sm:w-auto">
+                <button className="w-full sm:w-auto border border-[#00E5FF] text-[#00E5FF] px-6 py-3.5 rounded-xl hover:bg-[#00E5FF]/10 transition-colors">
+                  See What's Available
                 </button>
               </a>
             </div>
-            {/* FOMO + engagement baits */}
+            {/* Social proof + feature highlights */}
             <div className="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-4 sm:gap-5 text-sm text-white/80">
-              <a
-                href="https://t.me/TradeWithSMTM_bot"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full border border-[#229ED9]/30 bg-[#229ED9]/10 px-4 py-1.5 hover:bg-[#229ED9]/20 transition-colors cursor-pointer"
-              >
-                <Send size={14} className="rotate-45 text-[#229ED9]" />
-                Try the Telegram Bot
-              </a>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5">
-                🔓 Founding Member Badge
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-1.5">
+                <Bell size={14} className="text-[#00E5FF]" />
+                Real-time alerts
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#B6FF00]/30 bg-[#B6FF00]/10 px-4 py-1.5">
+                <Search size={14} className="text-[#B6FF00]" />
+                Whale tracking
               </span>
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5">
-                ⚡ Limited early spots
+                💰 Free to use
               </span>
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5">
-                📛 Claim your @handle
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full px-4 py-1.5">
                 <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
-                12,482 joined • 89 today
+                Active community
               </span>
             </div>
           </div>
@@ -99,24 +91,61 @@ export default function HomePage() {
       {/* Divider before features/problem */}
       <hr className="my-16 h-px border-0 bg-gradient-to-r from-transparent via-[#00E5FF] to-[#B6FF00] opacity-50" />
 
-      {/* Feature grid (no cards) */}
-      <section id="learn-more" className="relative py-12">
+      {/* Available Now: Telegram Bot Features */}
+      <section id="features" className="relative py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-1.5 mb-4">
+              <Zap size={14} className="text-[#00E5FF]" />
+              <span className="text-xs tracking-wide text-[#00E5FF] font-medium">AVAILABLE NOW</span>
+            </div>
+            <h2 className="font-display text-3xl md:text-5xl font-extrabold">Telegram Bot Features</h2>
+            <p className="mt-4 text-white/80 max-w-2xl mx-auto">
+              Get instant alerts and research tools. Free and open to everyone.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
             <FeatureCard
-              title="AI Portfolio Companion"
-              description="News + signals tied to your assets."
-              icon={<BrainCircuit size={28} className="text-teal" />}
+              title="Real-Time Alerts"
+              description="Follow markets and whales. Get notified on price changes and large trades instantly."
+              icon={<Bell size={28} className="text-teal" />}
             />
             <FeatureCard
-              title="Stake Predictions"
-              description="Put conviction behind your opinions, see who’s right."
+              title="Whale Tracking"
+              description="Discover top traders by PnL and volume. Follow their moves across all markets or specific ones."
+              icon={<Search size={28} className="text-teal" />}
+            />
+            <FeatureCard
+              title="Market Research"
+              description="Browse hot markets, search predictions, check live prices and net positions."
               icon={<TrendingUp size={28} className="text-teal" />}
             />
+          </div>
+
+          {/* Coming Soon Section */}
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.05] px-4 py-1.5 mb-4">
+              <span className="text-xs tracking-wide text-white/70 font-medium">COMING SOON</span>
+            </div>
+            <h3 className="font-display text-2xl md:text-3xl font-bold">What's Next</h3>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard
-              title="Viral Sharing"
-              description="Turn takes into meme cards, roast bad calls."
-              icon={<Share2 size={28} className="text-teal" />}
+              title="Discord Bot"
+              description="Bring alerts and research to your Discord servers. Same features, new platform."
+              icon={<MessageSquare size={28} className="text-white/50" />}
+            />
+            <FeatureCard
+              title="Twitter Integration"
+              description="Get alerts via DMs and tweet your best predictions with verified receipts."
+              icon={<Twitter size={28} className="text-white/50" />}
+            />
+            <FeatureCard
+              title="Trade Execution"
+              description="Execute trades directly from alerts. One-tap to enter positions when opportunities arise."
+              icon={<Zap size={28} className="text-white/50" />}
             />
           </div>
         </div>
@@ -128,27 +157,27 @@ export default function HomePage() {
       {/* Problem → Agitation → Transformation */}
       <section id="problem" className="relative py-12 md:py-20">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="font-display text-3xl md:text-5xl font-extrabold mb-8">From Clout to Credibility</h2>
+          <h2 className="font-display text-3xl md:text-5xl font-extrabold mb-8">Stop Chasing Alpha. Start Following It.</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Before card */}
             <article className="rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-6">
-              <h3 className="text-xl font-semibold mb-3">Before — The Problem</h3>
+              <h3 className="text-xl font-semibold mb-3">The Old Way</h3>
               <ul className="space-y-2 text-white/85">
-                <li>❌ <strong>Hot takes</strong> win attention, not accuracy.</li>
-                <li>❌ <strong>No skin in the game</strong> — zero accountability.</li>
-                <li>❌ <strong>Signal is buried</strong> — hard to know who to trust.</li>
-                <li>❌ <strong>No upside</strong> for being right, only clout.</li>
+                <li>❌ <strong>Miss opportunities</strong> — markets move while you sleep.</li>
+                <li>❌ <strong>Hard to find edge</strong> — who's actually profitable?</li>
+                <li>❌ <strong>Scattered info</strong> — checking multiple sites manually.</li>
+                <li>❌ <strong>Late to trends</strong> — see whale moves after they happen.</li>
               </ul>
             </article>
 
             {/* After card */}
             <article className="rounded-2xl border border-teal/20 bg-teal/[0.06] p-6">
-              <h3 className="text-xl font-semibold mb-3">After — The Transformation</h3>
+              <h3 className="text-xl font-semibold mb-3">The SMTM Way</h3>
               <ul className="space-y-2 text-white/85">
-                <li>✅ <strong>Stake conviction</strong>: Long/Short + confidence.</li>
-                <li>✅ <strong>Earn credibility</strong>: transparent records, leaderboards.</li>
-                <li>✅ <strong>Get paid</strong>: tips and viral meme cards.</li>
-                <li>✅ <strong>Trust at a glance</strong>: verified portfolios, badges.</li>
+                <li>✅ <strong>Never miss a move</strong>: instant alerts 24/7.</li>
+                <li>✅ <strong>Follow the best</strong>: track top traders by verified PnL.</li>
+                <li>✅ <strong>All in one place</strong>: research, alerts, and analysis.</li>
+                <li>✅ <strong>Real-time edge</strong>: see whale trades as they happen.</li>
               </ul>
             </article>
           </div>
@@ -159,31 +188,56 @@ export default function HomePage() {
 
       <section className="relative py-16 md:py-24">
         <div className="mx-auto max-w-6xl px-6">
-          <h2 className="font-display text-3xl md:text-5xl font-extrabold">Financialize Everything.</h2>
-          <p className="mt-4 text-muted max-w-3xl">
-            From memes to markets, SMTM lets users back conviction with real stakes. Unlike social media that rewards outrage, SMTM rewards accuracy.
+          <h2 className="font-display text-3xl md:text-5xl font-extrabold">Start with Alerts. Scale with Execution.</h2>
+          <p className="mt-4 text-white/80 max-w-3xl">
+            Our Telegram bot gives you the intelligence layer today. Soon, you'll execute trades directly from alerts, turning information into action instantly. From research to execution, all in one place.
           </p>
+          <div className="mt-8 flex flex-wrap gap-4 items-center">
+            <a
+              href="https://t.me/TradeWithSMTM_bot"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <button className="bg-[#229ED9] hover:bg-[#1a8fc7] transition-colors text-white font-semibold px-6 py-3 rounded-xl flex items-center gap-2 shadow-lg">
+                <Send size={18} className="rotate-45" />
+                Try the Bot Now
+              </button>
+            </a>
+            <span className="text-white/60 text-sm">Free • No signup required • Available 24/7</span>
+          </div>
         </div>
       </section>
 
       <section id="waitlist" className="relative py-12 md:py-16">
         <div className="mx-auto max-w-6xl px-6">
           <hr className="mx-auto mb-6 h-px w-40 sm:w-60 border-0 rounded bg-[linear-gradient(90deg,transparent,rgba(0,229,255,0.8),rgba(182,255,0,0.8),transparent)] opacity-70" />
-          <h3 className="font-display text-2xl md:text-3xl font-bold">Join the Waitlist</h3>
-          <p className="text-white/80 mt-2">Be first to profit from conviction. Join early, shape the market.</p>
+          <h3 className="font-display text-2xl md:text-3xl font-bold">Join the Waitlist for Early Access</h3>
+          <p className="text-white/80 mt-2">Get early access to trade execution, Discord/Twitter bots, and exclusive features. Try the Telegram bot now while you wait.</p>
 
-          {/* Mini leaderboard / ticker */}
+          {/* Feature previews */}
           <div className="mt-5 overflow-x-auto whitespace-nowrap">
             <div className="inline-flex items-center gap-4 text-sm text-white/85">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ NVDA beat EPS +12% <span className="text-teal">+25 cred</span></span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ BTC &gt; $70k pre-halving <span className="text-teal">+18 cred</span></span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">❌ DOGE to $2 <span className="text-red-400">-7 cred</span></span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">✅ ETH ETF approved <span className="text-teal">+22 cred</span></span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">⚡ One-tap trade execution</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">🎯 Advanced analytics</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">🏆 Leaderboards & reputation</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">📱 Multi-platform support</span>
             </div>
           </div>
 
           <div className="mt-6 max-w-lg">
             <WaitlistForm />
+          </div>
+
+          <div className="mt-6">
+            <a
+              href="https://t.me/TradeWithSMTM_bot"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-[#229ED9] hover:text-[#00E5FF] transition-colors text-sm font-medium"
+            >
+              <Send size={16} className="rotate-45" />
+              Or start using the Telegram bot now (free, no signup) →
+            </a>
           </div>
         </div>
       </section>
