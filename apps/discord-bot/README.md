@@ -1,7 +1,7 @@
 # SMTM Discord Bot (Scaffold)
 
 This is a minimal scaffold for a Discord bot that mirrors the Telegram experience:
-- Discovery: /markets, /price, /whales, /whales_top, /search
+- Discovery: /markets, /price, /whales, /search
 - Profile: /link, /unlink, /stats
 - Summaries: /net, /overview
 - Shareable Cards: /card_profile, /card_trade, /card_whale
@@ -19,4 +19,3 @@ This is a minimal scaffold for a Discord bot that mirrors the Telegram experienc
 ## Deploy
 - Deploy `apps/discord-bot` on Render.
 - Provide `DISCORD_BOT_TOKEN` in environment variables.
-

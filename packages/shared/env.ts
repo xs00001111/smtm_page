@@ -19,6 +19,9 @@ const envSchema = z.object({
   WHALE_TRADE_MIN_SIZE: z.string().default('1000'),
   TELEGRAM_SUBSCRIPTIONS_FILE: z.string().default('apps/telegram-bot/data/subscriptions.csv'),
   TELEGRAM_LINKS_FILE: z.string().default('apps/telegram-bot/data/links.csv'),
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_ANON_KEY: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
 });
 
 export const env = envSchema.parse({
@@ -35,4 +38,7 @@ export const env = envSchema.parse({
   WHALE_TRADE_MIN_SIZE: process.env.WHALE_TRADE_MIN_SIZE || '1000',
   TELEGRAM_SUBSCRIPTIONS_FILE: process.env.TELEGRAM_SUBSCRIPTIONS_FILE || 'apps/telegram-bot/data/subscriptions.csv',
   TELEGRAM_LINKS_FILE: process.env.TELEGRAM_LINKS_FILE || 'apps/telegram-bot/data/links.csv',
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
 });
