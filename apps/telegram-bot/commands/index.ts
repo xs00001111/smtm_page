@@ -99,8 +99,8 @@ export function registerCommands(bot: Telegraf) {
         '• /price <market> — Get market price\n' +
         '• /net <market> — Net positions by user\n' +
         '• /overview <market> — Sides, totals, pricing\n' +
-        '• /card_profile — Create your profile card\n' +
-        '• /card_trade — Create a trade card\n\n' +
+        '• /profile_card — Create your profile card\n' +
+        '• /trade_card — Create a trade card\n\n' +
         '👤 Profile:\n' +
         '• /link <id|url|username> — Link your Polymarket address\n' +
         '• /unlink — Remove links\n' +
@@ -191,9 +191,9 @@ export function registerCommands(bot: Telegraf) {
         '/price <market> — Get market price\n' +
         '/net <market_url|id|slug> — Net positions by user\n' +
         '/overview <market_url|id|slug> — Sides, totals, pricing\n' +
-        '/card_profile — Create your profile card\n' +
-        '/card_profile <address|@user> — Create a profile card for anyone\n' +
-        '/card_trade <market> <yes|no> <stake_$> [entry_%] [current_%] — Create a trade card\n\n' +
+        '/profile_card — Create your profile card\n' +
+        '/profile_card <address|@user> — Create a profile card for anyone\n' +
+        '/trade_card <market> <yes|no> <stake_$> [entry_%] [current_%] — Create a trade card\n\n' +
         '👤 Profile Links:\n' +
         '/link <id|url|username> — Link your Polymarket address\n' +
         '/unlink — Unlink all connected profiles\n' +
@@ -236,19 +236,19 @@ export function registerCommands(bot: Telegraf) {
     try {
       if (isAddress) {
         await linkPolymarketAddress(userId, input)
-        await ctx.reply('✅ Linked Polymarket address!\n\n💡 Try /card_profile to create your profile card.')
+        await ctx.reply('✅ Linked Polymarket address!\n\n💡 Try /profile_card to create your profile card.')
         return
       }
       if (looksLikeUrl) {
         const parsed = parsePolymarketProfile(input)
         if (parsed?.address) {
           await linkPolymarketAddress(userId, parsed.address)
-          await ctx.reply('✅ Linked Polymarket address from profile URL!\n\n💡 Try /card_profile to create your profile card.')
+          await ctx.reply('✅ Linked Polymarket address from profile URL!\n\n💡 Try /profile_card to create your profile card.')
           return
         }
         if (parsed?.username) {
           await linkPolymarketUsername(userId, parsed.username)
-          await ctx.reply(`✅ Linked Polymarket username @${parsed.username}!\n\n💡 Try /card_profile to create your profile card.`)
+          await ctx.reply(`✅ Linked Polymarket username @${parsed.username}!\n\n💡 Try /profile_card to create your profile card.`)
           return
         }
         // Unknown URL — fall back to treating as Kalshi if looks like a simple username in URL is not parseable
@@ -1623,8 +1623,8 @@ export function registerCommands(bot: Telegraf) {
     }
   });
 
-  // Card: Profile — generate a shareable image and send it
-  bot.command('card_profile', async (ctx) => {
+  // Profile card — generate a shareable image and send it
+  bot.command('profile_card', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     const userId = ctx.from!.id
     try {
@@ -1646,8 +1646,8 @@ export function registerCommands(bot: Telegraf) {
             'First link your address:\n' +
             '/link 0x<your_address>\n\n' +
             'Or create a profile card for anyone:\n' +
-            '/card_profile 0x<address>\n' +
-            '/card_profile @username'
+            '/profile_card 0x<address>\n' +
+            '/profile_card @username'
           )
           return
         }
@@ -1669,9 +1669,9 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply(
           '❌ Could not resolve Polymarket address.\n\n' +
           'Try:\n' +
-          '• /card_profile 0x<address>\n' +
-          '• /card_profile @username\n' +
-          '• /card_profile <profile_url>'
+          '• /profile_card 0x<address>\n' +
+          '• /profile_card @username\n' +
+          '• /profile_card <profile_url>'
         )
         return
       }
@@ -1726,21 +1726,21 @@ export function registerCommands(bot: Telegraf) {
     }
   })
 
-  // Card: Whale (alias to profile with whale flair later)
-  bot.command('card_whale', async (ctx) => {
-    await ctx.reply('ℹ️ Whale cards use the profile card format for now.\n\nTry: /card_profile <address>')
+  // Whale card (alias to profile with whale flair later)
+  bot.command('whale_card', async (ctx) => {
+    await ctx.reply('ℹ️ Whale cards use the profile card format for now.\n\nTry: /profile_card <address>')
   })
 
-  // Card: Trade (user crafts a flex card)
-  // Usage: /card_trade <market> <yes|no> <stake_$> [entry_%] [current_%]
-  bot.command('card_trade', async (ctx) => {
+  // Trade card (user crafts a flex card)
+  // Usage: /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]
+  bot.command('trade_card', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     if (args.length < 3) {
       await ctx.reply(
         'Create a trade card to flex your wins! 💪\n\n' +
-        'Usage: /card_trade <market> <yes|no> <stake_$> [entry_%] [current_%]\n\n' +
+        'Usage: /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n\n' +
         'Example:\n' +
-        '/card_trade 0x123... yes 1000 65 72'
+        '/trade_card 0x123... yes 1000 65 72'
       )
       return
     }
@@ -1778,6 +1778,17 @@ export function registerCommands(bot: Telegraf) {
       logger.error('card_trade failed', e)
       await ctx.reply('❌ Failed to create your trade card. Please check your inputs and try again.')
     }
+  })
+
+  // Backwards compatibility aliases for old command names
+  bot.command('card_profile', async (ctx) => {
+    await ctx.reply('ℹ️ This command has been renamed to /profile_card\n\nTry: /profile_card')
+  })
+  bot.command('card_trade', async (ctx) => {
+    await ctx.reply('ℹ️ This command has been renamed to /trade_card\n\nTry: /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]')
+  })
+  bot.command('card_whale', async (ctx) => {
+    await ctx.reply('ℹ️ This command has been renamed to /whale_card\n\nTry: /whale_card')
   })
 
   logger.info('Commands registered');
