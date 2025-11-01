@@ -4,7 +4,7 @@ import { getTopRewardMarket, formatRewardInfo } from '../services/rewards';
 import { findMarket, findMarketFuzzy, findWhaleFuzzy, gammaApi, dataApi, clobApi } from '@smtm/data';
 import { wsMonitor } from '../index';
 import { botConfig } from '../config/bot';
-import { linkPolymarketAddress, linkPolymarketUsername, linkKalshiUsername, unlinkAll, getLinks, parsePolymarketProfile } from '../services/links';
+import { linkPolymarketAddress, linkPolymarketUsername, unlinkAll, getLinks, parsePolymarketProfile } from '../services/links';
 import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, resolveAction, actionUnfollowMarket, actionUnfollowWhaleAll, actionUnfollowWhaleMarket } from '../services/actions';
 
 /**
@@ -301,7 +301,7 @@ export function registerCommands(bot: Telegraf) {
     }
   })
 
-  // Stats command — show full profile for Polymarket; Kalshi placeholder
+  // Stats command — show full profile for Polymarket
   bot.command('stats', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     const userId = ctx.from!.id
@@ -313,24 +313,21 @@ export function registerCommands(bot: Telegraf) {
         'Usage:\n' +
         '• /stats 0x<polymarket_address>\n' +
         '• /stats https://polymarket.com/profile/<address|@username>\n' +
-        '• /stats <polymarket_username>\n' +
-        '• /stats <kalshi_username> (limited)\n\n' +
+        '• /stats <polymarket_username>\n\n' +
         'Tip: /link saves your profile so you can run /stats without arguments.'
       )
     }
 
     try {
-      let mode: 'poly_address'|'poly_username'|'kalshi'|null = null
+      let mode: 'poly_address'|'poly_username'|null = null
       let polyAddress: string | undefined
       let polyUsername: string | undefined
-      let kalshiUser: string | undefined
 
       if (!inputRaw) {
         const linked = await getLinks(userId)
         if (!linked) { await replyUsage(); return }
         if (linked.polymarket_address) { mode = 'poly_address'; polyAddress = linked.polymarket_address }
         else if (linked.polymarket_username) { mode = 'poly_username'; polyUsername = linked.polymarket_username }
-        else if (linked.kalshi_username) { mode = 'kalshi'; kalshiUser = linked.kalshi_username }
         else { await replyUsage(); return }
       } else {
         const input = inputRaw
@@ -339,7 +336,7 @@ export function registerCommands(bot: Telegraf) {
           const parsed = parsePolymarketProfile(input)
           if (parsed?.address) { mode = 'poly_address'; polyAddress = parsed.address }
           else if (parsed?.username) { mode = 'poly_username'; polyUsername = parsed.username }
-          else { mode = 'kalshi'; kalshiUser = input }
+          else { await replyUsage(); return }
         } else if (/^[a-zA-Z0-9_\-]+$/.test(input)) {
           // Username; default to Polymarket username first
           polyUsername = input.replace(/^@/, '')
@@ -347,16 +344,6 @@ export function registerCommands(bot: Telegraf) {
         } else {
           await replyUsage(); return
         }
-      }
-
-      if (mode === 'kalshi') {
-        const { getKalshiUserStats } = await import('../services/kalshi')
-        const stats = await getKalshiUserStats(kalshiUser!)
-        if (!stats) {
-          await ctx.reply('ℹ️ Kalshi user stats require an authenticated API and are not available without a key. Your link is saved for future features.')
-          return
-        }
-        // If a public API becomes available, format and return here
       }
 
       // Resolve username -> address via leaderboard fuzzy search

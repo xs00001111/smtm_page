@@ -8,7 +8,6 @@ type LinkRow = {
   user_id: number
   polymarket_address?: string | null
   polymarket_username?: string | null
-  kalshi_username?: string | null
 }
 
 // Supabase integration
@@ -32,7 +31,7 @@ async function sb<T = any>(path: string, opts?: RequestInit): Promise<T | null> 
 }
 
 const FILE = env.TELEGRAM_LINKS_FILE
-const HEADER = 'created_at,user_id,polymarket_address,polymarket_username,kalshi_username\n'
+const HEADER = 'created_at,user_id,polymarket_address,polymarket_username\n'
 let rows: LinkRow[] = []
 
 async function ensureFile() {
@@ -56,7 +55,6 @@ async function save() {
       String(r.user_id),
       r.polymarket_address ?? '',
       r.polymarket_username ?? '',
-      r.kalshi_username ?? '',
     ].join(',')
     lines.push(line + '\n')
   }
@@ -76,7 +74,6 @@ export async function loadLinks() {
         user_id: Number(parts[1]),
         polymarket_address: parts[2] || undefined,
         polymarket_username: parts[3] || undefined,
-        kalshi_username: parts[4] || undefined,
       }
       rows.push(row)
     }
@@ -139,27 +136,6 @@ export async function linkPolymarketUsername(userId: number, username: string) {
   await save()
 }
 
-export async function linkKalshiUsername(userId: number, username: string) {
-  if (supabaseAvailable()) {
-    try {
-      await sb(`tg_links`, {
-        method: 'POST',
-        body: JSON.stringify({
-          user_id: userId,
-          kalshi_username: username,
-        }),
-        headers: { Prefer: 'resolution=merge-duplicates' },
-      })
-      logger.info('Linked Kalshi username via Supabase', { userId, username })
-      return
-    } catch (e) {
-      logger.error('Supabase linkKalshiUsername failed, falling back to CSV', e)
-    }
-  }
-  const row = getOrCreate(userId)
-  row.kalshi_username = username
-  await save()
-}
 
 export async function getLinks(userId: number): Promise<LinkRow | undefined> {
   if (supabaseAvailable()) {
@@ -172,7 +148,6 @@ export async function getLinks(userId: number): Promise<LinkRow | undefined> {
           user_id: Number(r.user_id),
           polymarket_address: r.polymarket_address || undefined,
           polymarket_username: r.polymarket_username || undefined,
-          kalshi_username: r.kalshi_username || undefined,
         }
       }
       return undefined
