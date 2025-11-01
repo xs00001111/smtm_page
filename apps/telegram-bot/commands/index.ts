@@ -1740,9 +1740,30 @@ export function registerCommands(bot: Telegraf) {
         `&unrealized=${encodeURIComponent((unrealized>=0?'+':'-')+'$'+Math.abs(Math.round(unrealized)).toLocaleString())}`+
         `&roi=${encodeURIComponent(roi)}&rank=${encodeURIComponent(rank)}&pnlLb=${encodeURIComponent(pnlLb)}`
 
-      logger.info({ address, url, realized, unrealized, roi, rank }, 'profile_card: Generated image URL, sending to Telegram')
+      logger.info({ address, url, realized, unrealized, roi, rank }, 'profile_card: Generated image URL, fetching to verify')
 
-      await ctx.replyWithPhoto({ url }, { caption: `👤 Profile — ${short}\nView: https://polymarket.com/profile/${address}` })
+      // Fetch the image first to verify it exists and is valid
+      const imageResponse = await fetch(url)
+      logger.info({
+        address,
+        status: imageResponse.status,
+        contentType: imageResponse.headers.get('content-type'),
+        contentLength: imageResponse.headers.get('content-length')
+      }, 'profile_card: Image fetch response')
+
+      if (!imageResponse.ok) {
+        throw new Error(`Image generation failed: ${imageResponse.status} ${imageResponse.statusText}`)
+      }
+
+      const buffer = Buffer.from(await imageResponse.arrayBuffer())
+
+      if (buffer.length === 0) {
+        throw new Error('Image generation returned empty file')
+      }
+
+      logger.info({ address, imageSize: buffer.length }, 'profile_card: Image fetched successfully, sending to Telegram')
+
+      await ctx.replyWithPhoto({ source: buffer }, { caption: `👤 Profile — ${short}\nView: https://polymarket.com/profile/${address}` })
 
       logger.info({ address }, 'profile_card: Successfully sent profile card')
     } catch (e: any) {

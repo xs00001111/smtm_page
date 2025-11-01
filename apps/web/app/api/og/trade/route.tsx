@@ -32,35 +32,35 @@ export async function GET(req: Request) {
         }}
       >
         <div style={{ fontSize: 36, opacity: 0.9 }}>{title}</div>
-        <div style={{ fontSize: 24, color: muted, marginTop: 8 }}>Side: {side}</div>
+        <div style={{ fontSize: 24, color: muted, marginTop: 8 }}>{`Side: ${side}`}</div>
 
         <div style={{ display: 'flex', gap: 24, marginTop: 40 }}>
-          <div style={{ background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
             <div style={{ fontSize: 18, color: muted }}>Stake</div>
             <div style={{ fontSize: 38, color: teal }}>{stake}</div>
           </div>
-          <div style={{ background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
             <div style={{ fontSize: 18, color: muted }}>Entry</div>
             <div style={{ fontSize: 38 }}>{entry}</div>
           </div>
-          <div style={{ background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
             <div style={{ fontSize: 18, color: muted }}>Exit/Current</div>
             <div style={{ fontSize: 38 }}>{exit}</div>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 24, marginTop: 24 }}>
-          <div style={{ background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
             <div style={{ fontSize: 18, color: muted }}>PnL</div>
             <div style={{ fontSize: 38 }}>{pnl}</div>
           </div>
-          <div style={{ background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
             <div style={{ fontSize: 18, color: muted }}>ROI</div>
             <div style={{ fontSize: 38 }}>{roi}</div>
           </div>
         </div>
 
-        <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div style={{ fontSize: 24, opacity: 0.8 }}>smtm.ai</div>
           <div style={{ fontSize: 18, color: muted }}>Forward this card in Telegram</div>
         </div>
@@ -69,4 +69,3 @@ export async function GET(req: Request) {
     { width: 1200, height: 630 }
   )
 }
-
