@@ -1735,7 +1735,7 @@ export function registerCommands(bot: Telegraf) {
 
       const base = 'https://smtm.ai'
       const short = address.slice(0,6)+'...'+address.slice(-4)
-      const url = `${base}/api/og/profile?address=${encodeURIComponent(short)}&title=${encodeURIComponent('Polymarket Profile')}`+
+      const url = `${base}/api/og/profile?address=${encodeURIComponent(address)}&title=${encodeURIComponent('Polymarket Profile')}`+
         `&value=${encodeURIComponent(value.value||'0')}&realized=${encodeURIComponent((realized>=0?'+':'-')+'$'+Math.abs(Math.round(realized)).toLocaleString())}`+
         `&unrealized=${encodeURIComponent((unrealized>=0?'+':'-')+'$'+Math.abs(Math.round(unrealized)).toLocaleString())}`+
         `&roi=${encodeURIComponent(roi)}&rank=${encodeURIComponent(rank)}&pnlLb=${encodeURIComponent(pnlLb)}`
