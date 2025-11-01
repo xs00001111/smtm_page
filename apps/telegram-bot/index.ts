@@ -81,10 +81,26 @@ async function start() {
       logger.info('No active subscriptions; WS will start on first subscription');
     }
 
-    // Launch bot
-    await bot.launch();
+    // Launch bot with retry logic for 409 conflicts
+    let retries = 0;
+    const maxRetries = 5;
 
-    logger.info('Telegram bot is running');
+    while (retries < maxRetries) {
+      try {
+        await bot.launch();
+        logger.info('Telegram bot is running');
+        break;
+      } catch (error: any) {
+        if (error?.response?.error_code === 409 && retries < maxRetries - 1) {
+          retries++;
+          const delay = Math.min(1000 * Math.pow(2, retries), 30000); // exponential backoff, max 30s
+          logger.warn(`409 conflict detected, retrying in ${delay}ms (attempt ${retries}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw error;
+        }
+      }
+    }
 
     // Enable graceful stop
     process.once('SIGINT', async () => {
