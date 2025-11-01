@@ -1687,12 +1687,20 @@ export function registerCommands(bot: Telegraf) {
 
       await ctx.reply('⏳ Creating your profile card...')
 
-      const [value, positions, closed, lb] = await Promise.all([
-        dataApi.getUserValue(address),
-        dataApi.getUserPositions({ user: address, limit: 200 }),
-        dataApi.getClosedPositions(address, 200),
-        findWhaleFuzzy(address, 1)
-      ])
+      // Add timeout wrapper to prevent hanging
+      const timeout = (ms: number) => new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), ms)
+      )
+
+      const [value, positions, closed, lb] = await Promise.race([
+        Promise.all([
+          dataApi.getUserValue(address),
+          dataApi.getUserPositions({ user: address, limit: 200 }),
+          dataApi.getClosedPositions(address, 200),
+          findWhaleFuzzy(address, 1)
+        ]),
+        timeout(30000) // 30 second timeout
+      ]) as any
 
       let realized = 0
       for (const p of closed) { const n = parseFloat(p.pnl||'0'); if (!isNaN(n)) realized += n }
