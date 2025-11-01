@@ -102,8 +102,8 @@ export function registerCommands(bot: Telegraf) {
         '• /profile_card — Create your profile card\n' +
         '• /trade_card — Create a trade card\n\n' +
         '👤 Profile:\n' +
-        '• /link <id|url|username> — Link your Polymarket address\n' +
-        '• /unlink — Remove links\n' +
+        '• /link <address|@username|url> — Link your Polymarket profile\n' +
+        '• /unlink — Remove link\n' +
         '• /stats [id|url|username] — Show profile stats\n\n' +
         '🔥 Alerts:\n' +
         '• /follow 0x<market_id> — Market price alerts\n' +
@@ -194,9 +194,9 @@ export function registerCommands(bot: Telegraf) {
         '/profile_card — Create your profile card\n' +
         '/profile_card <address|@user> — Create a profile card for anyone\n' +
         '/trade_card <market> <yes|no> <stake_$> [entry_%] [current_%] — Create a trade card\n\n' +
-        '👤 Profile Links:\n' +
-        '/link <id|url|username> — Link your Polymarket address\n' +
-        '/unlink — Unlink all connected profiles\n' +
+        '👤 Profile:\n' +
+        '/link <address|@username|url> — Link your Polymarket profile\n' +
+        '/unlink — Remove link\n' +
         '/stats [id|url|username] — Show stats for any user\n\n' +
         '🔔 Alerts:\n' +
         '/follow 0x<market_id> — Market price alerts\n' +
@@ -213,18 +213,19 @@ export function registerCommands(bot: Telegraf) {
     );
   });
 
-  // Link command — link Polymarket address or Kalshi username
+  // Link command — link Polymarket address
   bot.command('link', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     const userId = ctx.from!.id
     if (args.length === 0) {
       await ctx.reply(
-        '🔗 Link a profile to your Telegram account.\n\n' +
+        '🔗 Link your Polymarket profile to your Telegram account.\n\n' +
         'Usage:\n' +
         '• /link 0x<polymarket_address>\n' +
-        '• /link https://polymarket.com/profile/<address|@username>\n' +
-        '• /link <kalshi_username>\n\n' +
-        'Note: PnL-in-nickname applies where supported. No verification for now.'
+        '• /link https://polymarket.com/profile/0x...\n' +
+        '• /link https://polymarket.com/@username\n' +
+        '• /link @username\n\n' +
+        'This allows commands like /stats and /profile_card to work without arguments.'
       )
       return
     }
@@ -239,11 +240,12 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply('✅ Linked Polymarket address!\n\n💡 Try /profile_card to create your profile card.')
         return
       }
+
       if (looksLikeUrl) {
         const parsed = parsePolymarketProfile(input)
         if (parsed?.address) {
           await linkPolymarketAddress(userId, parsed.address)
-          await ctx.reply('✅ Linked Polymarket address from profile URL!\n\n💡 Try /profile_card to create your profile card.')
+          await ctx.reply('✅ Linked Polymarket address!\n\n💡 Try /profile_card to create your profile card.')
           return
         }
         if (parsed?.username) {
@@ -251,12 +253,32 @@ export function registerCommands(bot: Telegraf) {
           await ctx.reply(`✅ Linked Polymarket username @${parsed.username}!\n\n💡 Try /profile_card to create your profile card.`)
           return
         }
-        // Unknown URL — fall back to treating as Kalshi if looks like a simple username in URL is not parseable
+        // URL provided but couldn't parse
+        await ctx.reply(
+          '❌ Could not parse Polymarket profile URL.\n\n' +
+          'Supported formats:\n' +
+          '• https://polymarket.com/profile/0x...\n' +
+          '• https://polymarket.com/@username'
+        )
+        return
       }
-      // If not an address or recognized Polymarket URL, treat as Kalshi username
-      const kalshiUser = input.replace(/^@/, '')
-      await linkKalshiUsername(userId, kalshiUser)
-      await ctx.reply(`✅ Linked Kalshi username ${kalshiUser}!`)
+
+      // If starts with @, treat as Polymarket username
+      if (input.startsWith('@')) {
+        const username = input.slice(1)
+        await linkPolymarketUsername(userId, username)
+        await ctx.reply(`✅ Linked Polymarket username @${username}!\n\n💡 Try /profile_card to create your profile card.`)
+        return
+      }
+
+      // Unknown format
+      await ctx.reply(
+        '❌ Unrecognized format.\n\n' +
+        'Usage:\n' +
+        '• /link 0x<address>\n' +
+        '• /link https://polymarket.com/@username\n' +
+        '• /link @username'
+      )
     } catch (e:any) {
       logger.error('link command failed', { error: e?.message })
       await ctx.reply('❌ Failed to link. Please check the format and try again.')
