@@ -1636,10 +1636,10 @@ export function registerCommands(bot: Telegraf) {
   bot.command('profile_card', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     const userId = ctx.from!.id
+    let address: string | undefined // Declare outside try block for error logging
     try {
       // Reuse stats resolution for address
       let input = args.join(' ').trim()
-      let address: string | undefined
       if (!input) {
         const linked = await getLinks(userId)
         if (linked?.polymarket_address) {
