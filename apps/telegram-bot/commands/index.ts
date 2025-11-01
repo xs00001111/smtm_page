@@ -304,7 +304,7 @@ export function registerCommands(bot: Telegraf) {
       let kalshiUser: string | undefined
 
       if (!inputRaw) {
-        const linked = getLinks(userId)
+        const linked = await getLinks(userId)
         if (!linked) { await replyUsage(); return }
         if (linked.polymarket_address) { mode = 'poly_address'; polyAddress = linked.polymarket_address }
         else if (linked.polymarket_username) { mode = 'poly_username'; polyUsername = linked.polymarket_username }
@@ -1632,7 +1632,7 @@ export function registerCommands(bot: Telegraf) {
       let input = args.join(' ').trim()
       let address: string | undefined
       if (!input) {
-        const linked = getLinks(userId)
+        const linked = await getLinks(userId)
         if (linked?.polymarket_address) {
           address = linked.polymarket_address
         } else if (linked?.polymarket_username) {

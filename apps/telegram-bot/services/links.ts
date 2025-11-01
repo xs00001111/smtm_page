@@ -11,6 +11,26 @@ type LinkRow = {
   kalshi_username?: string | null
 }
 
+// Supabase integration
+function supabaseAvailable(): boolean {
+  return !!(env.SUPABASE_URL && env.SUPABASE_ANON_KEY)
+}
+
+async function sb<T = any>(path: string, opts?: RequestInit): Promise<T | null> {
+  const url = `${env.SUPABASE_URL}/rest/v1/${path}`
+  const headers = {
+    apikey: env.SUPABASE_ANON_KEY!,
+    Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+    ...opts?.headers,
+  }
+  const res = await fetch(url, { ...opts, headers })
+  if (!res.ok) throw new Error(`Supabase error: ${res.status}`)
+  const text = await res.text()
+  return text ? JSON.parse(text) : null
+}
+
 const FILE = env.TELEGRAM_LINKS_FILE
 const HEADER = 'created_at,user_id,polymarket_address,polymarket_username,kalshi_username\n'
 let rows: LinkRow[] = []
@@ -76,29 +96,103 @@ function getOrCreate(userId: number): LinkRow {
 }
 
 export async function linkPolymarketAddress(userId: number, address: string) {
+  if (supabaseAvailable()) {
+    try {
+      await sb(`tg_links`, {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: userId,
+          polymarket_address: address,
+        }),
+        headers: { Prefer: 'resolution=merge-duplicates' },
+      })
+      logger.info('Linked Polymarket address via Supabase', { userId, address: address.slice(0, 10) })
+      return
+    } catch (e) {
+      logger.error('Supabase linkPolymarketAddress failed, falling back to CSV', e)
+    }
+  }
   const row = getOrCreate(userId)
   row.polymarket_address = address
-  // If user had a username linked but now provided address, keep both; address is authoritative
   await save()
 }
 
 export async function linkPolymarketUsername(userId: number, username: string) {
+  if (supabaseAvailable()) {
+    try {
+      await sb(`tg_links`, {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: userId,
+          polymarket_username: username,
+        }),
+        headers: { Prefer: 'resolution=merge-duplicates' },
+      })
+      logger.info('Linked Polymarket username via Supabase', { userId, username })
+      return
+    } catch (e) {
+      logger.error('Supabase linkPolymarketUsername failed, falling back to CSV', e)
+    }
+  }
   const row = getOrCreate(userId)
   row.polymarket_username = username
   await save()
 }
 
 export async function linkKalshiUsername(userId: number, username: string) {
+  if (supabaseAvailable()) {
+    try {
+      await sb(`tg_links`, {
+        method: 'POST',
+        body: JSON.stringify({
+          user_id: userId,
+          kalshi_username: username,
+        }),
+        headers: { Prefer: 'resolution=merge-duplicates' },
+      })
+      logger.info('Linked Kalshi username via Supabase', { userId, username })
+      return
+    } catch (e) {
+      logger.error('Supabase linkKalshiUsername failed, falling back to CSV', e)
+    }
+  }
   const row = getOrCreate(userId)
   row.kalshi_username = username
   await save()
 }
 
-export function getLinks(userId: number) {
+export async function getLinks(userId: number): Promise<LinkRow | undefined> {
+  if (supabaseAvailable()) {
+    try {
+      const data = await sb<any[]>(`tg_links?user_id=eq.${userId}&select=*`)
+      if (data && data.length > 0) {
+        const r = data[0]
+        return {
+          created_at: r.created_at,
+          user_id: Number(r.user_id),
+          polymarket_address: r.polymarket_address || undefined,
+          polymarket_username: r.polymarket_username || undefined,
+          kalshi_username: r.kalshi_username || undefined,
+        }
+      }
+      return undefined
+    } catch (e) {
+      logger.error('Supabase getLinks failed, falling back to in-memory', e)
+    }
+  }
   return rows.find(r => r.user_id === userId)
 }
 
 export async function unlinkAll(userId: number) {
+  if (supabaseAvailable()) {
+    try {
+      await sb(`tg_links?user_id=eq.${userId}`, { method: 'DELETE' })
+      logger.info('Unlinked all via Supabase', { userId })
+      return 1
+    } catch (e) {
+      logger.error('Supabase unlinkAll failed, falling back to CSV', e)
+    }
+  }
   const before = rows.length
   rows = rows.filter(r => r.user_id !== userId)
   if (rows.length !== before) await save()
