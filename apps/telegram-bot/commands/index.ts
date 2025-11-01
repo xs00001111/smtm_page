@@ -1662,19 +1662,27 @@ export function registerCommands(bot: Telegraf) {
         }
       } else if (/^0x[a-fA-F0-9]{40}$/.test(input)) {
         address = input
+        logger.info({ input, address }, 'profile_card: Direct address provided')
       } else if (/^https?:\/\//i.test(input)) {
         const parsed = parsePolymarketProfile(input)
+        logger.info({ input, parsed }, 'profile_card: Parsed URL')
         address = parsed?.address
         if (!address && parsed?.username) {
+          logger.info({ username: parsed.username }, 'profile_card: Resolving username from URL via findWhaleFuzzy')
           const res = await findWhaleFuzzy(parsed.username, 1)
           address = res[0]?.user_id
+          logger.info({ username: parsed.username, results: res.length, address }, 'profile_card: Username resolution result')
         }
       } else {
-        const res = await findWhaleFuzzy(input.replace(/^@/, ''), 1)
+        const username = input.replace(/^@/, '')
+        logger.info({ input, username }, 'profile_card: Resolving username via findWhaleFuzzy')
+        const res = await findWhaleFuzzy(username, 1)
         address = res[0]?.user_id
+        logger.info({ username, results: res.length, address, topResult: res[0] }, 'profile_card: Username resolution result')
       }
 
       if (!address) {
+        logger.warn({ input, userId }, 'profile_card: Could not resolve address')
         await ctx.reply(
           '❌ Could not resolve Polymarket address.\n\n' +
           'Try:\n' +
@@ -1685,6 +1693,7 @@ export function registerCommands(bot: Telegraf) {
         return
       }
 
+      logger.info({ address, userId }, 'profile_card: Starting card generation')
       await ctx.reply('⏳ Creating your profile card...')
 
       // Add timeout wrapper to prevent hanging
@@ -1692,15 +1701,24 @@ export function registerCommands(bot: Telegraf) {
         setTimeout(() => reject(new Error('timeout')), ms)
       )
 
+      logger.info({ address }, 'profile_card: Fetching user data from APIs')
       const [value, positions, closed, lb] = await Promise.race([
         Promise.all([
-          dataApi.getUserValue(address),
-          dataApi.getUserPositions({ user: address, limit: 200 }),
-          dataApi.getClosedPositions(address, 200),
-          findWhaleFuzzy(address, 1)
+          dataApi.getUserValue(address).catch(e => { logger.error({ err: e, address }, 'getUserValue failed'); throw e; }),
+          dataApi.getUserPositions({ user: address, limit: 200 }).catch(e => { logger.error({ err: e, address }, 'getUserPositions failed'); throw e; }),
+          dataApi.getClosedPositions(address, 200).catch(e => { logger.error({ err: e, address }, 'getClosedPositions failed'); throw e; }),
+          findWhaleFuzzy(address, 1).catch(e => { logger.error({ err: e, address }, 'findWhaleFuzzy failed'); throw e; })
         ]),
         timeout(30000) // 30 second timeout
       ]) as any
+
+      logger.info({
+        address,
+        valueData: value?.value,
+        positionsCount: positions?.length,
+        closedCount: closed?.length,
+        lbCount: lb?.length
+      }, 'profile_card: Data fetched successfully')
 
       let realized = 0
       for (const p of closed) { const n = parseFloat(p.pnl||'0'); if (!isNaN(n)) realized += n }
@@ -1722,9 +1740,22 @@ export function registerCommands(bot: Telegraf) {
         `&unrealized=${encodeURIComponent((unrealized>=0?'+':'-')+'$'+Math.abs(Math.round(unrealized)).toLocaleString())}`+
         `&roi=${encodeURIComponent(roi)}&rank=${encodeURIComponent(rank)}&pnlLb=${encodeURIComponent(pnlLb)}`
 
+      logger.info({ address, url, realized, unrealized, roi, rank }, 'profile_card: Generated image URL, sending to Telegram')
+
       await ctx.replyWithPhoto({ url }, { caption: `👤 Profile — ${short}\nView: https://polymarket.com/profile/${address}` })
+
+      logger.info({ address }, 'profile_card: Successfully sent profile card')
     } catch (e: any) {
-      logger.error('card_profile failed', e)
+      logger.error({
+        err: e,
+        message: e?.message,
+        stack: e?.stack,
+        response: e?.response,
+        code: e?.code,
+        address,
+        userId
+      }, 'profile_card: Command failed with error')
+      console.error('Full profile_card error:', e)
       const errorMsg = e?.message || String(e)
       if (errorMsg.includes('not found') || errorMsg.includes('404')) {
         await ctx.reply('❌ Profile not found. Make sure the address has activity on Polymarket.')
