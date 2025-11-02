@@ -26,6 +26,8 @@ export async function GET(req: Request) {
   const pnlParam = searchParams.get('pnl')
   const realized = searchParams.get('realized')
   const unrealized = searchParams.get('unrealized')
+  const address = searchParams.get('address')
+  const title = searchParams.get('title')
 
   const pnlValue = pnlParam != null
     ? parseMoneyToNumber(pnlParam)
@@ -44,13 +46,24 @@ export async function GET(req: Request) {
           height: '630px',
           width: '1200px',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           background: bg,
           fontFamily: 'ui-sans-serif, system-ui, -apple-system',
         }}
       >
+        {title ? (
+          <div style={{ position: 'absolute', top: 40, width: '100%', textAlign: 'center', color: '#9fb3c8', fontSize: 32 }}>
+            {title}
+          </div>
+        ) : null}
         <div style={{ fontSize: 220, fontWeight: 800, color }}>{pnlText}</div>
+        {address ? (
+          <div style={{ marginTop: 16, color: '#9fb3c8', fontSize: 32 }}>
+            {address}
+          </div>
+        ) : null}
       </div>
     ),
     { width: 1200, height: 630 }
