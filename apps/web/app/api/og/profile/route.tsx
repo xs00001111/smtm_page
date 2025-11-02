@@ -27,13 +27,18 @@ export async function GET(req: Request) {
   const realized = searchParams.get('realized')
   const unrealized = searchParams.get('unrealized')
   const address = searchParams.get('address')
+  const username = searchParams.get('username')
   const title = searchParams.get('title')
+  const investedParam = searchParams.get('invested')
+  const valueParam = searchParams.get('value')
 
   const pnlValue = pnlParam != null
     ? parseMoneyToNumber(pnlParam)
     : parseMoneyToNumber(realized) + parseMoneyToNumber(unrealized)
 
   const pnlText = formatCurrency(pnlValue)
+  const invested = parseMoneyToNumber(investedParam)
+  const positionValue = parseMoneyToNumber(valueParam)
   const bg = '#000000'
   const positive = pnlValue > 0
   const negative = pnlValue < 0
@@ -55,13 +60,23 @@ export async function GET(req: Request) {
       >
         {title ? (
           <div style={{ position: 'absolute', top: 40, width: '100%', textAlign: 'center', color: '#9fb3c8', fontSize: 32 }}>
-            {title}
+          {title}
           </div>
         ) : null}
         <div style={{ fontSize: 220, fontWeight: 800, color }}>{pnlText}</div>
-        {address ? (
-          <div style={{ marginTop: 16, color: '#9fb3c8', fontSize: 32 }}>
-            {address}
+        {/* Stats row: PNL%, Invested, Position */}
+        <div style={{ marginTop: 8, display: 'flex', gap: 48, color: '#9fb3c8' }}>
+          <div style={{ fontSize: 28 }}>PNL</div>
+          <div style={{ fontSize: 28 }}>{searchParams.get('roi') || '—'}</div>
+          <div style={{ fontSize: 28 }}>Invested</div>
+          <div style={{ fontSize: 28 }}>${invested.toLocaleString()}</div>
+          <div style={{ fontSize: 28 }}>Position</div>
+          <div style={{ fontSize: 28 }}>${positionValue.toLocaleString()}</div>
+        </div>
+        {/* Username or address */}
+        {(username || address) ? (
+          <div style={{ position: 'absolute', bottom: 40, left: 60, color: '#ffffff', fontSize: 40, fontWeight: 700 }}>
+            {username || address}
           </div>
         ) : null}
       </div>
