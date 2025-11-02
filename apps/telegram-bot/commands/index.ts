@@ -1729,13 +1729,25 @@ export function registerCommands(bot: Telegraf) {
         openInitial += init; openCurrent += cur
       }
       const unrealized = openCurrent - openInitial
+      const pnlTotal = Math.round(realized + unrealized)
       const roi = openInitial>0 ? (((openCurrent-openInitial)/openInitial)*100).toFixed(1)+'%' : '—'
       const rank = lb.length ? String(lb[0].rank) : ''
       const pnlLb = lb.length ? ((lb[0].pnl>=0?'+':'-')+'$'+Math.abs(Math.round(lb[0].pnl)).toLocaleString()) : ''
 
+      // Log success/failure of fetching user PNL
+      if ((positions?.length ?? 0) === 0 && (closed?.length ?? 0) === 0) {
+        logger.warn({ address, positions: positions?.length || 0, closed: closed?.length || 0 }, 'profile_card: No positions found; user PnL may be zero')
+      }
+      if (Number.isFinite(pnlTotal)) {
+        logger.info({ address, realized, unrealized, pnlTotal }, 'profile_card: Successfully computed user PnL')
+      } else {
+        logger.error({ address, realized, unrealized, pnlTotal }, 'profile_card: Failed to compute user PnL')
+      }
+
       const base = 'https://smtm.ai'
       const short = address.slice(0,6)+'...'+address.slice(-4)
       const url = `${base}/api/og/profile?address=${encodeURIComponent(address)}&title=${encodeURIComponent('Polymarket Profile')}`+
+        `&pnl=${encodeURIComponent(String(pnlTotal))}`+
         `&value=${encodeURIComponent(value.value||'0')}&realized=${encodeURIComponent((realized>=0?'+':'-')+'$'+Math.abs(Math.round(realized)).toLocaleString())}`+
         `&unrealized=${encodeURIComponent((unrealized>=0?'+':'-')+'$'+Math.abs(Math.round(unrealized)).toLocaleString())}`+
         `&roi=${encodeURIComponent(roi)}&rank=${encodeURIComponent(rank)}&pnlLb=${encodeURIComponent(pnlLb)}`

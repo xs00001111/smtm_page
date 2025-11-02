@@ -4,7 +4,10 @@ export const runtime = 'edge'
 
 function parseMoneyToNumber(input: string | null): number {
   if (!input) return 0
-  const cleaned = input.replace(/[$,+\s]/g, '')
+  // Normalize various minus dashes to '-'
+  const normalized = input.replace(/[−–—]/g, '-')
+  // Remove all non-numeric/decimal/minus characters (also strips currency and grouping)
+  const cleaned = normalized.replace(/[^0-9.\-]/g, '')
   const num = Number.parseFloat(cleaned)
   return Number.isFinite(num) ? num : 0
 }
