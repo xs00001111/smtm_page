@@ -192,3 +192,27 @@ export function parsePolymarketProfile(input: string): { address?: string, usern
   return null
 }
 
+// Best-effort resolver: username -> address
+export async function resolveUsernameToAddress(username: string): Promise<string | undefined> {
+  const uname = username.replace(/^@/, '')
+  // 1) Try leaderboard fuzzy search
+  try {
+    const { findWhaleFuzzy } = await import('@smtm/data')
+    const res = await findWhaleFuzzy(uname, 1)
+    if (res && res[0]?.user_id) return res[0].user_id
+  } catch (e) {
+    logger.error({ e, username: uname }, 'resolveUsernameToAddress: fuzzy search failed')
+  }
+  // 2) Try fetching profile page and regex the address
+  try {
+    const encoded = encodeURIComponent('@' + uname)
+    const url = `https://polymarket.com/profile/${encoded}`
+    const resp = await fetch(url)
+    const html = await resp.text()
+    const m = html.match(/0x[a-fA-F0-9]{40}/)
+    if (m) return m[0]
+  } catch (e) {
+    logger.error({ e, username: uname }, 'resolveUsernameToAddress: html scrape failed')
+  }
+  return undefined
+}

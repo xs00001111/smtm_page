@@ -4,7 +4,7 @@ import { getTopRewardMarket, formatRewardInfo } from '../services/rewards';
 import { findMarket, findMarketFuzzy, findWhaleFuzzy, gammaApi, dataApi, clobApi } from '@smtm/data';
 import { wsMonitor } from '../index';
 import { botConfig } from '../config/bot';
-import { linkPolymarketAddress, linkPolymarketUsername, unlinkAll, getLinks, parsePolymarketProfile } from '../services/links';
+import { linkPolymarketAddress, linkPolymarketUsername, unlinkAll, getLinks, parsePolymarketProfile, resolveUsernameToAddress } from '../services/links';
 import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, resolveAction, actionUnfollowMarket, actionUnfollowWhaleAll, actionUnfollowWhaleMarket } from '../services/actions';
 
 /**
@@ -1598,8 +1598,7 @@ export function registerCommands(bot: Telegraf) {
         if (linked?.polymarket_address) {
           address = linked.polymarket_address
         } else if (linked?.polymarket_username) {
-          const res = await findWhaleFuzzy(linked.polymarket_username, 1)
-          address = res[0]?.user_id
+          address = await resolveUsernameToAddress(linked.polymarket_username)
         }
 
         if (!address) {
