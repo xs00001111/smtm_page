@@ -85,10 +85,20 @@ export class DataApiClient {
    * @returns User value data
    */
   async getUserValue(user: string): Promise<UserValue> {
-    const { data } = await this.client.get<UserValue>('/value', {
+    const { data } = await this.client.get<any>('/value', {
       params: { user },
     });
-    return data;
+    const item = Array.isArray(data) ? data[0] : data;
+    if (!item) {
+      return { user, value: '0' };
+    }
+    const vRaw = item.value;
+    const valueNum = typeof vRaw === 'number' ? vRaw : parseFloat(String(vRaw ?? '0'));
+    return {
+      user: item.user || user,
+      value: Number.isFinite(valueNum) ? String(valueNum) : '0',
+      positions_count: item.positions_count,
+    };
   }
 
   /**

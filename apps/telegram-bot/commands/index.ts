@@ -379,7 +379,8 @@ export function registerCommands(bot: Telegraf) {
       // Realized PnL from closed positions
       let realizedPnl = 0
       for (const p of closed) {
-        const n = parseFloat(p.pnl || '0')
+        const rp = (p as any).realizedPnl ?? (p as any).pnl ?? 0
+        const n = typeof rp === 'number' ? rp : parseFloat(String(rp))
         if (!isNaN(n)) realizedPnl += n
       }
 
@@ -387,15 +388,21 @@ export function registerCommands(bot: Telegraf) {
       let openInitial = 0
       let openCurrent = 0
       for (const p of openPositions) {
-        const cur = parseFloat(p.value || '0')
-        const init = parseFloat(p.initial_value || '0')
+        const curRaw = (p as any).value ?? (p as any).currentValue ?? 0
+        const initRaw = (p as any).initial_value ?? (p as any).initialValue ?? 0
+        const cur = typeof curRaw === 'number' ? curRaw : parseFloat(String(curRaw))
+        const init = typeof initRaw === 'number' ? initRaw : parseFloat(String(initRaw))
         if (!isNaN(cur)) openCurrent += cur
         if (!isNaN(init)) openInitial += init
       }
       const unrealizedPnl = openCurrent - openInitial
 
       // Top positions by current value
-      const byValue = [...openPositions].sort((a,b)=>parseFloat(b.value||'0')-parseFloat(a.value||'0')).slice(0,5)
+      const byValue = [...openPositions].sort((a,b)=>{
+        const av = (a as any).value ?? (a as any).currentValue ?? 0
+        const bv = (b as any).value ?? (b as any).currentValue ?? 0
+        return (typeof bv==='number'?bv:parseFloat(String(bv))) - (typeof av==='number'?av:parseFloat(String(av)))
+      }).slice(0,5)
 
       // Resolve market titles/links for top positions
       const uniqueMarkets = Array.from(new Set(byValue.map(p=>p.market))).slice(0,5)
@@ -442,8 +449,10 @@ export function registerCommands(bot: Telegraf) {
           const mk = marketMap.get(p.market)
           const title = mk?.question ? mk.question.slice(0,90) + (mk.question.length>90?'...':'') : p.market
           const url = mk ? getPolymarketMarketUrl(mk) : null
-          const v = Math.round(parseFloat(p.value||'0'))
-          const iv = Math.round(parseFloat(p.initial_value||'0') || 0)
+          const pv = (p as any).value ?? (p as any).currentValue ?? 0
+          const piv = (p as any).initial_value ?? (p as any).initialValue ?? 0
+          const v = Math.round(typeof pv==='number' ? pv : parseFloat(String(pv)) || 0)
+          const iv = Math.round(typeof piv==='number' ? piv : parseFloat(String(piv)) || 0)
           const upnl = v - iv
           const upnlStr = `${upnl>=0?'+':'-'}$${Math.abs(upnl).toLocaleString()}`
           msg += `• ${title}\n   Value: $${v.toLocaleString()}  •  uPnL: ${upnlStr}${url?`\n   🔗 ${url}`:''}\n`
@@ -1721,12 +1730,19 @@ export function registerCommands(bot: Telegraf) {
       }, 'profile_card: Data fetched successfully')
 
       let realized = 0
-      for (const p of closed) { const n = parseFloat(p.pnl||'0'); if (!isNaN(n)) realized += n }
+      for (const p of closed) {
+        const rp = (p as any).realizedPnl ?? (p as any).pnl ?? 0
+        const n = typeof rp === 'number' ? rp : parseFloat(String(rp))
+        if (!isNaN(n)) realized += n
+      }
       let openInitial = 0, openCurrent = 0
       for (const p of positions) {
-        const cur = parseFloat(p.value||'0') || 0
-        const init = parseFloat(p.initial_value||'0') || 0
-        openInitial += init; openCurrent += cur
+        const curRaw = (p as any).value ?? (p as any).currentValue ?? 0
+        const initRaw = (p as any).initial_value ?? (p as any).initialValue ?? 0
+        const cur = typeof curRaw === 'number' ? curRaw : parseFloat(String(curRaw)) || 0
+        const init = typeof initRaw === 'number' ? initRaw : parseFloat(String(initRaw)) || 0
+        if (!isNaN(init)) openInitial += init
+        if (!isNaN(cur)) openCurrent += cur
       }
       const unrealized = openCurrent - openInitial
       const pnlTotal = Math.round(realized + unrealized)
