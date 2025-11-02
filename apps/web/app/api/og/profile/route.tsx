@@ -58,11 +58,7 @@ export async function GET(req: Request) {
           fontFamily: 'ui-sans-serif, system-ui, -apple-system',
         }}
       >
-        {title ? (
-          <div style={{ position: 'absolute', top: 40, width: '100%', textAlign: 'center', color: '#9fb3c8', fontSize: 32 }}>
-          {title}
-          </div>
-        ) : null}
+        {/* Title intentionally hidden per design request */}
         <div style={{ fontSize: 220, fontWeight: 800, color }}>{pnlText}</div>
         {/* Stats row: PNL%, Invested, Position */}
         <div style={{ marginTop: 8, display: 'flex', gap: 48, color: '#9fb3c8' }}>
