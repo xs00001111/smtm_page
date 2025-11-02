@@ -49,7 +49,6 @@ async function start() {
       { command: 'link', description: 'Link your Polymarket profile' },
       { command: 'unlink', description: 'Unlink all connected profiles' },
       { command: 'stats', description: 'Show stats for an address or profile' },
-      { command: 'profile', description: 'View your profile card' },
       { command: 'profile_card', description: 'Create a profile card' },
       { command: 'trade_card', description: 'Create a trade card' },
       { command: 'whale_card', description: 'Create a whale card' },

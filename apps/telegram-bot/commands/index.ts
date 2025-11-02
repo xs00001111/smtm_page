@@ -90,27 +90,16 @@ export function registerCommands(bot: Telegraf) {
     logger.info('User started bot', { userId: ctx.from?.id });
     await ctx.reply(
       'Welcome to SMTM Bot! 🎯\n\n' +
-        '🔍 Discovery:\n' +
+        '🖼️ Create Flex Cards:\n' +
+        '• /profile_card <address|@username|profile_url> — Profile card\n' +
+        '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%] — Trade card\n\n' +
+        '🔍 Discovery (optional):\n' +
         '• /markets — Browse hot markets\n' +
-        '• /whales — Top traders leaderboard\n' +
-        '• /whales <market_id> — Whales for specific market\n' +
         '• /search markets <query> — Find markets\n' +
         '• /search whales <name> — Find traders\n' +
         '• /price <market> — Get market price\n' +
-        '• /net <market> — Net positions by user\n' +
-        '• /overview <market> — Sides, totals, pricing\n' +
-        '• /profile_card — Create your profile card\n' +
-        '• /trade_card — Create a trade card\n\n' +
-        '👤 Profile:\n' +
-        '• /link <address|@username|url> — Link your Polymarket profile\n' +
-        '• /unlink — Remove link\n' +
-        '• /stats [id|url|username] — Show profile stats\n\n' +
-        '🔥 Alerts:\n' +
-        '• /follow 0x<market_id> — Market price alerts\n' +
-        '• /follow 0x<wallet> — Copy whale (all markets)\n' +
-        '• /follow 0x<wallet> 0x<market_id> — Whale on specific market\n' +
-        '• /list — View your follows\n\n' +
-        '💡 Tip: Use /markets to get market IDs!'
+        '• /overview <market> — Sides, totals, pricing\n\n' +
+        '💡 Tip: Use /profile_card with @username to show name on the card.'
     );
   });
 
@@ -182,34 +171,16 @@ export function registerCommands(bot: Telegraf) {
   bot.command('help', async (ctx) => {
     await ctx.reply(
       '📚 SMTM Bot Help\n\n' +
-        '🔍 Discovery:\n' +
+        '🖼️ Create Flex Cards:\n' +
+        '/profile_card <address|@username|profile_url> — Profile card\n' +
+        '/trade_card <market> <yes|no> <stake_$> [entry_%] [current_%] — Trade card\n\n' +
+        '🔍 Discovery (optional):\n' +
         '/markets — Browse hot markets\n' +
-        '/whales — Top traders leaderboard\n' +
-        '/whales <market_id> — Whales for specific market\n' +
         '/search markets <query> — Search markets\n' +
         '/search whales <name> — Search traders\n' +
         '/price <market> — Get market price\n' +
-        '/net <market_url|id|slug> — Net positions by user\n' +
-        '/overview <market_url|id|slug> — Sides, totals, pricing\n' +
-        '/profile_card — Create your profile card\n' +
-        '/profile_card <address|@user> — Create a profile card for anyone\n' +
-        '/trade_card <market> <yes|no> <stake_$> [entry_%] [current_%] — Create a trade card\n\n' +
-        '👤 Profile:\n' +
-        '/link <address|@username|url> — Link your Polymarket profile\n' +
-        '/unlink — Remove link\n' +
-        '/stats [id|url|username] — Show stats for any user\n\n' +
-        '🔔 Alerts:\n' +
-        '/follow 0x<market_id> — Market price alerts\n' +
-        '/follow 0x<wallet> — Copy whale (all markets)\n' +
-        '/follow 0x<wallet> 0x<market_id> — Whale on specific market\n' +
-        '/unfollow … — Stop follows\n' +
-        '/list — View follows\n\n' +
-        '⚙️ System:\n' +
-        '/status — Connection status\n' +
-        '/test_push — Test alerts\n\n' +
-        '💡 Pro Tips:\n' +
-        '• Use /markets to get market IDs\n' +
-        '• Follow whales without market_id for copy trading all their moves!'
+        '/overview <market> — Sides, totals, pricing\n\n' +
+        '💡 Tip: Use @username in /profile_card to show the handle on the image.'
     );
   });
 
@@ -1612,34 +1583,7 @@ export function registerCommands(bot: Telegraf) {
     }
   });
 
-  // Profile command - Open profile card mini app
-  bot.command('profile', async (ctx) => {
-    logger.info('Profile command', { userId: ctx.from?.id });
-
-    try {
-      const userId = ctx.from?.id;
-      const miniAppUrl = `https://smtm.ai/mini/profile${userId ? `?user=${userId}` : ''}`;
-
-      await ctx.reply(
-        '👤 View your SMTM profile card with stats, badges, and shareable image!',
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: '🎯 Open Profile Card',
-                  web_app: { url: miniAppUrl },
-                },
-              ],
-            ],
-          },
-        }
-      );
-    } catch (error) {
-      logger.error('Error in profile command', error);
-      await ctx.reply('❌ Unable to load profile. Please try again or contact support if this persists.');
-    }
-  });
+  // Removed /profile command per product direction focusing on flex cards
 
   // Profile card — generate a shareable image and send it
   bot.command('profile_card', async (ctx) => {
