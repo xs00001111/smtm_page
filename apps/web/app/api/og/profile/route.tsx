@@ -39,7 +39,6 @@ export async function GET(req: Request) {
   const pnlText = formatCurrency(pnlValue)
   const invested = parseMoneyToNumber(investedParam)
   const positionValue = parseMoneyToNumber(valueParam)
-  const bg = '#000000'
   const positive = pnlValue > 0
   const negative = pnlValue < 0
   const color = positive ? '#22c55e' : negative ? '#ef4444' : '#9fb3c8'
@@ -56,80 +55,53 @@ export async function GET(req: Request) {
     ? `${Math.round(positionValue / 100) / 10}K`
     : Math.round(positionValue).toString()
 
+  const bg = '#0b1220'
+  const fg = '#e6faff'
+  const muted = '#9fb3c8'
+  const pnlFormatted = positive ? `+${pnlText}` : pnlText
+
   return new ImageResponse(
     (
       <div
         style={{
-          height: 630,
-          width: 1200,
+          height: '630px',
+          width: '1200px',
           display: 'flex',
           flexDirection: 'column',
-          background: '#0a0a0a',
+          background: bg,
+          color: fg,
+          padding: '48px',
           fontFamily: 'ui-sans-serif, system-ui, -apple-system',
-          padding: '60px 80px',
         }}
       >
-        {/* Top Section: Username/Address on left, SMTM branding on right */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 60 }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 48, fontWeight: 700, color: '#ffffff' }}>
-              {displayName || 'Polymarket Profile'}
-            </div>
+        <div style={{ fontSize: 36, opacity: 0.9 }}>{displayName || 'Profile'}</div>
+        <div style={{ fontSize: 24, color: muted, marginTop: 8 }}>Poly</div>
+
+        <div style={{ display: 'flex', gap: 24, marginTop: 40 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
+            <div style={{ fontSize: 18, color: muted }}>PNL</div>
+            <div style={{ fontSize: 64, fontWeight: 900, color }}>{pnlFormatted}</div>
           </div>
-          <div style={{ fontSize: 32, fontWeight: 700, color: '#666' }}>
-            SMTMPro
+          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
+            <div style={{ fontSize: 18, color: muted }}>PNL %</div>
+            <div style={{ fontSize: 38 }}>{roi}</div>
           </div>
         </div>
 
-        {/* Token/Category Label */}
-        <div style={{ fontSize: 52, fontWeight: 600, color: '#ffffff', marginBottom: 32 }}>
-          Poly
-        </div>
-
-        {/* Large PNL in colored box */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          background: positive ? 'rgba(74, 222, 128, 0.15)' : negative ? 'rgba(239, 68, 68, 0.15)' : 'rgba(159, 179, 200, 0.15)',
-          border: `4px solid ${color}`,
-          borderRadius: 16,
-          padding: '24px 48px',
-          marginBottom: 32,
-        }}>
-          <div style={{ fontSize: 140, fontWeight: 900, color, lineHeight: 1 }}>
-            {positive ? '+' : ''}{pnlText}
+        <div style={{ display: 'flex', gap: 24, marginTop: 24 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
+            <div style={{ fontSize: 18, color: muted }}>Invested</div>
+            <div style={{ fontSize: 38 }}>${investedDisplay}</div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
+            <div style={{ fontSize: 18, color: muted }}>Position</div>
+            <div style={{ fontSize: 38 }}>${positionDisplay}</div>
           </div>
         </div>
 
-        {/* Stats Row */}
-        <div style={{ display: 'flex', gap: 64, alignItems: 'center' }}>
-          {/* PNL Percentage */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 28, color: '#9fb3c8', fontWeight: 500, marginBottom: 8 }}>PNL</div>
-            <div style={{ fontSize: 52, fontWeight: 700, color }}>{roi}</div>
-          </div>
-
-          {/* Invested */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 28, color: '#9fb3c8', fontWeight: 500, marginBottom: 8 }}>Invested</div>
-            <div style={{ fontSize: 52, fontWeight: 700, color: '#ffffff' }}>${investedDisplay}</div>
-          </div>
-
-          {/* Position */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ fontSize: 28, color: '#9fb3c8', fontWeight: 500, marginBottom: 8 }}>Position</div>
-            <div style={{ fontSize: 52, fontWeight: 700, color: '#ffffff' }}>${positionDisplay}</div>
-          </div>
-        </div>
-
-        {/* Bottom CTA */}
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', marginBottom: 12 }}>
-            smtm.ai
-          </div>
-          <div style={{ fontSize: 22, color: '#9fb3c8' }}>
-            Track your prediction market trades
-          </div>
+        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div style={{ fontSize: 24, opacity: 0.8 }}>smtm.ai</div>
+          <div style={{ fontSize: 18, color: muted }}>Track your prediction market trades</div>
         </div>
       </div>
     ),
