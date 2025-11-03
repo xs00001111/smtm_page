@@ -48,6 +48,14 @@ export async function GET(req: Request) {
   const displayName = username || (address ? short(address) : '')
   const roi = searchParams.get('roi') || '—'
 
+  // Format numbers for display (toLocaleString not supported in Satori)
+  const investedDisplay = invested >= 1000
+    ? `${Math.round(invested / 100) / 10}K`
+    : Math.round(invested).toString()
+  const positionDisplay = positionValue >= 1000
+    ? `${Math.round(positionValue / 100) / 10}K`
+    : Math.round(positionValue).toString()
+
   return new ImageResponse(
     (
       <div
@@ -104,13 +112,13 @@ export async function GET(req: Request) {
           {/* Invested */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 28, color: '#9fb3c8', fontWeight: 500, marginBottom: 8 }}>Invested</div>
-            <div style={{ fontSize: 52, fontWeight: 700, color: '#ffffff' }}>${invested.toLocaleString()}</div>
+            <div style={{ fontSize: 52, fontWeight: 700, color: '#ffffff' }}>${investedDisplay}</div>
           </div>
 
           {/* Position */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 28, color: '#9fb3c8', fontWeight: 500, marginBottom: 8 }}>Position</div>
-            <div style={{ fontSize: 52, fontWeight: 700, color: '#ffffff' }}>${positionValue.toLocaleString()}</div>
+            <div style={{ fontSize: 52, fontWeight: 700, color: '#ffffff' }}>${positionDisplay}</div>
           </div>
         </div>
 
