@@ -62,23 +62,23 @@ export async function GET(req: Request) {
         }}
       >
         {/* Top Section: Username/Address on left, SMTM branding on right */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '60px 80px', position: 'absolute', top: 0, left: 0, right: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '60px 80px', position: 'absolute', top: '0px', left: '0px', right: '0px' }}>
           {displayName && (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={{ fontSize: 48, fontWeight: 700, color: '#ffffff', marginBottom: 8 }}>
+              <div style={{ fontSize: '48px', fontWeight: 700, color: '#ffffff', marginBottom: '8px' }}>
                 {displayName}
               </div>
             </div>
           )}
-          <div style={{ fontSize: 32, fontWeight: 700, color: '#666', letterSpacing: 2 }}>
+          <div style={{ fontSize: '32px', fontWeight: 700, color: '#666', letterSpacing: '2px' }}>
             SMTMPro
           </div>
         </div>
 
         {/* Main Content - Centered */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', flex: 1, padding: '0 80px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', flex: 1, padding: '0px 80px' }}>
           {/* Token/Category Label */}
-          <div style={{ fontSize: 52, fontWeight: 600, color: '#ffffff', marginBottom: 32 }}>
+          <div style={{ fontSize: '52px', fontWeight: 600, color: '#ffffff', marginBottom: '32px' }}>
             Poly
           </div>
 
@@ -88,43 +88,43 @@ export async function GET(req: Request) {
             alignItems: 'center',
             background: positive ? 'rgba(74, 222, 128, 0.15)' : negative ? 'rgba(239, 68, 68, 0.15)' : 'rgba(159, 179, 200, 0.15)',
             border: `4px solid ${color}`,
-            borderRadius: 16,
+            borderRadius: '16px',
             padding: '24px 48px',
-            marginBottom: 32,
+            marginBottom: '32px',
           }}>
-            <div style={{ fontSize: 140, fontWeight: 900, color, lineHeight: 1 }}>
+            <div style={{ fontSize: '140px', fontWeight: 900, color, lineHeight: 1 }}>
               {positive ? '+' : ''}{pnlText}
             </div>
           </div>
 
           {/* Stats Row */}
-          <div style={{ display: 'flex', gap: 64, alignItems: 'center', marginTop: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginTop: '24px' }}>
             {/* PNL Percentage */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 28, color: '#9fb3c8', fontWeight: 500 }}>PNL</div>
-              <div style={{ fontSize: 52, fontWeight: 700, color }}>{roi}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', marginRight: '64px' }}>
+              <div style={{ fontSize: '28px', color: '#9fb3c8', fontWeight: 500, marginBottom: '8px' }}>PNL</div>
+              <div style={{ fontSize: '52px', fontWeight: 700, color }}>{roi}</div>
             </div>
 
             {/* Invested */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 28, color: '#9fb3c8', fontWeight: 500 }}>Invested</div>
-              <div style={{ fontSize: 52, fontWeight: 700, color: '#ffffff' }}>${invested.toLocaleString()}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', marginRight: '64px' }}>
+              <div style={{ fontSize: '28px', color: '#9fb3c8', fontWeight: 500, marginBottom: '8px' }}>Invested</div>
+              <div style={{ fontSize: '52px', fontWeight: 700, color: '#ffffff' }}>${invested.toLocaleString()}</div>
             </div>
 
             {/* Position */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 28, color: '#9fb3c8', fontWeight: 500 }}>Position</div>
-              <div style={{ fontSize: 52, fontWeight: 700, color: '#ffffff' }}>${positionValue.toLocaleString()}</div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ fontSize: '28px', color: '#9fb3c8', fontWeight: 500, marginBottom: '8px' }}>Position</div>
+              <div style={{ fontSize: '52px', fontWeight: 700, color: '#ffffff' }}>${positionValue.toLocaleString()}</div>
             </div>
           </div>
         </div>
 
         {/* Bottom CTA */}
-        <div style={{ position: 'absolute', bottom: 60, left: 80, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#ffffff', letterSpacing: 0.5 }}>
+        <div style={{ position: 'absolute', bottom: '60px', left: '80px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: '28px', fontWeight: 700, color: '#ffffff', letterSpacing: '0.5px', marginBottom: '12px' }}>
             smtm.ai
           </div>
-          <div style={{ fontSize: 22, color: '#9fb3c8', maxWidth: 600 }}>
+          <div style={{ fontSize: '22px', color: '#9fb3c8' }}>
             Track your prediction market trades
           </div>
         </div>
