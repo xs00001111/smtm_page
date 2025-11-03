@@ -69,12 +69,9 @@ export async function GET(req: Request) {
           <div style={{ fontSize: 28 }}>Position</div>
           <div style={{ fontSize: 28 }}>${positionValue.toLocaleString()}</div>
         </div>
-        {/* Username or address */}
-        {(username || address) ? (
-          <div style={{ position: 'absolute', bottom: 40, left: 60, color: '#ffffff', fontSize: 40, fontWeight: 700 }}>
-            {username || address}
-          </div>
-        ) : null}
+        <div style={{ position: 'absolute', bottom: 40, left: 60, color: '#ffffff', fontSize: 40, fontWeight: 700 }}>
+          {username || address || 'Profile'}
+        </div>
       </div>
     ),
     { width: 1200, height: 630 }
