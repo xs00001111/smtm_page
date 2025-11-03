@@ -39,26 +39,10 @@ export async function GET(req: Request) {
   const pnlText = formatCurrency(pnlValue)
   const invested = parseMoneyToNumber(investedParam)
   const positionValue = parseMoneyToNumber(valueParam)
+  const bg = '#000000'
   const positive = pnlValue > 0
   const negative = pnlValue < 0
   const color = positive ? '#22c55e' : negative ? '#ef4444' : '#9fb3c8'
-
-  const short = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`
-  const displayName = username || (address ? short(address) : '')
-  const roi = searchParams.get('roi') || '—'
-
-  // Format numbers for display (toLocaleString not supported in Satori)
-  const investedDisplay = invested >= 1000
-    ? `${Math.round(invested / 100) / 10}K`
-    : Math.round(invested).toString()
-  const positionDisplay = positionValue >= 1000
-    ? `${Math.round(positionValue / 100) / 10}K`
-    : Math.round(positionValue).toString()
-
-  const bg = '#0b1220'
-  const fg = '#e6faff'
-  const muted = '#9fb3c8'
-  const pnlFormatted = positive ? `+${pnlText}` : pnlText
 
   return new ImageResponse(
     (
@@ -68,41 +52,29 @@ export async function GET(req: Request) {
           width: '1200px',
           display: 'flex',
           flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
           background: bg,
-          color: fg,
-          padding: '48px',
           fontFamily: 'ui-sans-serif, system-ui, -apple-system',
         }}
       >
-        <div style={{ fontSize: 36, opacity: 0.9 }}>{displayName || 'Profile'}</div>
-        <div style={{ fontSize: 24, color: muted, marginTop: 8 }}>Poly</div>
-
-        <div style={{ display: 'flex', gap: 24, marginTop: 40 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
-            <div style={{ fontSize: 18, color: muted }}>PNL</div>
-            <div style={{ fontSize: 64, fontWeight: 900, color }}>{pnlFormatted}</div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
-            <div style={{ fontSize: 18, color: muted }}>PNL %</div>
-            <div style={{ fontSize: 38 }}>{roi}</div>
-          </div>
+        {/* Title intentionally hidden per design request */}
+        <div style={{ fontSize: 220, fontWeight: 800, color }}>{pnlText}</div>
+        {/* Stats row: PNL%, Invested, Position */}
+        <div style={{ marginTop: 8, display: 'flex', gap: 48, color: '#9fb3c8' }}>
+          <div style={{ fontSize: 28 }}>PNL</div>
+          <div style={{ fontSize: 28 }}>{searchParams.get('roi') || '—'}</div>
+          <div style={{ fontSize: 28 }}>Invested</div>
+          <div style={{ fontSize: 28 }}>${invested.toLocaleString()}</div>
+          <div style={{ fontSize: 28 }}>Position</div>
+          <div style={{ fontSize: 28 }}>${positionValue.toLocaleString()}</div>
         </div>
-
-        <div style={{ display: 'flex', gap: 24, marginTop: 24 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
-            <div style={{ fontSize: 18, color: muted }}>Invested</div>
-            <div style={{ fontSize: 38 }}>${investedDisplay}</div>
+        {/* Username or address */}
+        {(username || address) ? (
+          <div style={{ position: 'absolute', bottom: 40, left: 60, color: '#ffffff', fontSize: 40, fontWeight: 700 }}>
+            {username || address}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', background: '#0f172a', padding: 24, borderRadius: 16, width: 340 }}>
-            <div style={{ fontSize: 18, color: muted }}>Position</div>
-            <div style={{ fontSize: 38 }}>${positionDisplay}</div>
-          </div>
-        </div>
-
-        <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-          <div style={{ fontSize: 24, opacity: 0.8 }}>smtm.ai</div>
-          <div style={{ fontSize: 18, color: muted }}>Track your prediction market trades</div>
-        </div>
+        ) : null}
       </div>
     ),
     { width: 1200, height: 630 }
