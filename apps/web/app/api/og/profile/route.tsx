@@ -59,19 +59,19 @@ export async function GET(req: Request) {
         }}
       >
         {/* Title intentionally hidden per design request */}
-        <div style={{ fontSize: 220, fontWeight: 800, color }}>{pnlText}</div>
+        <div style={{ fontSize: 220, fontWeight: 800, color, display: 'flex' }}>{pnlText}</div>
         {/* Stats row: PNL%, Invested, Position */}
         <div style={{ marginTop: 8, display: 'flex', gap: 48, color: '#9fb3c8' }}>
           <div style={{ fontSize: 28 }}>PNL</div>
           <div style={{ fontSize: 28 }}>{searchParams.get('roi') || '—'}</div>
           <div style={{ fontSize: 28 }}>Invested</div>
-          <div style={{ fontSize: 28 }}>${invested.toLocaleString()}</div>
+          <div style={{ fontSize: 28 }}>{`$${invested.toLocaleString()}`}</div>
           <div style={{ fontSize: 28 }}>Position</div>
-          <div style={{ fontSize: 28 }}>${positionValue.toLocaleString()}</div>
+          <div style={{ fontSize: 28 }}>{`$${positionValue.toLocaleString()}`}</div>
         </div>
         {/* Username or address */}
         {(username || address) ? (
-          <div style={{ position: 'absolute', bottom: 40, left: 60, color: '#ffffff', fontSize: 40, fontWeight: 700 }}>
+          <div style={{ position: 'absolute', bottom: 40, left: 60, color: '#ffffff', fontSize: 40, fontWeight: 700, display: 'flex' }}>
             {username || address}
           </div>
         ) : null}
