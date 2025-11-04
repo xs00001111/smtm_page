@@ -6,6 +6,7 @@ import { wsMonitor } from '../index';
 import { botConfig } from '../config/bot';
 import { linkPolymarketAddress, linkPolymarketUsername, unlinkAll, getLinks, parsePolymarketProfile, resolveUsernameToAddress } from '../services/links';
 import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, resolveAction, actionUnfollowMarket, actionUnfollowWhaleAll, actionUnfollowWhaleMarket } from '../services/actions';
+import { recordSurveyResponse } from '../services/survey';
 
 /**
  * Generate Polymarket profile URL for a whale/trader
@@ -107,7 +108,26 @@ export function registerCommands(bot: Telegraf) {
   bot.on('callback_query', async (ctx) => {
     try {
       const data = (ctx.callbackQuery as any)?.data as string | undefined
-      if (!data || !data.startsWith('act:')) return
+      if (!data) return
+      // Survey responses (interest poll)
+      if (data.startsWith('survey:')) {
+        const answer = data.slice('survey:'.length) as 'yes'|'maybe'|'no'
+        const userId = ctx.from!.id
+        const uname = ctx.from?.username || undefined
+        await recordSurveyResponse(userId, uname, answer)
+        await ctx.answerCbQuery('✅ Thanks for your feedback!')
+        try {
+          await ctx.reply(
+            answer === 'yes'
+              ? '🚀 Noted! We\'ll ping you when arbitrage & spread farming goes live.'
+              : answer === 'maybe'
+              ? '👍 Got it — we\'ll keep you posted as it shapes up.'
+              : '🙏 Thanks! Appreciate the signal.'
+          )
+        } catch {}
+        return
+      }
+      if (!data.startsWith('act:')) return
       const id = data.slice(4)
       const rec = await resolveAction(id)
       if (!rec) { await ctx.answerCbQuery('Action expired. Try again.'); return }
@@ -183,6 +203,22 @@ export function registerCommands(bot: Telegraf) {
         '💡 Tip: Use @username in /profile_card to show the handle on the image.'
     );
   });
+
+  // Survey: gauge interest in arbitrage & spread farming feature
+  bot.command('survey', async (ctx) => {
+    const text =
+      '🧪 New Feature Survey\n\n' +
+      'We\'re building tools to spot arbitrage and spread farming opportunities across markets.\n' +
+      'Would you be interested in this feature?'
+    const keyboard = {
+      inline_keyboard: [[
+        { text: '✅ I\'m interested', callback_data: 'survey:yes' },
+        { text: '🤔 Maybe', callback_data: 'survey:maybe' },
+        { text: '❌ Not interested', callback_data: 'survey:no' },
+      ]],
+    }
+    await ctx.reply(text, { reply_markup: keyboard as any })
+  })
 
   // Link command — link Polymarket address
   bot.command('link', async (ctx) => {
