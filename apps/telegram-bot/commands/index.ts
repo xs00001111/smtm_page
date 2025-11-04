@@ -91,16 +91,20 @@ export function registerCommands(bot: Telegraf) {
     logger.info('User started bot', { userId: ctx.from?.id });
     await ctx.reply(
       'Welcome to SMTM Bot! 🎯\n\n' +
-        '🖼️ Create Flex Cards:\n' +
-        '• /profile_card <address|@username|profile_url> — Profile card\n' +
-        '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%] — Trade card\n\n' +
-        '🔍 Discovery (optional):\n' +
-        '• /markets — Browse hot markets\n' +
-        '• /search markets <query> — Find markets\n' +
-        '• /search whales <name> — Find traders\n' +
-        '• /price <market> — Get market price\n' +
-        '• /overview <market> — Sides, totals, pricing\n\n' +
-        '💡 Tip: Use /profile_card with @username to show name on the card.'
+        'Create:\n' +
+        '• /profile_card <address|@username|profile_url>\n' +
+        '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n\n' +
+        'Discover:\n' +
+        '• /markets — Hot markets\n' +
+        '• /whales — Top traders\n' +
+        '• /search markets <query> | /search whales <query>\n' +
+        '• /overview <market> — Sides, holders, pricing\n\n' +
+        'Follow alerts:\n' +
+        '• /follow <market_id|wallet>  • /unfollow ...  • /list\n\n' +
+        'Account & stats:\n' +
+        '• /link 0x... | @username  • /unlink  • /stats <address|@username>\n\n' +
+        'Feedback: /survey\n' +
+        'Tip: Use /profile_card with @username to show the handle.'
     );
   });
 
@@ -190,17 +194,26 @@ export function registerCommands(bot: Telegraf) {
   // Help command
   bot.command('help', async (ctx) => {
     await ctx.reply(
-      '📚 SMTM Bot Help\n\n' +
-        '🖼️ Create Flex Cards:\n' +
-        '/profile_card <address|@username|profile_url> — Profile card\n' +
-        '/trade_card <market> <yes|no> <stake_$> [entry_%] [current_%] — Trade card\n\n' +
-        '🔍 Discovery (optional):\n' +
-        '/markets — Browse hot markets\n' +
-        '/search markets <query> — Search markets\n' +
-        '/search whales <name> — Search traders\n' +
-        '/price <market> — Get market price\n' +
-        '/overview <market> — Sides, totals, pricing\n\n' +
-        '💡 Tip: Use @username in /profile_card to show the handle on the image.'
+      '📚 SMTM Help\n\n' +
+        'Create\n' +
+        '• /profile_card <address|@username|profile_url>\n' +
+        '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n\n' +
+        'Discover\n' +
+        '• /markets  • /whales\n' +
+        '• /search markets <query>\n' +
+        '• /search whales <query>\n' +
+        '• /overview <market> — Sides, holders, pricing\n\n' +
+        'Alerts\n' +
+        '• /follow <market_id> — price alerts\n' +
+        '• /follow 0x<wallet> — whale trades\n' +
+        '• /follow 0x<wallet> 0x<market_id> — whale on a market\n' +
+        '• /unfollow ...  • /list\n\n' +
+        'Account\n' +
+        '• /link 0x... | @username  • /unlink\n' +
+        '• /stats <address|@username>\n\n' +
+        'Feedback\n' +
+        '• /survey — Tell us what to build next\n\n' +
+        'Tip: Use @username in /profile_card to print the handle on the card.'
     );
   });
 
