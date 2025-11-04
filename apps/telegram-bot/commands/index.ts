@@ -752,90 +752,11 @@ export function registerCommands(bot: Telegraf) {
     }
   });
 
-  // Subscribe (deprecated) -> instruct to use /follow
-  bot.command('subscribe', async (ctx) => {
-    await ctx.reply('This command is deprecated. Use /follow instead.\nExamples:\n• /follow 0x<market_id> (market price alerts)\n• /follow 0x<wallet> (copy whale all markets)\n• /follow 0x<wallet> 0x<market_id> (whale on specific market)')
-  });
+  // (removed) subscribe command
 
-  // Unsubscribe command
-  bot.command('unsubscribe', async (ctx) => {
-    const args = ctx.message.text.split(' ').slice(1);
-    if (args.length === 0) {
-      await ctx.reply(
-        '❓ Please specify a market.\n\n' +
-          'Example: /unsubscribe trump 2024\n\n' +
-          'Use /list to see your subscriptions'
-      );
-      return;
-    }
+  // (removed) unsubscribe command — use /unfollow instead
 
-    const looksLikeCond = (s: string) => /^0x[a-fA-F0-9]{64}$/.test(s)
-    const first = args[0]
-    const query = args.join(' ');
-    const userId = ctx.from!.id;
-    logger.info('Unsubscribe command', { userId, query });
-
-    try {
-      await ctx.reply('🔍 Looking up market...');
-
-      // Resolve market id or search with logs
-      let market: any = null
-      if (looksLikeCond(first)) {
-        try {
-          market = await gammaApi.getMarket(first)
-          logger.info('unsubscribe: resolved by condition id', { conditionId: first, tokens: market?.tokens?.length || 0 })
-        } catch (e: any) {
-          logger.error('unsubscribe: getMarket failed', { conditionId: first, error: e?.message })
-        }
-      }
-      if (!market) {
-        try {
-          market = await findMarket(query)
-          logger.info('unsubscribe: resolved by search', { query, conditionId: market?.condition_id })
-        } catch (e: any) {
-          logger.error('unsubscribe: findMarket failed', { query, error: e?.message })
-        }
-      }
-      if (!market) {
-        await ctx.reply(
-          `❌ Could not find market matching "${query}".\n\n` +
-            'Use /list to see your current subscriptions.'
-        );
-        return;
-      }
-
-      const tokenId = market.tokens?.[0]?.token_id;
-      if (!tokenId) {
-        await ctx.reply('❌ This market isn\'t ready for alerts yet. Try /markets for active markets.');
-        return;
-      }
-
-      // Unsubscribe from alerts
-      const success = wsMonitor.unsubscribeFromMarket(userId, tokenId);
-      if (!success) {
-        await ctx.reply('⚠️ You are not subscribed to this market.');
-        return;
-      }
-
-      await ctx.reply(
-        `✅ Unsubscribed from alerts!\n\n` +
-          `📊 Market: ${market.question}\n\n` +
-          `You will no longer receive price alerts for this market.`
-      );
-
-      logger.info('User unsubscribed from market', { userId, tokenId });
-      const { removeMarketSubscription } = await import('../services/subscriptions')
-      await removeMarketSubscription(userId, tokenId)
-    } catch (error) {
-      logger.error('Error in unsubscribe command', error);
-      await ctx.reply('❌ Unable to unsubscribe. Try /list to see your follows, then /unfollow instead.');
-    }
-  });
-
-  // Whale trade alerts command (deprecated) -> instruct to use /follow
-  bot.command('whale', async (ctx) => {
-    await ctx.reply('This command is deprecated. Use /follow instead.\nExamples:\n• /follow 0x<wallet> (copy whale all markets)\n• /follow 0x<wallet> 0x<market_id> (whale on specific market)')
-  });
+  // (removed) whale command
 
   // Whales leaderboard (global or by market)
   bot.command('whales', async (ctx) => {
@@ -1367,28 +1288,7 @@ export function registerCommands(bot: Telegraf) {
     }
   });
 
-  // Test push delivery (sends sample price + whale alerts if subscribed)
-  bot.command('test_push', async (ctx) => {
-    const userId = ctx.from!.id
-    try {
-      const priceSent = await wsMonitor.debugSendPrice(userId)
-      const whaleSent = await wsMonitor.debugSendWhale(userId)
-
-      if (!priceSent && !whaleSent) {
-        await ctx.reply(
-          '⚠️ Can\'t send test - no active follows!\n\nTo test alerts:\n1. /markets to find a market\n2. /follow <market_id> to enable alerts\n3. /test_push to test'
-        )
-        return
-      }
-
-      let msg = '🧪 Test push sent:\n'
-      if (priceSent) msg += '• Price alert ✅\n'
-      if (whaleSent) msg += '• Whale alert ✅\n'
-      await ctx.reply(msg)
-    } catch (err) {
-      await ctx.reply('❌ Failed to send test push. Please try again.')
-    }
-  })
+  // (removed) test_push command
 
   // Follow command (standardized):
   // /follow 0x<market_id> => market price alerts
@@ -1860,16 +1760,7 @@ export function registerCommands(bot: Telegraf) {
     }
   })
 
-  // Backwards compatibility aliases for old command names
-  bot.command('card_profile', async (ctx) => {
-    await ctx.reply('ℹ️ This command has been renamed to /profile_card\n\nTry: /profile_card')
-  })
-  bot.command('card_trade', async (ctx) => {
-    await ctx.reply('ℹ️ This command has been renamed to /trade_card\n\nTry: /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]')
-  })
-  bot.command('card_whale', async (ctx) => {
-    await ctx.reply('ℹ️ This command has been renamed to /whale_card\n\nTry: /whale_card')
-  })
+  // (removed) legacy card_* alias commands
 
   logger.info('Commands registered');
 }
