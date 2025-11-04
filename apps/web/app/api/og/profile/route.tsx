@@ -41,8 +41,12 @@ export async function GET(req: Request) {
     return Number.isFinite(n) && n > 0 ? n : 100_000
   })()
   const rankNum = rankParam ? Number.parseInt(rankParam, 10) : NaN
-  const beatPercent = Number.isFinite(rankNum) && rankNum > 0
-    ? Math.max(0, Math.min(100, Math.round(((totalUsers - rankNum) / totalUsers) * 100)))
+  // Compute Top X% (smaller is better). Format smartly.
+  const topPercentRaw = Number.isFinite(rankNum) && rankNum > 0
+    ? (rankNum / totalUsers) * 100
+    : null
+  const topPercent = topPercentRaw != null
+    ? (topPercentRaw < 10 ? Math.round(topPercentRaw * 10) / 10 : Math.round(topPercentRaw))
     : null
 
   const pnlValue = pnlParam != null
@@ -71,8 +75,8 @@ export async function GET(req: Request) {
           fontFamily: 'ui-sans-serif, system-ui, -apple-system',
         }}
       >
-        {/* Percentile only (no rank/total numbers shown) */}
-        {beatPercent !== null ? (
+        {/* Percentile only (no raw rank/total shown) */}
+        {topPercent !== null ? (
           <div
             style={{
               position: 'absolute',
@@ -84,14 +88,17 @@ export async function GET(req: Request) {
               display: 'flex',
             }}
           >
-            {`Beat ${beatPercent}% of Polymarket users`}
+            {`Top ${topPercent}%`}
           </div>
         ) : null}
-        {/* Title intentionally hidden per design request */}
-        <div style={{ fontSize: 220, fontWeight: 800, color, display: 'flex' }}>{pnlText}</div>
-        {/* Stats row: PNL%, Invested, Position */}
-        <div style={{ marginTop: 8, display: 'flex', gap: 48, color: '#9fb3c8' }}>
-          <div style={{ fontSize: 28 }}>PNL</div>
+        {/* Headline row: label + big PNL on one line */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 24 }}>
+          <div style={{ fontSize: 64, color: '#9fb3c8', fontWeight: 700, display: 'flex' }}>PNL</div>
+          <div style={{ fontSize: 220, fontWeight: 800, color, lineHeight: 1, display: 'flex' }}>{pnlText}</div>
+        </div>
+        {/* Stats row: ROI, Invested, Position */}
+        <div style={{ marginTop: 12, display: 'flex', gap: 48, color: '#9fb3c8' }}>
+          <div style={{ fontSize: 28 }}>ROI</div>
           <div style={{ fontSize: 28 }}>{searchParams.get('roi') || '—'}</div>
           <div style={{ fontSize: 28 }}>Invested</div>
           <div style={{ fontSize: 28 }}>{`$${invested.toLocaleString()}`}</div>
