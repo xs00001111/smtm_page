@@ -31,6 +31,8 @@ export async function GET(req: Request) {
   const title = searchParams.get('title')
   const investedParam = searchParams.get('invested')
   const valueParam = searchParams.get('value')
+  const rankParam = searchParams.get('rank')
+  const pnlLbParam = searchParams.get('pnlLb')
 
   const pnlValue = pnlParam != null
     ? parseMoneyToNumber(pnlParam)
@@ -58,6 +60,22 @@ export async function GET(req: Request) {
           fontFamily: 'ui-sans-serif, system-ui, -apple-system',
         }}
       >
+        {/* Rank and leaderboard PnL (optional) */}
+        {(rankParam || pnlLbParam) ? (
+          <div
+            style={{
+              position: 'absolute',
+              top: 40,
+              left: 60,
+              color: '#9fb3c8',
+              fontSize: 32,
+              fontWeight: 600,
+              display: 'flex',
+            }}
+          >
+            {rankParam ? `Rank #${rankParam}` : ''}{rankParam && pnlLbParam ? '  •  ' : ''}{pnlLbParam ? `Leaderboard PnL ${pnlLbParam}` : ''}
+          </div>
+        ) : null}
         {/* Title intentionally hidden per design request */}
         <div style={{ fontSize: 220, fontWeight: 800, color, display: 'flex' }}>{pnlText}</div>
         {/* Stats row: PNL%, Invested, Position */}
