@@ -41,12 +41,15 @@ export async function GET(req: Request) {
     return Number.isFinite(n) && n > 0 ? n : 100_000
   })()
   const rankNum = rankParam ? Number.parseInt(rankParam, 10) : NaN
-  // Compute Top X% (smaller is better). Format smartly.
-  const topPercentRaw = Number.isFinite(rankNum) && rankNum > 0
-    ? (rankNum / totalUsers) * 100
-    : null
+  // Percentiles
+  // Top X% (smaller is better)
+  const topPercentRaw = Number.isFinite(rankNum) && rankNum > 0 ? (rankNum / totalUsers) * 100 : null
   const topPercent = topPercentRaw != null
     ? (topPercentRaw < 10 ? Math.round(topPercentRaw * 10) / 10 : Math.round(topPercentRaw))
+    : null
+  // Beat Y% (larger is better)
+  const beatPercent = Number.isFinite(rankNum) && rankNum > 0
+    ? Math.max(0, Math.min(100, Math.round(((totalUsers - rankNum) / totalUsers) * 100)))
     : null
 
   const pnlValue = pnlParam != null
@@ -75,31 +78,16 @@ export async function GET(req: Request) {
           fontFamily: 'ui-sans-serif, system-ui, -apple-system',
         }}
       >
-        {/* Percentile only (no raw rank/total shown) */}
-        {topPercent !== null ? (
-          <div
-            style={{
-              position: 'absolute',
-              top: 40,
-              left: 60,
-              color: '#9fb3c8',
-              fontSize: 28,
-              fontWeight: 600,
-              display: 'flex',
-            }}
-          >
-            {`Top ${topPercent}%`}
-          </div>
-        ) : null}
-        {/* Headline row: label + big PNL on one line */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 24 }}>
-          <div style={{ fontSize: 64, color: '#9fb3c8', fontWeight: 700, display: 'flex' }}>PNL</div>
-          <div style={{ fontSize: 220, fontWeight: 800, color, lineHeight: 1, display: 'flex' }}>{pnlText}</div>
+        {/* Remove top-left badge for a cleaner layout */}
+        {/* Headline row: label + big PNL on one line (bottom-aligned) */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 24 }}>
+          <div style={{ fontSize: 72, color: '#9fb3c8', fontWeight: 700, display: 'flex', lineHeight: 1 }}>PNL</div>
+          <div style={{ fontSize: 220, fontWeight: 800, color, lineHeight: 0.9, display: 'flex' }}>{pnlText}</div>
         </div>
-        {/* Stats row: ROI, Invested, Position */}
-        <div style={{ marginTop: 12, display: 'flex', gap: 48, color: '#9fb3c8' }}>
-          <div style={{ fontSize: 28 }}>ROI</div>
-          <div style={{ fontSize: 28 }}>{searchParams.get('roi') || '—'}</div>
+        {/* Stats row: Beat %, Invested, Position */}
+        <div style={{ marginTop: 14, display: 'flex', gap: 48, color: '#9fb3c8' }}>
+          <div style={{ fontSize: 28, display: 'flex' }}>Beat</div>
+          <div style={{ fontSize: 28, display: 'flex' }}>{beatPercent != null ? `${beatPercent}%` : (topPercent != null ? `Top ${topPercent}%` : '—')}</div>
           <div style={{ fontSize: 28 }}>Invested</div>
           <div style={{ fontSize: 28 }}>{`$${invested.toLocaleString()}`}</div>
           <div style={{ fontSize: 28 }}>Position</div>
