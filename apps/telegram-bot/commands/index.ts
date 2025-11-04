@@ -1743,12 +1743,13 @@ export function registerCommands(bot: Telegraf) {
       const short = address.slice(0,6)+'...'+address.slice(-4)
       // Determine display name (prefer Polymarket username)
       const displayName = (Array.isArray(lb) && lb[0]?.user_name) ? lb[0].user_name : short
+      const approxTotalUsers = 120000 // conservative public estimate; override as needed
       const url = `${base}/api/og/profile?address=${encodeURIComponent(address)}&username=${encodeURIComponent(displayName.startsWith('@')?displayName:'@'+displayName)}&title=${encodeURIComponent('Polymarket Profile')}`+
         `&pnl=${encodeURIComponent(String(pnlTotal))}`+
         `&value=${encodeURIComponent(value.value||'0')}&invested=${encodeURIComponent(String(Math.round(openInitial)))}`+
         `&realized=${encodeURIComponent((realized>=0?'+':'-')+'$'+Math.abs(Math.round(realized)).toLocaleString())}`+
         `&unrealized=${encodeURIComponent((unrealized>=0?'+':'-')+'$'+Math.abs(Math.round(unrealized)).toLocaleString())}`+
-        `&roi=${encodeURIComponent(roi)}&rank=${encodeURIComponent(rank)}&pnlLb=${encodeURIComponent(pnlLb)}`
+        `&roi=${encodeURIComponent(roi)}&rank=${encodeURIComponent(rank)}&pnlLb=${encodeURIComponent(pnlLb)}&total=${approxTotalUsers}`
 
       logger.info({ address, url, realized, unrealized, roi, rank }, 'profile_card: Generated image URL, fetching to verify')
 
