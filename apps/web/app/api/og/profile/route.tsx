@@ -71,27 +71,12 @@ export async function GET(req: Request) {
           fontFamily: 'ui-sans-serif, system-ui, -apple-system',
         }}
       >
-        {/* Rank and leaderboard PnL (optional) */}
-        {(rankParam || pnlLbParam) ? (
-          <div
-            style={{
-              position: 'absolute',
-              top: 40,
-              left: 60,
-              color: '#9fb3c8',
-              fontSize: 32,
-              fontWeight: 600,
-              display: 'flex',
-            }}
-          >
-            {rankParam ? `Rank #${rankParam}` : ''}{rankParam && pnlLbParam ? '  •  ' : ''}{pnlLbParam ? `Leaderboard PnL ${pnlLbParam}` : ''}
-          </div>
-        ) : null}
+        {/* Percentile only (no rank/total numbers shown) */}
         {beatPercent !== null ? (
           <div
             style={{
               position: 'absolute',
-              top: 84,
+              top: 40,
               left: 60,
               color: '#9fb3c8',
               fontSize: 28,
