@@ -33,6 +33,17 @@ export async function GET(req: Request) {
   const valueParam = searchParams.get('value')
   const rankParam = searchParams.get('rank')
   const pnlLbParam = searchParams.get('pnlLb')
+  const totalUsersParam = searchParams.get('total')
+
+  // Approximate Polymarket total users for percentile calc; overridable via ?total=
+  const totalUsers = (() => {
+    const n = totalUsersParam ? Number.parseInt(totalUsersParam, 10) : NaN
+    return Number.isFinite(n) && n > 0 ? n : 100_000
+  })()
+  const rankNum = rankParam ? Number.parseInt(rankParam, 10) : NaN
+  const beatPercent = Number.isFinite(rankNum) && rankNum > 0
+    ? Math.max(0, Math.min(100, Math.round(((totalUsers - rankNum) / totalUsers) * 100)))
+    : null
 
   const pnlValue = pnlParam != null
     ? parseMoneyToNumber(pnlParam)
@@ -74,6 +85,21 @@ export async function GET(req: Request) {
             }}
           >
             {rankParam ? `Rank #${rankParam}` : ''}{rankParam && pnlLbParam ? '  •  ' : ''}{pnlLbParam ? `Leaderboard PnL ${pnlLbParam}` : ''}
+          </div>
+        ) : null}
+        {beatPercent !== null ? (
+          <div
+            style={{
+              position: 'absolute',
+              top: 84,
+              left: 60,
+              color: '#9fb3c8',
+              fontSize: 28,
+              fontWeight: 600,
+              display: 'flex',
+            }}
+          >
+            {`Beat ${beatPercent}% of Polymarket users`}
           </div>
         ) : null}
         {/* Title intentionally hidden per design request */}
