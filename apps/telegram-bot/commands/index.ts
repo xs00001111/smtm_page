@@ -784,12 +784,20 @@ export function registerCommands(bot: Telegraf) {
         // Use Polymarket leaderboard API for top whales (much faster!)
         await ctx.reply('🔍 Loading top traders...')
         try {
-          logger.info('whales: fetching leaderboard')
-          const leaderboard = await dataApi.getLeaderboard({ limit: 10 })
+          logger.info('whales: fetching leaderboard (limit=10)')
+          let leaderboard = await dataApi.getLeaderboard({ limit: 10 })
           logger.info('whales: leaderboard returned', { count: leaderboard.length })
 
+          // Soft retry once if empty (transient bot protections)
           if (leaderboard.length === 0) {
-            await ctx.reply('❌ No whales found. Try a specific market: `/whales 0x<market_id>`', { parse_mode: 'Markdown' })
+            await new Promise(r => setTimeout(r, 400));
+            logger.info('whales: retrying leaderboard fetch')
+            leaderboard = await dataApi.getLeaderboard({ limit: 10 })
+            logger.info('whales: retry returned', { count: leaderboard.length })
+          }
+
+          if (leaderboard.length === 0) {
+            await ctx.reply('❌ Unable to load leaderboard right now. Try a specific market: `/whales 0x<market_id>`\n\nBrowse: https://polymarket.com/leaderboard', { parse_mode: 'Markdown' })
             return
           }
 

@@ -28,6 +28,9 @@ export class DataApiClient {
         // Some Polymarket endpoints may return 403 without a UA in Node
         'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
         'Accept': 'application/json',
+        // Hint origin to pass basic bot protections
+        'Origin': 'https://polymarket.com',
+        'Referer': 'https://polymarket.com/',
       },
     });
   }
@@ -110,13 +113,43 @@ export class DataApiClient {
    * @returns Array of leaderboard entries sorted by PnL
    */
   async getLeaderboard(params?: LeaderboardParams): Promise<LeaderboardEntry[]> {
-    const { data } = await this.client.get<LeaderboardEntry[]>('/leaderboard', {
-      params: {
-        limit: params?.limit || 50,
-        offset: params?.offset || 0,
-      },
-    });
-    return data;
+    const limit = params?.limit || 50;
+    const offset = params?.offset || 0;
+    // Attempt 1: axios
+    try {
+      const { data } = await this.client.get<LeaderboardEntry[]>('/leaderboard', { params: { limit, offset } });
+      return data;
+    } catch (err1: any) {
+      // Attempt 2: fetch with explicit headers
+      try {
+        const url = `${this.baseURL}/leaderboard?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`;
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Origin': 'https://polymarket.com',
+            'Referer': 'https://polymarket.com/',
+          },
+        } as any);
+        if (res.ok) {
+          const text = await res.text();
+          try {
+            const json = JSON.parse(text);
+            return Array.isArray(json) ? (json as LeaderboardEntry[]) : [];
+          } catch (e) {
+            console.error('getLeaderboard: JSON parse failed', { snippet: text.slice(0, 200) });
+            return [];
+          }
+        }
+        console.error('getLeaderboard: fetch failed', { status: res.status, statusText: res.statusText });
+      } catch (err2) {
+        console.error('getLeaderboard fallback fetch error:', (err2 as any)?.message || err2);
+      }
+      // If all attempts fail, return empty to let callers degrade gracefully
+      console.error('getLeaderboard: axios failed', (err1 as any)?.message || err1);
+      return [];
+    }
   }
 
   /**
