@@ -5,7 +5,7 @@ import { findMarket, findMarketFuzzy, findWhaleFuzzy, gammaApi, dataApi, clobApi
 import { wsMonitor } from '../index';
 import { botConfig } from '../config/bot';
 import { linkPolymarketAddress, linkPolymarketUsername, unlinkAll, getLinks, parsePolymarketProfile, resolveUsernameToAddress } from '../services/links';
-import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, resolveAction, actionUnfollowMarket, actionUnfollowWhaleAll, actionUnfollowWhaleMarket } from '../services/actions';
+import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, resolveAction, actionUnfollowMarket, actionUnfollowWhaleAll, actionUnfollowWhaleMarket, actionFollowWhaleAllMany } from '../services/actions';
 import { recordSurveyResponse } from '../services/survey';
 
 /**
@@ -155,6 +155,26 @@ export function registerCommands(bot: Telegraf) {
         const { addWhaleSubscription } = await import('../services/subscriptions')
         await addWhaleSubscription(userId, '', marketName || 'Market', botConfig.websocket.whaleTrademinSize, address, conditionId)
         await ctx.answerCbQuery(ok ? '✅ Following whale on market!' : 'Already following')
+      } else if (rec.type === 'follow_whale_all_many') {
+        const { addresses } = rec.data as { addresses: string[] }
+        const userId = ctx.from!.id
+        let okCount = 0
+        try {
+          const { addWhaleSubscriptionAll } = await import('../services/subscriptions')
+          for (const addrRaw of (addresses || []).slice(0, 20)) {
+            const addr = String(addrRaw || '').toLowerCase()
+            if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) continue
+            const ok = wsMonitor.subscribeToWhaleTradesAll(userId, addr, botConfig.websocket.whaleTrademinSize)
+            if (ok) {
+              okCount++
+              await addWhaleSubscriptionAll(userId, addr, botConfig.websocket.whaleTrademinSize)
+            }
+          }
+          await ctx.answerCbQuery(okCount > 0 ? `✅ Following ${okCount} whales` : 'No new follows')
+          if (okCount > 0) await ctx.reply(`✅ Following ${okCount} whales (all markets)`)
+        } catch {
+          await ctx.answerCbQuery('❌ Failed to follow all')
+        }
       } else if (rec.type === 'unfollow_market') {
         const { tokenId, conditionId, marketName } = rec.data
         try {
@@ -822,6 +842,7 @@ export function registerCommands(bot: Telegraf) {
               }
               let msg = '🐋 Top Traders (fallback)\n\n'
               const keyboard: { text: string; callback_data: string }[][] = []
+              const addresses: string[] = []
               let i = 0
               for (const [addr, bal] of top) {
                 i += 1
@@ -832,10 +853,12 @@ export function registerCommands(bot: Telegraf) {
                 msg += `   🔗 ${profileUrl}\n`
                 try {
                   const tok = await actionFollowWhaleAll(addr)
-                  keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }])
+                  keyboard.push([{ text: `Follow ${i}`, callback_data: `act:${tok}` }])
+                  addresses.push(addr)
                 } catch {}
                 msg += '\n'
               }
+              try { const tokAll = await actionFollowWhaleAllMany(addresses); keyboard.push([{ text: 'Follow All (Top 10)', callback_data: `act:${tokAll}` }]) } catch {}
               msg += '💡 Tip: Use /whales 0x<market_id> for market-specific whales.'
               await ctx.reply(msg, { reply_markup: { inline_keyboard: keyboard } as any })
               return
@@ -848,22 +871,30 @@ export function registerCommands(bot: Telegraf) {
 
           let msg = '🐋 Top Traders (by PnL)\n\n'
           const keyboard: { text: string; callback_data: string }[][] = []
-          leaderboard.forEach(async (entry, i) => {
+          const addresses: string[] = []
+          let i = 0
+          for (const entry of leaderboard) {
+            i += 1
             const short = entry.user_id.slice(0,6)+'...'+entry.user_id.slice(-4)
             const name = entry.user_name || 'Anonymous'
             const pnl = entry.pnl > 0 ? `+$${Math.round(entry.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(entry.pnl)).toLocaleString()}`
             const vol = `$${Math.round(entry.vol).toLocaleString()}`
             const profileUrl = getPolymarketProfileUrl(entry.user_name, entry.user_id)
-            msg += `${i+1}. ${name} (${short})\n`
+            msg += `${i}. ${name} (${short})\n`
             msg += `   ID: ${entry.user_id}\n`
             msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
             msg += `   🔗 ${profileUrl}\n`
             msg += `   ${'<code>'+esc(`/follow ${entry.user_id}`)+'</code>'}\n\n`
+            addresses.push(entry.user_id)
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
-              keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }])
+              keyboard.push([{ text: `Follow ${i}`, callback_data: `act:${tok}` }])
             } catch {}
-          })
+          }
+          try {
+            const tokAll = await actionFollowWhaleAllMany(addresses)
+            keyboard.push([{ text: 'Follow All (Top 10)', callback_data: `act:${tokAll}` }])
+          } catch {}
           msg += '💡 Tip: For a specific market, run <code>/whales &lt;market_id&gt;</code> to list whales there with a market-specific follow command.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
           return

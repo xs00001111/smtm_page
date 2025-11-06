@@ -1,7 +1,7 @@
 import { env } from '@smtm/shared/env'
 import { logger } from '../utils/logger'
 
-type ActionType = 'follow_market' | 'follow_whale_market' | 'follow_whale_all'
+type ActionType = 'follow_market' | 'follow_whale_market' | 'follow_whale_all' | 'follow_whale_all_many'
 
 type ActionRecord = {
   id: string
@@ -100,6 +100,10 @@ export async function actionFollowWhaleAll(address: string) {
 
 export async function actionFollowWhaleMarket(address: string, conditionId: string, marketName: string) {
   return createAction('follow_whale_market', { address, conditionId, marketName })
+}
+
+export async function actionFollowWhaleAllMany(addresses: string[]) {
+  return createAction('follow_whale_all_many', { addresses: Array.from(new Set(addresses)) })
 }
 
 // Unfollow helpers
