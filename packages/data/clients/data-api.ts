@@ -25,6 +25,9 @@ export class DataApiClient {
       timeout,
       headers: {
         'Content-Type': 'application/json',
+        // Some Polymarket endpoints may return 403 without a UA in Node
+        'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+        'Accept': 'application/json',
       },
     });
   }
