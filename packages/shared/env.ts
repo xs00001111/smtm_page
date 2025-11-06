@@ -22,6 +22,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  TELEGRAM_WEBHOOK_URL: z.string().url().optional(),
 });
 
 export const env = envSchema.parse({
@@ -41,4 +42,5 @@ export const env = envSchema.parse({
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  TELEGRAM_WEBHOOK_URL: process.env.TELEGRAM_WEBHOOK_URL,
 });

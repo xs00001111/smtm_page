@@ -146,6 +146,32 @@ export class DataApiClient {
       } catch (err2) {
         console.error('getLeaderboard fallback fetch error:', (err2 as any)?.message || err2);
       }
+      // Attempt 3: scrape public leaderboard HTML as last resort
+      try {
+        const url2 = 'https://polymarket.com/leaderboard';
+        const res2 = await fetch(url2, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+            'Accept': 'text/html,application/xhtml+xml',
+            'Referer': 'https://polymarket.com/',
+          },
+        } as any);
+        if (res2.ok) {
+          const html = await res2.text();
+          const addrs = Array.from(new Set((html.match(/0x[a-fA-F0-9]{40}/g) || [])));
+          const items: LeaderboardEntry[] = addrs.slice(0, 10).map((a, i) => ({
+            rank: String(i + 1),
+            user_id: a,
+            user_name: '',
+            vol: 0,
+            pnl: 0,
+            profile_image: '',
+          } as any));
+          if (items.length) return items;
+        }
+      } catch (e3) {
+        console.error('getLeaderboard scrape fallback failed', (e3 as any)?.message || e3);
+      }
       // If all attempts fail, return empty to let callers degrade gracefully
       console.error('getLeaderboard: axios failed', (err1 as any)?.message || err1);
       return [];

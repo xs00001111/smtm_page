@@ -84,13 +84,34 @@ async function start() {
     let retries = 0;
     const maxRetries = 5;
 
+    const useWebhook = Boolean(process.env.TELEGRAM_WEBHOOK_URL);
     while (retries < maxRetries) {
       try {
-        await bot.launch();
+        if (useWebhook) {
+          // Webhook mode (avoids 409 from multiple polling instances)
+          const url = process.env.TELEGRAM_WEBHOOK_URL as string;
+          const path = new URL(url).pathname || '/telegram-webhook';
+          await bot.telegram.setWebhook(url);
+          const { createServer } = await import('http');
+          const server = createServer((req, res) => {
+            if (req.url === path && req.method === 'POST') {
+              (bot.webhookCallback(path) as any)(req, res);
+            } else {
+              res.statusCode = 200; res.end('ok');
+            }
+          });
+          const port = Number(process.env.PORT || 3000);
+          server.listen(port);
+          logger.info('Telegram bot webhook server listening', { port, path });
+          break; // launched
+        } else {
+          // Polling mode
+          await bot.launch({ dropPendingUpdates: true });
+        }
         logger.info('Telegram bot is running');
         break;
       } catch (error: any) {
-        if (error?.response?.error_code === 409 && retries < maxRetries - 1) {
+        if (!useWebhook && error?.response?.error_code === 409 && retries < maxRetries - 1) {
           retries++;
           const delay = Math.min(1000 * Math.pow(2, retries), 30000); // exponential backoff, max 30s
           logger.warn(`409 conflict detected, retrying in ${delay}ms (attempt ${retries}/${maxRetries})`);
