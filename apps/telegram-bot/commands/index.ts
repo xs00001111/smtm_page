@@ -797,8 +797,53 @@ export function registerCommands(bot: Telegraf) {
           }
 
           if (leaderboard.length === 0) {
-            await ctx.reply('❌ Unable to load leaderboard right now. Try a specific market: `/whales 0x<market_id>`\n\nBrowse: https://polymarket.com/leaderboard', { parse_mode: 'Markdown' })
-            return
+            // Fallback: aggregate top holders across trending markets
+            try {
+              logger.info('whales: fallback via trending markets + top holders')
+              const trending = await gammaApi.getTrendingMarkets(3)
+              const uniq = new Map<string, number>() // address -> max balance seen
+              for (const m of (trending || [])) {
+                const cond = (m as any)?.condition_id || (m as any)?.conditionId
+                if (!cond) continue
+                try {
+                  const holders = await dataApi.getTopHolders({ market: cond, limit: 20, minBalance })
+                  holders.forEach((t:any)=>t.holders.forEach((h:any)=>{
+                    const bal = parseFloat(h.balance || '0')
+                    if (!isNaN(bal)) uniq.set(h.address, Math.max(uniq.get(h.address) || 0, bal))
+                  }))
+                } catch (e:any) {
+                  logger.error('whales: fallback holders failed', { cond, error: e?.message })
+                }
+              }
+              const top = Array.from(uniq.entries()).sort((a,b)=>b[1]-a[1]).slice(0, 10)
+              if (top.length === 0) {
+                await ctx.reply('❌ Unable to load leaderboard right now. Try a specific market: `/whales 0x<market_id>`\n\nBrowse: https://polymarket.com/leaderboard', { parse_mode: 'Markdown' })
+                return
+              }
+              let msg = '🐋 Top Traders (fallback)\n\n'
+              const keyboard: { text: string; callback_data: string }[][] = []
+              let i = 0
+              for (const [addr, bal] of top) {
+                i += 1
+                const short = addr.slice(0,6)+'...'+addr.slice(-4)
+                const profileUrl = getPolymarketProfileUrl(null, addr)
+                msg += `${i}. ${short}\n`
+                msg += `   Est. Balance: ${Math.round(bal)}\n`
+                msg += `   🔗 ${profileUrl}\n`
+                try {
+                  const tok = await actionFollowWhaleAll(addr)
+                  keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }])
+                } catch {}
+                msg += '\n'
+              }
+              msg += '💡 Tip: Use /whales 0x<market_id> for market-specific whales.'
+              await ctx.reply(msg, { reply_markup: { inline_keyboard: keyboard } as any })
+              return
+            } catch (e:any) {
+              logger.error('whales: fallback trending+holders failed', { error: e?.message })
+              await ctx.reply('❌ Unable to load leaderboard right now. Try a specific market: `/whales 0x<market_id>`\n\nBrowse: https://polymarket.com/leaderboard', { parse_mode: 'Markdown' })
+              return
+            }
           }
 
           let msg = '🐋 Top Traders (by PnL)\n\n'
