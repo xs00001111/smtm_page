@@ -90,30 +90,23 @@ export function registerCommands(bot: Telegraf) {
   bot.command('start', async (ctx) => {
     logger.info('User started bot', { userId: ctx.from?.id });
     await ctx.reply(
-      'Welcome to SMTM Bot! 🎯\n\n' +
-        'Create:\n' +
-        '• /profile_card [address|@username|profile_url] — use your linked profile if omitted\n' +
-        '   e.g. /profile_card @alice\n' +
-        '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n' +
-        '   e.g. /trade_card trump-2024 yes 1000 65 72\n\n' +
-        'Discover:\n' +
+      'Welcome to SMTM 🎯\n\n' +
+        'Quick actions:\n' +
         '• /markets [query] — hot markets or search\n' +
-        '   e.g. /markets election\n' +
-        '• /whales [0x<market_id>|query] — leaderboard, whales in market, or search\n' +
-        '   e.g. /whales  •  /whales 0xABC...  •  /whales alice\n' +
-        '• /price <id|slug|keywords> — detailed price view\n' +
-        '   e.g. /price 0xABC...  •  /price trump-2024\n' +
-        '• /overview <market> — sides, holders, pricing\n\n' +
-        'Follow alerts:\n' +
-        '• /follow 0x<market_id> — price alerts\n' +
-        '• /follow 0x<wallet> — whale trades (all markets)\n' +
-        '• /follow 0x<wallet> 0x<market_id> — whale on a specific market\n' +
-        '• /unfollow <...>  •  /list\n\n' +
-        'Account & stats:\n' +
-        '• /link 0x... | @username  •  /unlink  •  /stats <address|@username>\n\n' +
-        'Utility:\n' +
-        '• /status — connection status  •  /survey — feedback\n\n' +
-        'Tip: Use @username in /profile_card to print the handle; omit args to use your linked profile.'
+        '• /whales [0x<id>|query] — leaderboard, market whales, or search\n' +
+        '• /profile_card [@username|address] — uses linked profile if omitted\n' +
+        '• /follow 0x<market_id> • /list\n\n' +
+        'More commands: /help',
+      {
+        reply_markup: {
+          keyboard: [
+            [{ text: '/markets' }, { text: '/whales' }],
+            [{ text: '/list' }, { text: '/profile_card' }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        } as any
+      }
     );
   });
 
@@ -247,7 +240,17 @@ export function registerCommands(bot: Telegraf) {
         '• /stats <address|@username>\n\n' +
         'Utility\n' +
         '• /status — connection status  •  /survey — feedback\n\n' +
-        'Tip: Use @username in /profile_card to print the handle on the card; omit args for your linked profile.'
+        'Tip: Use @username in /profile_card to print the handle on the card; omit args for your linked profile.',
+      {
+        reply_markup: {
+          keyboard: [
+            [{ text: '/markets' }, { text: '/whales' }],
+            [{ text: '/list' }, { text: '/profile_card' }]
+          ],
+          resize_keyboard: true,
+          one_time_keyboard: true
+        } as any
+      }
     );
   });
 
