@@ -27,13 +27,15 @@ apps/telegram-bot/
 
 ## Available Commands
 
-- `/start` - Welcome message and command list
-- `/help` - Help information
-- `/price <market>` - Get current price for a market
-- `/subscribe <market>` - Subscribe to price updates
-- `/unsubscribe <market>` - Unsubscribe from price updates
-- `/list` - List your subscriptions
-- `/markets` - Browse popular markets
+- `/start` — Welcome message and command list
+- `/help` — Help information
+- `/price <market>` — Get current price for a market (id, slug, or keywords)
+- `/markets [query]` — Browse hot markets or search by keywords
+- `/whales [0x<market_id>|query]` — Leaderboard, whales in a market, or search traders
+- `/follow <market_id|0x<wallet>[ 0x<market_id>]` — Follow market price alerts or whale trades
+- `/unfollow <market_id|0x<wallet>[ 0x<market_id>]` — Stop following
+- `/list` — List your follows
+- `/profile_card [address|@username|profile_url]` — Create a profile card (omit args to use your linked profile)
 
 ## Setup
 

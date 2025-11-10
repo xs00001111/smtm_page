@@ -92,19 +92,18 @@ export function registerCommands(bot: Telegraf) {
     await ctx.reply(
       'Welcome to SMTM Bot! 🎯\n\n' +
         'Create:\n' +
-        '• /profile_card <address|@username|profile_url>\n' +
+        '• /profile_card [address|@username|profile_url] — uses your linked profile if omitted\n' +
         '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n\n' +
         'Discover:\n' +
-        '• /markets — Hot markets\n' +
-        '• /whales — Top traders\n' +
-        '• /search markets <query> | /search whales <query>\n' +
+        '• /markets [query] — Hot markets or search\n' +
+        '• /whales [0x<market_id>|query] — Leaderboard, whales in market, or search\n' +
         '• /overview <market> — Sides, holders, pricing\n\n' +
         'Follow alerts:\n' +
         '• /follow <market_id|wallet>  • /unfollow ...  • /list\n\n' +
         'Account & stats:\n' +
         '• /link 0x... | @username  • /unlink  • /stats <address|@username>\n\n' +
         'Feedback: /survey\n' +
-        'Tip: Use /profile_card with @username to show the handle.'
+        'Tip: Use /profile_card with @username to print the handle; omit args to use your linked profile.'
     );
   });
 
@@ -216,12 +215,11 @@ export function registerCommands(bot: Telegraf) {
     await ctx.reply(
       '📚 SMTM Help\n\n' +
         'Create\n' +
-        '• /profile_card <address|@username|profile_url>\n' +
+        '• /profile_card [address|@username|profile_url] — uses your linked profile if omitted\n' +
         '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n\n' +
         'Discover\n' +
-        '• /markets  • /whales\n' +
-        '• /search markets <query>\n' +
-        '• /search whales <query>\n' +
+        '• /markets [query] — Hot markets or search\n' +
+        '• /whales [0x<market_id>|query] — Leaderboard, whales in market, or search\n' +
         '• /overview <market> — Sides, holders, pricing\n\n' +
         'Alerts\n' +
         '• /follow <market_id> — price alerts\n' +
@@ -233,7 +231,7 @@ export function registerCommands(bot: Telegraf) {
         '• /stats <address|@username>\n\n' +
         'Feedback\n' +
         '• /survey — Tell us what to build next\n\n' +
-        'Tip: Use @username in /profile_card to print the handle on the card.'
+        'Tip: Use @username in /profile_card to print the handle on the card; omit args for your linked profile.'
     );
   });
 
@@ -647,143 +645,7 @@ export function registerCommands(bot: Telegraf) {
     }
   });
 
-  // Search command - Fuzzy search for markets and whales
-  bot.command('search', async (ctx) => {
-    const args = ctx.message.text.split(' ').slice(1);
-    if (args.length === 0) {
-      await ctx.reply(
-        '🔍 Search Command\n\n' +
-        'Usage:\n' +
-        '• /search markets <query> — search for markets\n' +
-        '• /search whales <query> — search for top traders\n\n' +
-        'Examples:\n' +
-        '• /search markets trump election\n' +
-        '• /search whales lirenTadd'
-      );
-      return;
-    }
-
-    const type = args[0].toLowerCase();
-    const query = args.slice(1).join(' ');
-
-    if (!query) {
-      await ctx.reply('❌ Please provide a search query.\n\nExample: /search markets trump');
-      return;
-    }
-
-    const userId = ctx.from?.id;
-    logger.info('Search command', { userId, type, query });
-
-    try {
-      if (type === 'markets' || type === 'market') {
-        // Search markets
-        await ctx.reply('🔍 Searching...');
-
-        const results = await findMarketFuzzy(query, 5);
-
-        if (results.length === 0) {
-          await ctx.reply(
-            `❌ No matches for "${query}"\n\n` +
-            'Try:\n' +
-            '• Different keywords (e.g., "election", "crypto")\n' +
-            '• /markets to browse trending'
-          );
-          return;
-        }
-
-        let message = `🔍 Search Results (${results.length})\n\n`;
-        const keyboard: { text: string; callback_data: string }[][] = []
-
-        for (let i=0;i<results.length;i++) {
-          const market = results[i]
-          const title = market.question || 'Untitled';
-          const conditionId = market.condition_id || market.conditionId;
-
-          // Parse price
-          let priceStr = 'N/A';
-          try {
-            if (market.outcomePrices) {
-              const prices = typeof market.outcomePrices === 'string'
-                ? JSON.parse(market.outcomePrices)
-                : market.outcomePrices;
-              if (Array.isArray(prices) && prices.length > 0) {
-                priceStr = `${(parseFloat(prices[0]) * 100).toFixed(1)}%`;
-              }
-            }
-          } catch {}
-
-          message += `${i + 1}. ${title.slice(0, 80)}${title.length > 80 ? '...' : ''}\n`;
-          message += `   Price: ${priceStr}\n`;
-
-          // Add market URL from API
-          const marketUrl = getPolymarketMarketUrl(market);
-          if (marketUrl) {
-            message += `   🔗 ${marketUrl}\n`;
-          }
-
-          if (conditionId) {
-            message += `   /price ${conditionId}\n`;
-            try { const tok = await actionFollowMarket(conditionId, title); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
-          }
-          message += '\n';
-        }
-
-        message += '💡 Use /price <market_id> for details';
-        await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any });
-
-      } else if (type === 'whales' || type === 'whale') {
-        // Search whales
-        await ctx.reply('🔍 Searching...');
-
-        const results = await findWhaleFuzzy(query, 5);
-
-        if (results.length === 0) {
-          await ctx.reply(
-            `❌ No traders match "${query}"\n\n` +
-            'Try:\n' +
-            '• Different search terms\n' +
-            '• /whales for leaderboard'
-          );
-          return;
-        }
-
-        let message = `🐋 Search Results (${results.length})\n\n`;
-        const keyboard: { text: string; callback_data: string }[][] = []
-
-        for (let i=0;i<results.length;i++) {
-          const whale = results[i]
-          const name = whale.user_name || 'Anonymous';
-          const short = whale.user_id.slice(0, 6) + '...' + whale.user_id.slice(-4);
-          const pnl = whale.pnl > 0
-            ? `+$${Math.round(whale.pnl).toLocaleString()}`
-            : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`;
-          const vol = `$${Math.round(whale.vol).toLocaleString()}`;
-          const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id);
-
-          message += `${i + 1}. ${name} (${short})\n`;
-          message += `   ID: ${whale.user_id}\n`;
-          message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`;
-          message += `   Rank: #${whale.rank}\n`;
-          message += `   🔗 ${profileUrl}\n\n`;
-          try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
-        }
-
-        message += '💡 Use /whales to see full leaderboard';
-        await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any });
-
-      } else {
-        await ctx.reply(
-          '❌ Invalid search type. Use:\n' +
-          '• /search markets <query>\n' +
-          '• /search whales <query>'
-        );
-      }
-
-    } catch (error: any) {
-      logger.error('Error in search command', { error: error?.message || error });
-      await ctx.reply('❌ Search unavailable. Try /markets to browse instead.');
-    }
-  });
+  // (removed) search command — use /markets [query] and /whales [0x<market_id>|query]
 
   // (removed) subscribe command
 
@@ -791,7 +653,7 @@ export function registerCommands(bot: Telegraf) {
 
   // (removed) whale command
 
-  // Whales leaderboard (global or by market)
+  // Whales leaderboard (global, by market, or search)
   bot.command('whales', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     const looksLikeCond = (s: string) => /^0x[a-fA-F0-9]{64}$/.test(s)
@@ -905,15 +767,42 @@ export function registerCommands(bot: Telegraf) {
         }
       }
 
-      // By market
+      // By market or fallback to whale search
       const q = args.join(' ')
-      await ctx.reply('🔍 Loading market whales...')
       const first = args[0]
-      const market = looksLikeCond(first) ? await gammaApi.getMarket(first) : await findMarket(q)
+      let market: any = null
+      try { market = looksLikeCond(first) ? await gammaApi.getMarket(first) : await findMarket(q) } catch {}
       if (!market) {
-        await ctx.reply('❌ Market not found. Try /markets to browse or use full market ID (0x...).')
-        return
+        await ctx.reply('🔍 Searching top traders...')
+        try {
+          const results = await findWhaleFuzzy(q, 5)
+          if (!results.length) { await ctx.reply('❌ No traders match your query. Try different keywords or use /whales for leaderboard.'); return }
+          let message = `🐋 Search Results (${results.length})\n\n`
+          const keyboard: { text: string; callback_data: string }[][] = []
+          for (let i=0;i<results.length;i++) {
+            const whale = results[i]
+            const name = whale.user_name || 'Anonymous'
+            const short = whale.user_id.slice(0,6)+'...'+whale.user_id.slice(-4)
+            const pnl = whale.pnl > 0 ? `+$${Math.round(whale.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`
+            const vol = `$${Math.round(whale.vol).toLocaleString()}`
+            const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id)
+            message += `${i+1}. ${name} (${short})\n`
+            message += `   ID: ${whale.user_id}\n`
+            message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+            message += `   Rank: #${whale.rank}\n`
+            message += `   🔗 ${profileUrl}\n\n`
+            try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
+          }
+          message += '💡 Use /whales for global leaderboard or add a market id to scope.'
+          await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+          return
+        } catch (e:any) {
+          logger.error('whales: search fallback failed', { error: e?.message })
+          await ctx.reply('❌ Unable to search traders. Try again later or use /whales for leaderboard.')
+          return
+        }
       }
+      await ctx.reply('🔍 Loading market whales...')
       const holders = await dataApi.getTopHolders({ market: market.condition_id, limit: 20, minBalance })
       const uniq = new Map<string, number>()
       holders.forEach((t)=>t.holders.forEach((h)=>{
@@ -1189,12 +1078,50 @@ export function registerCommands(bot: Telegraf) {
     }
   });
 
-  // Markets command - Show trending markets with subscribe buttons
+  // Markets command - Hot list or fuzzy search
   bot.command('markets', async (ctx) => {
     const userId = ctx.from?.id;
-    logger.info('Markets command', { userId });
+    const args = ctx.message.text.split(' ').slice(1)
+    logger.info('Markets command', { userId, argsLen: args.length });
 
     try {
+      // If a query is provided, perform fuzzy search
+      if (args.length > 0) {
+        const query = args.join(' ')
+        await ctx.reply('🔍 Searching...')
+        const results = await findMarketFuzzy(query, 5)
+        if (!results.length) {
+          await ctx.reply(`❌ No matches for "${query}"\n\nTry different keywords (e.g., "election") or run /markets to browse trending.`)
+          return
+        }
+        let message = `🔍 Search Results (${results.length})\n\n`
+        const keyboard: { text: string; callback_data: string }[][] = []
+        for (let i=0;i<results.length;i++) {
+          const market = results[i]
+          const title = market.question || 'Untitled'
+          const conditionId = market.condition_id || market.conditionId
+          let priceStr = 'N/A'
+          try {
+            if (market.outcomePrices) {
+              const prices = typeof market.outcomePrices === 'string' ? JSON.parse(market.outcomePrices) : market.outcomePrices
+              if (Array.isArray(prices) && prices.length > 0) priceStr = `${(parseFloat(prices[0]) * 100).toFixed(1)}%`
+            }
+          } catch {}
+          message += `${i+1}. ${title.slice(0,80)}${title.length>80?'...':''}\n`
+          message += `   Price: ${priceStr}\n`
+          const url = getPolymarketMarketUrl(market)
+          if (url) message += `   🔗 ${url}\n`
+          if (conditionId) {
+            message += `   /price ${conditionId}\n`
+            try { const tok = await actionFollowMarket(conditionId, title); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
+          }
+          message += '\n'
+        }
+        message += '💡 Use /price <market_id> for details'
+        await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+        return
+      }
+
       await ctx.reply('🔍 Loading markets...');
 
       // Primary: active markets by volume
@@ -1306,7 +1233,7 @@ export function registerCommands(bot: Telegraf) {
       }
 
       if (markets.length === 0) {
-        await ctx.reply('❌ No active markets right now. Try /search markets <query> to find specific markets.');
+        await ctx.reply('❌ No active markets right now. Try /markets <query> to find specific markets.');
         return;
       }
 
@@ -1803,10 +1730,7 @@ export function registerCommands(bot: Telegraf) {
     }
   })
 
-  // Whale card (alias to profile with whale flair later)
-  bot.command('whale_card', async (ctx) => {
-    await ctx.reply('ℹ️ Whale cards use the profile card format for now.\n\nTry: /profile_card <address>')
-  })
+  // (removed) whale_card alias — use /profile_card for all profiles
 
   // Trade card (user crafts a flex card)
   // Usage: /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]

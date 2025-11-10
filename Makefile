@@ -2,7 +2,7 @@
 
 help:
 	@echo "make setup    Install dependencies"
-	@echo "make dev      Run Next.js dev server"
+	@echo "make dev      Run web + telegram dev"
 	@echo "make build    Build for production"
 	@echo "make start    Start production server"
 	@echo "make lint     Run ESLint"
@@ -21,4 +21,3 @@ start:
 
 lint:
 	npm run lint || true
-
