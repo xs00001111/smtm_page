@@ -1138,113 +1138,130 @@ export function registerCommands(bot: Telegraf) {
       return
     }
     const query = args.join(' ')
+
     try {
-      await ctx.reply('🔍 Loading market overview...')
-      const market = await resolveMarketFromInput(query)
-      if (!market) { await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.'); return }
-      const conditionId = market.condition_id || market.conditionId
-      const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
-      if (!holdersRes?.length) { await ctx.reply('❌ No holder data available for this market.'); return }
+      // Wrap entire command in timeout (25 seconds)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Command timeout')), 25000)
+      )
 
-      // Process each outcome
-      const url = getPolymarketMarketUrl(market)
+      const commandPromise = (async () => {
+        await ctx.reply('🔍 Loading market overview...')
+        const market = await resolveMarketFromInput(query)
+        if (!market) { await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.'); return }
+        const conditionId = market.condition_id || market.conditionId
+        const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
+        if (!holdersRes?.length) { await ctx.reply('❌ No holder data available for this market.'); return }
 
-      for (const token of market.tokens || []) {
-        const outcome = token.outcome || token.token_id
-        const set = holdersRes.find(h=>h.token===token.token_id)
+        // Process each outcome (limit to first 2 to avoid timeouts)
+        const url = getPolymarketMarketUrl(market)
+        const tokensToProcess = (market.tokens || []).slice(0, 2)
 
-        // Get orderbook
-        let book: any = null
-        let midpoint: number|null = null
-        let spread: number|null = null
-        try {
-          book = await clobApi.getOrderbook(token.token_id)
-          const bestBid = book.bids?.length ? parseFloat(book.bids[0].price) : null
-          const bestAsk = book.asks?.length ? parseFloat(book.asks[0].price) : null
-          if (bestBid!=null && bestAsk!=null) {
-            midpoint = (bestBid + bestAsk) / 2
-            spread = bestAsk - bestBid
-          }
-        } catch {}
+        for (const token of tokensToProcess) {
+          const outcome = token.outcome || token.token_id
+          const set = holdersRes.find(h=>h.token===token.token_id)
 
-        // Build orderbook overview message
-        let msg = `📊 Orderbook Overview\n\n${market.question} (${outcome})\n\n`
-        if (spread!=null && midpoint!=null) {
-          msg += `Spread: ${(spread*100).toFixed(1)}¢, Midpoint: ${(midpoint*100).toFixed(1)}¢\n\n`
-        }
+          // Get orderbook
+          let book: any = null
+          let midpoint: number|null = null
+          let spread: number|null = null
+          try {
+            book = await clobApi.getOrderbook(token.token_id)
+            const bestBid = book.bids?.length ? parseFloat(book.bids[0].price) : null
+            const bestAsk = book.asks?.length ? parseFloat(book.asks[0].price) : null
+            if (bestBid!=null && bestAsk!=null) {
+              midpoint = (bestBid + bestAsk) / 2
+              spread = bestAsk - bestBid
+            }
+          } catch {}
 
-        if (book && (book.bids?.length || book.asks?.length)) {
-          msg += `<code>Price    Size     Total</code>\n`
-          msg += `<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>\n`
-
-          // Show top 4 asks (reversed order)
-          const asks = (book.asks || []).slice(0, 4).reverse()
-          for (const ask of asks) {
-            const price = (parseFloat(ask.price)*100).toFixed(1)
-            const size = Math.round(parseFloat(ask.size))
-            const total = Math.round(parseFloat(ask.price) * parseFloat(ask.size))
-            msg += `<code>${price.padStart(4)}¢  ${String(size).padStart(6)}   $${total}</code>\n`
+          // Build orderbook overview message
+          let msg = `📊 Orderbook Overview\n\n${market.question} (${outcome})\n\n`
+          if (spread!=null && midpoint!=null) {
+            msg += `Spread: ${(spread*100).toFixed(1)}¢, Midpoint: ${(midpoint*100).toFixed(1)}¢\n\n`
           }
 
-          msg += `<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>\n`
+          if (book && (book.bids?.length || book.asks?.length)) {
+            msg += `<code>Price    Size     Total</code>\n`
+            msg += `<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>\n`
 
-          // Show top 4 bids
-          const bids = (book.bids || []).slice(0, 4)
-          for (const bid of bids) {
-            const price = (parseFloat(bid.price)*100).toFixed(1)
-            const size = Math.round(parseFloat(bid.size))
-            const total = Math.round(parseFloat(bid.price) * parseFloat(bid.size))
-            msg += `<code>${price.padStart(4)}¢  ${String(size).padStart(6)}   $${total}</code>\n`
+            // Show top 4 asks (reversed order)
+            const asks = (book.asks || []).slice(0, 4).reverse()
+            for (const ask of asks) {
+              const price = (parseFloat(ask.price)*100).toFixed(1)
+              const size = Math.round(parseFloat(ask.size))
+              const total = Math.round(parseFloat(ask.price) * parseFloat(ask.size))
+              msg += `<code>${price.padStart(4)}¢  ${String(size).padStart(6)}   $${total}</code>\n`
+            }
+
+            msg += `<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>\n`
+
+            // Show top 4 bids
+            const bids = (book.bids || []).slice(0, 4)
+            for (const bid of bids) {
+              const price = (parseFloat(bid.price)*100).toFixed(1)
+              const size = Math.round(parseFloat(bid.size))
+              const total = Math.round(parseFloat(bid.price) * parseFloat(bid.size))
+              msg += `<code>${price.padStart(4)}¢  ${String(size).padStart(6)}   $${total}</code>\n`
+            }
+          } else {
+            msg += `No orderbook data available.\n`
           }
-        } else {
-          msg += `No orderbook data available.\n`
-        }
 
-        await ctx.reply(msg, { parse_mode: 'HTML' })
+          await ctx.reply(msg, { parse_mode: 'HTML' })
 
-        // Build net position overview
-        if (set && set.holders.length > 0) {
-          // Build address -> share mapping
-          const positions = set.holders.map(h => ({
-            address: h.address,
-            shares: Math.round(parseFloat(h.balance || '0'))
-          })).filter(p => p.shares > 0).sort((a,b) => b.shares - a.shares).slice(0, 10)
+          // Build net position overview
+          if (set && set.holders.length > 0) {
+            // Build address -> share mapping
+            const positions = set.holders.map(h => ({
+              address: h.address,
+              shares: Math.round(parseFloat(h.balance || '0'))
+            })).filter(p => p.shares > 0).sort((a,b) => b.shares - a.shares).slice(0, 10)
 
-          let posMsg = `📊 Net Position Overview\n\n${market.question}\n\n🟢 ${outcome}\n\n`
-          positions.forEach((p, i) => {
-            const short = p.address.slice(0, 6) + '...' + p.address.slice(-4)
-            posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
-          })
+            let posMsg = `📊 Net Position Overview\n\n${market.question}\n\n🟢 ${outcome}\n\n`
+            positions.forEach((p, i) => {
+              const short = p.address.slice(0, 6) + '...' + p.address.slice(-4)
+              posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
+            })
 
-          // Check for opposite side positions
-          const oppositeToken = (market.tokens || []).find(t => t.token_id !== token.token_id)
-          if (oppositeToken) {
-            const oppositeSet = holdersRes.find(h=>h.token===oppositeToken.token_id)
-            if (oppositeSet && oppositeSet.holders.length > 0) {
-              const oppositePositions = oppositeSet.holders.map(h => ({
-                address: h.address,
-                shares: Math.round(parseFloat(h.balance || '0'))
-              })).filter(p => p.shares > 0).sort((a,b) => b.shares - a.shares).slice(0, 5)
+            // Check for opposite side positions
+            const oppositeToken = (market.tokens || []).find(t => t.token_id !== token.token_id)
+            if (oppositeToken) {
+              const oppositeSet = holdersRes.find(h=>h.token===oppositeToken.token_id)
+              if (oppositeSet && oppositeSet.holders.length > 0) {
+                const oppositePositions = oppositeSet.holders.map(h => ({
+                  address: h.address,
+                  shares: Math.round(parseFloat(h.balance || '0'))
+                })).filter(p => p.shares > 0).sort((a,b) => b.shares - a.shares).slice(0, 5)
 
-              const oppositeOutcome = oppositeToken.outcome || oppositeToken.token_id
-              if (oppositePositions.length > 0) {
-                posMsg += `\n🔴 ${oppositeOutcome}\n\n`
-                oppositePositions.forEach((p, i) => {
-                  const short = p.address.slice(0, 6) + '...' + p.address.slice(-4)
-                  posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
-                })
-              } else {
-                posMsg += `\n🔴 ${oppositeOutcome}\n\nEmpty\n`
+                const oppositeOutcome = oppositeToken.outcome || oppositeToken.token_id
+                if (oppositePositions.length > 0) {
+                  posMsg += `\n🔴 ${oppositeOutcome}\n\n`
+                  oppositePositions.forEach((p, i) => {
+                    const short = p.address.slice(0, 6) + '...' + p.address.slice(-4)
+                    posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
+                  })
+                } else {
+                  posMsg += `\n🔴 ${oppositeOutcome}\n\nEmpty\n`
+                }
               }
             }
-          }
 
-          await ctx.reply(posMsg)
+            await ctx.reply(posMsg)
+          }
         }
+      })()
+
+      // Race between command execution and timeout
+      await Promise.race([commandPromise, timeoutPromise])
+    } catch (e: any) {
+      if (e?.message === 'Command timeout') {
+        logger.warn('overview command timed out', { query })
+        await ctx.reply('⏱️ Request timed out. This market may be too large or the API is slow. Please try again.')
+      } else {
+        logger.error('overview command failed', e)
+        await ctx.reply('❌ Failed to load overview. Try again later.')
       }
-    } catch (e) {
-      logger.error('overview command failed', e)
-      await ctx.reply('❌ Failed to load overview. Try again later.')
     }
   })
 

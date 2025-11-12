@@ -83,6 +83,19 @@ async function start() {
     const maxRetries = 5;
 
     const useWebhook = Boolean(process.env.TELEGRAM_WEBHOOK_URL);
+
+    // In polling mode, ensure any existing webhook is removed to avoid conflicts
+    if (!useWebhook) {
+      try {
+        logger.info('Clearing any existing webhooks before polling...');
+        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+        // Small delay to ensure webhook is fully cleared
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (err) {
+        logger.warn('Failed to clear webhook (may not exist)', err);
+      }
+    }
+
     while (retries < maxRetries) {
       try {
         if (useWebhook) {
@@ -103,17 +116,28 @@ async function start() {
           logger.info('Telegram bot webhook server listening', { port, path });
           break; // launched
         } else {
-          // Polling mode
+          // Polling mode - with extra conflict handling
+          logger.info(`Starting bot in polling mode (attempt ${retries + 1}/${maxRetries})...`);
           await bot.launch({ dropPendingUpdates: true });
         }
         logger.info('Telegram bot is running');
         break;
       } catch (error: any) {
-        if (!useWebhook && error?.response?.error_code === 409 && retries < maxRetries - 1) {
-          retries++;
-          const delay = Math.min(1000 * Math.pow(2, retries), 30000); // exponential backoff, max 30s
-          logger.warn(`409 conflict detected, retrying in ${delay}ms (attempt ${retries}/${maxRetries})`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+        if (!useWebhook && error?.response?.error_code === 409) {
+          if (retries < maxRetries - 1) {
+            retries++;
+            const delay = Math.min(2000 * Math.pow(2, retries), 60000); // exponential backoff, max 60s
+            logger.warn(`409 conflict detected - another instance may be running. Retrying in ${delay}ms (attempt ${retries}/${maxRetries})`);
+            logger.warn('If this persists, check for multiple deployments or stuck processes.');
+            await new Promise(resolve => setTimeout(resolve, delay));
+            // Try to clear webhook again before retry
+            try {
+              await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+            } catch {}
+          } else {
+            logger.error('Max retries reached for 409 conflict. Multiple bot instances may be running. Exiting.');
+            throw new Error('409 Conflict: Cannot start bot - another instance is already polling Telegram. Check your deployments.');
+          }
         } else {
           throw error;
         }
