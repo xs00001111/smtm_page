@@ -230,6 +230,9 @@ export function registerCommands(bot: Telegraf) {
         '• /price <id|slug|keywords> — detailed price view\n' +
         '   e.g. /price 0xABC...  •  /price trump-2024\n' +
         '• /overview <market> — sides, holders, pricing\n\n' +
+        'Resolution\n' +
+        '• Exact: address or profile URL (preferred)\n' +
+        '• Fuzzy: username/name when exact not provided\n\n' +
         'Alerts\n' +
         '• /follow 0x<market_id> — price alerts\n' +
         '• /follow 0x<wallet> — whale trades (all markets)\n' +
