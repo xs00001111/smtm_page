@@ -852,53 +852,70 @@ export function registerCommands(bot: Telegraf) {
             await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
             return
           }
-          // Exact match on leaderboard user_name first (case-insensitive)
+          // Collect all potential matches before deciding what to show
+          let exactMatch: any = null
+          let profileMatch: { addr: string; uname: string } | null = null
+
+          // 1. Exact match on leaderboard user_name (case-insensitive)
           try {
             const leaderboard = await dataApi.getLeaderboard({ limit: 1000 })
             const exact = (leaderboard || []).filter(e => String(e.user_name || '').toLowerCase() === q.trim().toLowerCase())
             if (exact.length > 0) {
-              let message = `🐋 Search Results (${exact.length})\n\n`
-              const keyboard: { text: string; callback_data: string }[][] = []
-              for (let i=0;i<exact.length;i++) {
-                const whale = exact[i]
-                const name = whale.user_name || 'Anonymous'
-                const short = whale.user_id.slice(0,6)+'...'+whale.user_id.slice(-4)
-                const pnl = whale.pnl > 0 ? `+$${Math.round(whale.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`
-                const vol = `$${Math.round(whale.vol).toLocaleString()}`
-                const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id)
-                message += `${i+1}. ${name} (${short})\n`
-                message += `   ID: ${whale.user_id}\n`
-                message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
-                message += `   Rank: #${whale.rank}\n`
-                message += `   🔗 ${profileUrl}\n\n`
-                try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
+              // If positive PnL, return immediately
+              const hasPositivePnl = exact.some(e => e.pnl > 0)
+              if (hasPositivePnl) {
+                let message = `🐋 Search Results (${exact.length})\n\n`
+                const keyboard: { text: string; callback_data: string }[][] = []
+                for (let i=0;i<exact.length;i++) {
+                  const whale = exact[i]
+                  const name = whale.user_name || 'Anonymous'
+                  const short = whale.user_id.slice(0,6)+'...'+whale.user_id.slice(-4)
+                  const pnl = whale.pnl > 0 ? `+$${Math.round(whale.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`
+                  const vol = `$${Math.round(whale.vol).toLocaleString()}`
+                  const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id)
+                  message += `${i+1}. ${name} (${short})\n`
+                  message += `   ID: ${whale.user_id}\n`
+                  message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+                  message += `   Rank: #${whale.rank}\n`
+                  message += `   🔗 ${profileUrl}\n\n`
+                  try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
+                }
+                await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+                return
               }
-              await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
-              return
+              // Save exact match with negative PnL, but continue searching
+              exactMatch = exact[0]
             }
           } catch {}
 
-          // Exact profile handle across all users (via profile pages)
+          // 2. Try profile page scraping with case variations
           try {
             const uname = q.trim()
-            const addr = await resolveUsernameToAddressExact(uname)
-            if (addr) {
-              const short = addr.slice(0,6)+'...'+addr.slice(-4)
-              const profileUrl = `https://polymarket.com/@${encodeURIComponent(uname)}`
-              let message = `🐋 Profile\n\n`
-              message += `Handle: @${uname}\n`
-              message += `ID: ${addr}\n`
-              message += `🔗 ${profileUrl}\n\n`
-              const keyboard: { text: string; callback_data: string }[][] = []
-              try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${short}`, callback_data: `act:${tok}` }]) } catch {}
-              await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
-              return
+            const variations = [
+              uname, // Original case
+              uname.toLowerCase(), // lowercase
+              uname.charAt(0).toUpperCase() + uname.slice(1).toLowerCase(), // Title case
+              uname.toUpperCase(), // UPPERCASE
+            ]
+            // Remove duplicates
+            const uniqueVariations = Array.from(new Set(variations))
+
+            for (const variant of uniqueVariations) {
+              try {
+                const addr = await resolveUsernameToAddressExact(variant)
+                if (addr) {
+                  profileMatch = { addr, uname: variant }
+                  break
+                }
+              } catch {}
             }
           } catch {}
 
-          // Fuzzy search by name/id (leaderboard, wide pool)
+          // 3. Fuzzy search by name/id (leaderboard, wide pool)
           const results = await findWhaleFuzzyWide(q.replace(/^@/, ''), 5, 1000)
 
+          // 4. Decide what to show based on what we found
+          // Priority: fuzzy results > profileMatch > exactMatch (negative PnL) > nothing
           if (results.length > 0) {
             let message = `🐋 Search Results (${results.length})\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
@@ -918,6 +935,40 @@ export function registerCommands(bot: Telegraf) {
             }
             message += '💡 Use /whales for global leaderboard or add a market id to scope.'
             await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+            return
+          }
+
+          // If no fuzzy results but we found a profile match, show it
+          if (profileMatch) {
+            const short = profileMatch.addr.slice(0,6)+'...'+profileMatch.addr.slice(-4)
+            const profileUrl = `https://polymarket.com/@${encodeURIComponent(profileMatch.uname)}`
+            let message = `🐋 Profile\n\n`
+            message += `Handle: @${profileMatch.uname}\n`
+            message += `ID: ${profileMatch.addr}\n`
+            message += `🔗 ${profileUrl}\n\n`
+            const keyboard: { text: string; callback_data: string }[][] = []
+            try { const tok = await actionFollowWhaleAll(profileMatch.addr); keyboard.push([{ text: `Follow ${short}`, callback_data: `act:${tok}` }]) } catch {}
+            await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
+            return
+          }
+
+          // If we have exact match with negative PnL, show it as last resort
+          if (exactMatch) {
+            const whale = exactMatch
+            const name = whale.user_name || 'Anonymous'
+            const short = whale.user_id.slice(0,6)+'...'+whale.user_id.slice(-4)
+            const pnl = whale.pnl > 0 ? `+$${Math.round(whale.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`
+            const vol = `$${Math.round(whale.vol).toLocaleString()}`
+            const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id)
+            let message = `🐋 Exact Match\n\n`
+            message += `1. ${name} (${short})\n`
+            message += `   ID: ${whale.user_id}\n`
+            message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+            message += `   Rank: #${whale.rank}\n`
+            message += `   🔗 ${profileUrl}\n\n`
+            const keyboard: { text: string; callback_data: string }[][] = []
+            try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow`, callback_data: `act:${tok}` }]) } catch {}
+            await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
             return
           }
 
