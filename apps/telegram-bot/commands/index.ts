@@ -1140,18 +1140,31 @@ export function registerCommands(bot: Telegraf) {
     const query = args.join(' ')
 
     try {
-      // Wrap entire command in timeout (25 seconds)
+      // Wrap entire command in timeout (20 seconds - shorter for faster feedback)
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Command timeout')), 25000)
+        setTimeout(() => reject(new Error('Command timeout')), 20000)
       )
 
       const commandPromise = (async () => {
         await ctx.reply('🔍 Loading market overview...')
+        logger.info('overview: resolving market from input', { query })
         const market = await resolveMarketFromInput(query)
-        if (!market) { await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.'); return }
+        if (!market) {
+          logger.warn('overview: market not found', { query })
+          await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.')
+          return
+        }
+
         const conditionId = market.condition_id || market.conditionId
+        logger.info('overview: fetching holders', { conditionId })
+
         const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
-        if (!holdersRes?.length) { await ctx.reply('❌ No holder data available for this market.'); return }
+
+        logger.info('overview: holders fetched', { count: holdersRes?.length || 0 })
+        if (!holdersRes?.length) {
+          await ctx.reply('❌ No holder data available for this market.')
+          return
+        }
 
         // Process each outcome (limit to first 2 to avoid timeouts)
         const url = getPolymarketMarketUrl(market)
@@ -1160,20 +1173,25 @@ export function registerCommands(bot: Telegraf) {
         for (const token of tokensToProcess) {
           const outcome = token.outcome || token.token_id
           const set = holdersRes.find(h=>h.token===token.token_id)
+          logger.info('overview: processing token', { tokenId: token.token_id, outcome })
 
           // Get orderbook
           let book: any = null
           let midpoint: number|null = null
           let spread: number|null = null
           try {
+            logger.info('overview: fetching orderbook', { tokenId: token.token_id })
             book = await clobApi.getOrderbook(token.token_id)
+            logger.info('overview: orderbook fetched', { tokenId: token.token_id, hasBids: !!book?.bids?.length, hasAsks: !!book?.asks?.length })
             const bestBid = book.bids?.length ? parseFloat(book.bids[0].price) : null
             const bestAsk = book.asks?.length ? parseFloat(book.asks[0].price) : null
             if (bestBid!=null && bestAsk!=null) {
               midpoint = (bestBid + bestAsk) / 2
               spread = bestAsk - bestBid
             }
-          } catch {}
+          } catch (err) {
+            logger.error('overview: orderbook fetch failed', { tokenId: token.token_id, error: err })
+          }
 
           // Build orderbook overview message
           let msg = `📊 Orderbook Overview\n\n${market.question} (${outcome})\n\n`
@@ -1208,7 +1226,9 @@ export function registerCommands(bot: Telegraf) {
             msg += `No orderbook data available.\n`
           }
 
+          logger.info('overview: sending orderbook message', { tokenId: token.token_id })
           await ctx.reply(msg, { parse_mode: 'HTML' })
+          logger.info('overview: orderbook message sent', { tokenId: token.token_id })
 
           // Build net position overview
           if (set && set.holders.length > 0) {
@@ -1247,13 +1267,17 @@ export function registerCommands(bot: Telegraf) {
               }
             }
 
+            logger.info('overview: sending position message', { tokenId: token.token_id })
             await ctx.reply(posMsg)
+            logger.info('overview: position message sent', { tokenId: token.token_id })
           }
         }
+        logger.info('overview: command completed successfully')
       })()
 
       // Race between command execution and timeout
       await Promise.race([commandPromise, timeoutPromise])
+      logger.info('overview: Promise.race completed')
     } catch (e: any) {
       if (e?.message === 'Command timeout') {
         logger.warn('overview command timed out', { query })
