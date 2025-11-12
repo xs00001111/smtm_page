@@ -1297,14 +1297,14 @@ export function registerCommands(bot: Telegraf) {
       // Primary: active markets by volume
       let markets: any[] = []
       try {
-        logger.info('markets: using gammaApi.getActiveMarkets(10, volume)')
-        markets = await gammaApi.getActiveMarkets(10, 'volume')
+        logger.info('markets: using gammaApi.getActiveMarkets(20, volume)')
+        markets = await gammaApi.getActiveMarkets(20, 'volume')
         const c = Array.isArray(markets) ? markets.length : -1
         logger.info(`markets: gammaApi active returned count=${c} type=${typeof markets}`)
       } catch (inner: any) {
         logger.error('markets: gammaApi active failed', { error: inner?.message || String(inner) })
         // Fallback to direct fetch with timeout
-        const url = 'https://gamma-api.polymarket.com/markets?active=true&limit=10&order=volume&ascending=false'
+        const url = 'https://gamma-api.polymarket.com/markets?active=true&limit=20&order=volume&ascending=false'
         logger.info('markets: fallback fetch (active by volume)', { url })
         const controller = new AbortController();
         const to = setTimeout(() => controller.abort(), 7000);
@@ -1336,11 +1336,11 @@ export function registerCommands(bot: Telegraf) {
         markets = markets ? [markets] as any : []
       }
 
-      // Keep only ACTIVE markets with future end_date and real liquidity
+      // Keep only ACTIVE markets with future end_date and reasonable liquidity
       // Note: /markets endpoint doesn't include tokens array, so we can't filter on that here
       const before = markets.length
       const now = Date.now()
-      const minLiquidity = parseFloat(process.env.MARKET_MIN_LIQUIDITY || '5000')
+      const minLiquidity = parseFloat(process.env.MARKET_MIN_LIQUIDITY || '1000')
       let filtered = (markets || []).filter((m: any) => {
         const active = m?.active === true
         const closed = m?.closed === true
@@ -1354,9 +1354,9 @@ export function registerCommands(bot: Telegraf) {
         return active && !closed && !resolved && !archived && futureEnd && hasLiq
       })
       logger.info(`markets: filtered ACTIVE+futureEnd+liq>=${minLiquidity} before=${before} after=${filtered.length}`)
-      if (filtered.length === 0 && before > 0) {
-        // relax liquidity threshold
-        const relaxedMin = 1000
+      if (filtered.length < 3 && before > 0) {
+        // relax liquidity threshold further
+        const relaxedMin = 100
         filtered = (markets || []).filter((m: any) => {
           const active = m?.active === true
           const closed = m?.closed === true
@@ -1376,12 +1376,12 @@ export function registerCommands(bot: Telegraf) {
       // Secondary fallback: if empty, try trending as last resort and re-filter
       if (markets.length === 0) {
         try {
-          logger.info('markets: trying gammaApi.getTrendingMarkets(5) as fallback')
-          const alt = await gammaApi.getTrendingMarkets(5)
+          logger.info('markets: trying gammaApi.getTrendingMarkets(20) as fallback')
+          const alt = await gammaApi.getTrendingMarkets(20)
           markets = Array.isArray(alt) ? alt : []
           logger.info(`markets: trending fallback returned count=${markets.length}`)
           if (markets.length) {
-            const minLiquidity2 = parseFloat(process.env.MARKET_MIN_LIQUIDITY || '5000')
+            const minLiquidity2 = parseFloat(process.env.MARKET_MIN_LIQUIDITY || '100')
             const now2 = Date.now()
             markets = markets.filter((m: any)=>{
               const active = m?.active === true
@@ -1411,8 +1411,10 @@ export function registerCommands(bot: Telegraf) {
       let message = '🔥 Hot Markets\n\n';
       const keyboard: { text: string; callback_data: string }[][] = []
 
+      // Limit to 8 markets for display to avoid too-long messages
+      const displayMarkets = markets.slice(0, 8)
       let idx = 0
-      for (const market of markets as any[]) {
+      for (const market of displayMarkets as any[]) {
         idx += 1
         const title = escapeMd(String(market.question || 'Untitled market'))
 
