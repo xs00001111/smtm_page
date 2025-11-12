@@ -218,14 +218,14 @@ export function registerCommands(bot: Telegraf) {
     await ctx.reply(
       '📚 SMTM Help\n\n' +
         'Create\n' +
-        '• /profile_card [address|@username|profile_url] — accurate (address/URL) or fuzzy (username); uses linked profile if omitted\n' +
+        '• /profile_card [address|@username|profile_url] — exact with address/URL/@handle, fuzzy with name (no @); uses linked profile if omitted\n' +
         '   e.g. /profile_card 0xABC…  •  /profile_card @alice\n' +
         '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n' +
         '   e.g. /trade_card trump-2024 yes 1000 65 72\n\n' +
         'Discover\n' +
         '• /markets [query] — hot markets or search\n' +
         '   e.g. /markets election\n' +
-        '• /whales [0x<market_id>|query] — leaderboard, whales in market, or search; accurate (address/URL) and fuzzy (name/@username) supported\n' +
+        '• /whales [0x<market_id>|query] — leaderboard, whales in market, or search; exact with address/@handle, fuzzy with name (no @)\n' +
         '   e.g. /whales  •  /whales 0xABC...  •  /whales @alice\n' +
         '• /price <id|slug|keywords> — detailed price view\n' +
         '   e.g. /price 0xABC...  •  /price trump-2024\n' +
@@ -240,7 +240,7 @@ export function registerCommands(bot: Telegraf) {
         '• /unfollow <...>  •  /list\n\n' +
         'Account\n' +
         '• /link 0x... | @username  •  /unlink\n' +
-        '• /stats <address|@username|profile_url> — accurate (address/URL) or fuzzy (username)\n\n' +
+        '• /stats <address|@username|profile_url> — exact with address/URL/@handle, fuzzy with name (no @)\n\n' +
         'Utility\n' +
         '• /status — connection status  •  /survey — feedback\n\n' +
         'Tip: Use @username in /profile_card to print the handle on the card; omit args for your linked profile.',
@@ -366,6 +366,7 @@ export function registerCommands(bot: Telegraf) {
     const args = ctx.message.text.split(' ').slice(1)
     const userId = ctx.from!.id
     const inputRaw = args.join(' ').trim()
+    const hasAtInput = inputRaw.startsWith('@')
 
     const replyUsage = async () => {
       await ctx.reply(
@@ -373,7 +374,9 @@ export function registerCommands(bot: Telegraf) {
         'Usage:\n' +
         '• /stats 0x<polymarket_address>\n' +
         '• /stats https://polymarket.com/profile/<address|@username>\n' +
-        '• /stats <polymarket_username>\n\n' +
+        '• /stats @username (exact)\n' +
+        '• /stats <polymarket_username> (no @ = fuzzy)\n\n' +
+        'Resolution: Exact (address/URL/@handle) vs Fuzzy (name without @).\n' +
         'Tip: /link saves your profile so you can run /stats without arguments.'
       )
     }
@@ -397,7 +400,7 @@ export function registerCommands(bot: Telegraf) {
           if (parsed?.address) { mode = 'poly_address'; polyAddress = parsed.address }
           else if (parsed?.username) { mode = 'poly_username'; polyUsername = parsed.username }
           else { await replyUsage(); return }
-        } else if (/^[a-zA-Z0-9_\-]+$/.test(input)) {
+        } else if (/^[a-zA-Z0-9_\-@]+$/.test(input)) {
           // Username; default to Polymarket username first
           polyUsername = input.replace(/^@/, '')
           mode = 'poly_username'
@@ -406,32 +409,41 @@ export function registerCommands(bot: Telegraf) {
         }
       }
 
-      // Resolve username -> address with robust fallbacks
+      // Resolve username -> address
       if (mode === 'poly_username' && polyUsername) {
-        // 1) Leaderboard fuzzy search
-        const results = await findWhaleFuzzy(polyUsername, 1)
-        if (results.length && results[0]?.user_id) {
-          polyAddress = results[0].user_id
-        }
-        // 2) Profile page resolution if not on leaderboard
-        if (!polyAddress) {
+        if (hasAtInput || /^https?:/i.test(inputRaw)) {
+          // Exact handle/URL: no fuzzy, resolve via profile only
           try {
             const addr = await resolveUsernameToAddress(polyUsername)
             if (addr) polyAddress = addr
           } catch {}
-        }
-      }
-
-      if (!polyAddress && (mode === 'poly_address' || mode === 'poly_username')) {
-        // Additional fuzzy attempt using raw input
-        const results = await findWhaleFuzzy(polyUsername || inputRaw, 1)
-        if (results.length && results[0]?.user_id) {
-          polyAddress = results[0].user_id
+        } else {
+          // Name without @: allow fuzzy, then fallback to exact resolve
+          const results = await findWhaleFuzzy(polyUsername, 1)
+          if (results.length && results[0]?.user_id) {
+            polyAddress = results[0].user_id
+          }
+          if (!polyAddress) {
+            try {
+              const addr = await resolveUsernameToAddress(polyUsername)
+              if (addr) polyAddress = addr
+            } catch {}
+          }
         }
       }
 
       if (!polyAddress) {
-        await ctx.reply('❌ Could not resolve a Polymarket address from the input. Try an address or profile URL.')
+        if (hasAtInput) {
+          const uname = inputRaw.replace(/^@/, '')
+          const url = `https://polymarket.com/@${encodeURIComponent(uname)}`
+          await ctx.reply(
+            '❌ Could not resolve address for that handle right now.\n\n' +
+            `Profile: ${url}\n` +
+            'Tip: Try again later or provide the 0x wallet address.'
+          )
+          return
+        }
+        await ctx.reply('❌ Could not resolve a Polymarket address. Try an address, profile URL, or add @ for an exact handle.')
         return
       }
 
@@ -1683,34 +1695,45 @@ export function registerCommands(bot: Telegraf) {
         logger.info({ input, parsed }, 'profile_card: Parsed URL')
         address = parsed?.address
         if (!address && parsed?.username) {
-          logger.info({ username: parsed.username }, 'profile_card: Resolving username from URL via findWhaleFuzzy/resolve')
-          const res = await findWhaleFuzzy(parsed.username, 1)
-          address = res[0]?.user_id
-          if (!address) {
-            try { address = await resolveUsernameToAddress(parsed.username) } catch {}
-          }
-          logger.info({ username: parsed.username, results: res.length, address }, 'profile_card: Username resolution result')
+          logger.info({ username: parsed.username }, 'profile_card: Resolving username from URL via resolveUsernameToAddress (exact)')
+          try { address = await resolveUsernameToAddress(parsed.username) } catch {}
+          logger.info({ username: parsed.username, address }, 'profile_card: Username resolution result')
         }
       } else {
         const username = input.replace(/^@/, '')
-        logger.info({ input, username }, 'profile_card: Resolving username via findWhaleFuzzy/resolve')
-        const res = await findWhaleFuzzy(username, 1)
-        address = res[0]?.user_id
-        if (!address) {
+        const hasAt = input.startsWith('@')
+        logger.info({ input, username }, 'profile_card: Resolving username via exact/fuzzy')
+        if (hasAt) {
           try { address = await resolveUsernameToAddress(username) } catch {}
+        } else {
+          const res = await findWhaleFuzzy(username, 1)
+          address = res[0]?.user_id
+          if (!address) {
+            try { address = await resolveUsernameToAddress(username) } catch {}
+          }
         }
-        logger.info({ username, results: res.length, address, topResult: res[0] }, 'profile_card: Username resolution result')
+        logger.info({ username, address }, 'profile_card: Username resolution result')
       }
 
       if (!address) {
         logger.warn({ input, userId }, 'profile_card: Could not resolve address')
-        await ctx.reply(
-          '❌ Could not resolve Polymarket address.\n\n' +
-          'Try:\n' +
-          '• /profile_card 0x<address>\n' +
-          '• /profile_card @username\n' +
-          '• /profile_card <profile_url>'
-        )
+        const unameFromInput = input.startsWith('@') ? input.slice(1) : undefined
+        if (unameFromInput) {
+          const url = `https://polymarket.com/@${encodeURIComponent(unameFromInput)}`
+          await ctx.reply(
+            '❌ Could not resolve address for that handle right now.\n\n' +
+            `Profile: ${url}\n` +
+            'Tip: Try again later or provide the 0x wallet address.'
+          )
+        } else {
+          await ctx.reply(
+            '❌ Could not resolve Polymarket address.\n\n' +
+            'Try:\n' +
+            '• /profile_card 0x<address>\n' +
+            '• /profile_card @username\n' +
+            '• /profile_card <profile_url>'
+          )
+        }
         return
       }
 
