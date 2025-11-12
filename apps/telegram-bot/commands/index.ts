@@ -123,15 +123,17 @@ export function registerCommands(bot: Telegraf) {
       'Welcome to SMTM 🎯\n\n' +
         'Quick actions:\n' +
         '• /markets [query] — hot markets or search\n' +
-        '• /whales [0x<id>|query] — leaderboard, market whales, or search\n' +
-        '• /profile_card [@username|address] — uses linked profile if omitted\n' +
-        '• /follow 0x<market_id> • /list\n\n' +
+        '• /whales [query] — leaderboard or search traders\n' +
+        '• /price <market> — detailed price info\n' +
+        '• /overview <market> — orderbook & positions\n' +
+        '• /follow 0x<market_id> — price alerts\n' +
+        '• /list — view your follows\n\n' +
         'More commands: /help',
       {
         reply_markup: {
           keyboard: [
             [{ text: '/markets' }, { text: '/whales' }],
-            [{ text: '/list' }, { text: '/profile_card' }]
+            [{ text: '/list' }, { text: '/help' }]
           ],
           resize_keyboard: true,
           one_time_keyboard: true
@@ -145,24 +147,24 @@ export function registerCommands(bot: Telegraf) {
     try {
       const data = (ctx.callbackQuery as any)?.data as string | undefined
       if (!data) return
-      // Survey responses (interest poll)
-      if (data.startsWith('survey:')) {
-        const answer = data.slice('survey:'.length) as 'yes'|'maybe'|'no'
-        const userId = ctx.from!.id
-        const uname = ctx.from?.username || undefined
-        await recordSurveyResponse(userId, uname, answer)
-        await ctx.answerCbQuery('✅ Thanks for your feedback!')
-        try {
-          await ctx.reply(
-            answer === 'yes'
-              ? '🚀 Noted! We\'ll ping you when arbitrage & spread farming goes live.'
-              : answer === 'maybe'
-              ? '👍 Got it — we\'ll keep you posted as it shapes up.'
-              : '🙏 Thanks! Appreciate the signal.'
-          )
-        } catch {}
-        return
-      }
+      // Survey responses (interest poll) - HIDDEN: Auth not ready yet
+      // if (data.startsWith('survey:')) {
+      //   const answer = data.slice('survey:'.length) as 'yes'|'maybe'|'no'
+      //   const userId = ctx.from!.id
+      //   const uname = ctx.from?.username || undefined
+      //   await recordSurveyResponse(userId, uname, answer)
+      //   await ctx.answerCbQuery('✅ Thanks for your feedback!')
+      //   try {
+      //     await ctx.reply(
+      //       answer === 'yes'
+      //         ? '🚀 Noted! We\'ll ping you when arbitrage & spread farming goes live.'
+      //         : answer === 'maybe'
+      //         ? '👍 Got it — we\'ll keep you posted as it shapes up.'
+      //         : '🙏 Thanks! Appreciate the signal.'
+      //     )
+      //   } catch {}
+      //   return
+      // }
       if (!data.startsWith('act:')) return
       const id = data.slice(4)
       const rec = await resolveAction(id)
@@ -247,38 +249,37 @@ export function registerCommands(bot: Telegraf) {
   bot.command('help', async (ctx) => {
     await ctx.reply(
       '📚 SMTM Help\n\n' +
-        'Create\n' +
-        '• /profile_card [address|@username|profile_url] — exact with address/URL/@handle, fuzzy with name (no @); uses linked profile if omitted\n' +
-        '   e.g. /profile_card 0xABC…  •  /profile_card @alice\n' +
-        '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n' +
-        '   e.g. /trade_card trump-2024 yes 1000 65 72\n\n' +
         'Discover\n' +
-        '• /markets [query] — hot markets or search\n' +
-        '   e.g. /markets election\n' +
-        '• /whales [0x<market_id>|query] — leaderboard, whales in market, or search; exact with address/@handle, fuzzy with name (no @)\n' +
-        '   e.g. /whales  •  /whales 0xABC...  •  /whales @alice\n' +
+        '• /markets [segment|query] — browse markets\n' +
+        '   Segments: trending, breaking, new, ending\n' +
+        '   e.g. /markets trending  •  /markets election\n' +
+        '• /whales [query] — leaderboard or search traders\n' +
+        '   Use @ for exact handle, name without @ for fuzzy\n' +
+        '   e.g. /whales  •  /whales @alice  •  /whales alice\n' +
         '• /price <id|slug|keywords> — detailed price view\n' +
         '   e.g. /price 0xABC...  •  /price trump-2024\n' +
-        '• /overview <market> — sides, holders, pricing\n\n' +
-        'Resolution\n' +
-        '• Exact: address or profile URL (preferred)\n' +
-        '• Fuzzy: username/name when exact not provided\n\n' +
+        '• /overview <market_url|id|slug> — orderbook & positions\n' +
+        '   e.g. /overview https://polymarket.com/event/...\n\n' +
         'Alerts\n' +
         '• /follow 0x<market_id> — price alerts\n' +
         '• /follow 0x<wallet> — whale trades (all markets)\n' +
-        '• /follow 0x<wallet> 0x<market_id> — whale on a specific market\n' +
-        '• /unfollow <...>  •  /list\n\n' +
-        'Account\n' +
-        '• /link 0x... | @username  •  /unlink\n' +
-        '• /stats <address|@username|profile_url> — exact with address/URL/@handle, fuzzy with name (no @)\n\n' +
+        '• /follow 0x<wallet> 0x<market_id> — whale on specific market\n' +
+        '• /unfollow <...>  •  /list — manage follows\n\n' +
+        'Analysis\n' +
+        '• /profile_card [address|@username|url] — trader profile\n' +
+        '   e.g. /profile_card @alice  •  /profile_card 0xABC...\n' +
+        '• /stats <address|@username|url> — detailed stats\n' +
+        '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n' +
+        '   e.g. /trade_card trump-2024 yes 1000 65 72\n\n' +
         'Utility\n' +
-        '• /status — connection status  •  /survey — feedback\n\n' +
-        'Tip: Use @username in /profile_card to print the handle on the card; omit args for your linked profile.',
+        '• /status — connection status\n' +
+        '• /net <market> <wallet> — net position calculator\n\n' +
+        'Tip: Markets with $1K+ volume/liquidity shown. Use exact handles (@) or addresses for best results.',
       {
         reply_markup: {
           keyboard: [
             [{ text: '/markets' }, { text: '/whales' }],
-            [{ text: '/list' }, { text: '/profile_card' }]
+            [{ text: '/list' }, { text: '/help' }]
           ],
           resize_keyboard: true,
           one_time_keyboard: true
@@ -288,23 +289,25 @@ export function registerCommands(bot: Telegraf) {
   });
 
   // Survey: gauge interest in arbitrage & spread farming feature
-  bot.command('survey', async (ctx) => {
-    const text =
-      '🧪 New Feature Survey\n\n' +
-      'We\'re building tools to spot arbitrage and spread farming opportunities across markets.\n' +
-      'Would you be interested in this feature?'
-    const keyboard = {
-      inline_keyboard: [[
-        { text: '✅ I\'m interested', callback_data: 'survey:yes' },
-        { text: '🤔 Maybe', callback_data: 'survey:maybe' },
-        { text: '❌ Not interested', callback_data: 'survey:no' },
-      ]],
-    }
-    await ctx.reply(text, { reply_markup: keyboard as any })
-  })
+  // HIDDEN: Auth not ready yet
+  // bot.command('survey', async (ctx) => {
+  //   const text =
+  //     '🧪 New Feature Survey\n\n' +
+  //     'We\'re building tools to spot arbitrage and spread farming opportunities across markets.\n' +
+  //     'Would you be interested in this feature?'
+  //   const keyboard = {
+  //     inline_keyboard: [[
+  //       { text: '✅ I\'m interested', callback_data: 'survey:yes' },
+  //       { text: '🤔 Maybe', callback_data: 'survey:maybe' },
+  //       { text: '❌ Not interested', callback_data: 'survey:no' },
+  //     ]],
+  //   }
+  //   await ctx.reply(text, { reply_markup: keyboard as any })
+  // })
 
   // Link command — link Polymarket address
-  bot.command('link', async (ctx) => {
+  // HIDDEN: Auth not ready yet
+  /* bot.command('link', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     const userId = ctx.from!.id
     if (args.length === 0) {
@@ -373,10 +376,11 @@ export function registerCommands(bot: Telegraf) {
       logger.error('link command failed', { error: e?.message })
       await ctx.reply('❌ Failed to link. Please check the format and try again.')
     }
-  })
+  }) */
 
   // Unlink command — remove all linked profiles
-  bot.command('unlink', async (ctx) => {
+  // HIDDEN: Auth not ready yet
+  /* bot.command('unlink', async (ctx) => {
     const userId = ctx.from!.id
     try {
       const removed = await unlinkAll(userId)
@@ -389,7 +393,7 @@ export function registerCommands(bot: Telegraf) {
       logger.error('unlink command failed', { error: e?.message })
       await ctx.reply('❌ Failed to unlink. Please try again.')
     }
-  })
+  }) */
 
   // Stats command — show full profile for Polymarket
   bot.command('stats', async (ctx) => {
