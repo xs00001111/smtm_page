@@ -218,15 +218,15 @@ export function registerCommands(bot: Telegraf) {
     await ctx.reply(
       '📚 SMTM Help\n\n' +
         'Create\n' +
-        '• /profile_card [address|@username|profile_url] — use your linked profile if omitted\n' +
-        '   e.g. /profile_card @alice\n' +
+        '• /profile_card [address|@username|profile_url] — accurate (address/URL) or fuzzy (username); uses linked profile if omitted\n' +
+        '   e.g. /profile_card 0xABC…  •  /profile_card @alice\n' +
         '• /trade_card <market> <yes|no> <stake_$> [entry_%] [current_%]\n' +
         '   e.g. /trade_card trump-2024 yes 1000 65 72\n\n' +
         'Discover\n' +
         '• /markets [query] — hot markets or search\n' +
         '   e.g. /markets election\n' +
-        '• /whales [0x<market_id>|query] — leaderboard, whales in market, or search\n' +
-        '   e.g. /whales  •  /whales 0xABC...  •  /whales alice\n' +
+        '• /whales [0x<market_id>|query] — leaderboard, whales in market, or search; accurate (address/URL) and fuzzy (name/@username) supported\n' +
+        '   e.g. /whales  •  /whales 0xABC...  •  /whales @alice\n' +
         '• /price <id|slug|keywords> — detailed price view\n' +
         '   e.g. /price 0xABC...  •  /price trump-2024\n' +
         '• /overview <market> — sides, holders, pricing\n\n' +
@@ -237,7 +237,7 @@ export function registerCommands(bot: Telegraf) {
         '• /unfollow <...>  •  /list\n\n' +
         'Account\n' +
         '• /link 0x... | @username  •  /unlink\n' +
-        '• /stats <address|@username>\n\n' +
+        '• /stats <address|@username|profile_url> — accurate (address/URL) or fuzzy (username)\n\n' +
         'Utility\n' +
         '• /status — connection status  •  /survey — feedback\n\n' +
         'Tip: Use @username in /profile_card to print the handle on the card; omit args for your linked profile.',
@@ -403,16 +403,24 @@ export function registerCommands(bot: Telegraf) {
         }
       }
 
-      // Resolve username -> address via leaderboard fuzzy search
+      // Resolve username -> address with robust fallbacks
       if (mode === 'poly_username' && polyUsername) {
+        // 1) Leaderboard fuzzy search
         const results = await findWhaleFuzzy(polyUsername, 1)
         if (results.length && results[0]?.user_id) {
           polyAddress = results[0].user_id
         }
+        // 2) Profile page resolution if not on leaderboard
+        if (!polyAddress) {
+          try {
+            const addr = await resolveUsernameToAddress(polyUsername)
+            if (addr) polyAddress = addr
+          } catch {}
+        }
       }
 
       if (!polyAddress && (mode === 'poly_address' || mode === 'poly_username')) {
-        // Try fuzzy search on whales by inputRaw as fallback
+        // Additional fuzzy attempt using raw input
         const results = await findWhaleFuzzy(polyUsername || inputRaw, 1)
         if (results.length && results[0]?.user_id) {
           polyAddress = results[0].user_id
@@ -1637,16 +1645,22 @@ export function registerCommands(bot: Telegraf) {
         logger.info({ input, parsed }, 'profile_card: Parsed URL')
         address = parsed?.address
         if (!address && parsed?.username) {
-          logger.info({ username: parsed.username }, 'profile_card: Resolving username from URL via findWhaleFuzzy')
+          logger.info({ username: parsed.username }, 'profile_card: Resolving username from URL via findWhaleFuzzy/resolve')
           const res = await findWhaleFuzzy(parsed.username, 1)
           address = res[0]?.user_id
+          if (!address) {
+            try { address = await resolveUsernameToAddress(parsed.username) } catch {}
+          }
           logger.info({ username: parsed.username, results: res.length, address }, 'profile_card: Username resolution result')
         }
       } else {
         const username = input.replace(/^@/, '')
-        logger.info({ input, username }, 'profile_card: Resolving username via findWhaleFuzzy')
+        logger.info({ input, username }, 'profile_card: Resolving username via findWhaleFuzzy/resolve')
         const res = await findWhaleFuzzy(username, 1)
         address = res[0]?.user_id
+        if (!address) {
+          try { address = await resolveUsernameToAddress(username) } catch {}
+        }
         logger.info({ username, results: res.length, address, topResult: res[0] }, 'profile_card: Username resolution result')
       }
 
