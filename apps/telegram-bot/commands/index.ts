@@ -1255,8 +1255,13 @@ export function registerCommands(bot: Telegraf) {
     logger.info('Markets command', { userId, argsLen: args.length });
 
     try {
-      // If a query is provided, perform fuzzy search
-      if (args.length > 0) {
+      // Check for segment keywords (trending, breaking, new, ending)
+      const firstArg = args[0]?.toLowerCase()
+      const segments = ['trending', 'breaking', 'new', 'ending']
+      const isSegment = segments.includes(firstArg)
+
+      // If a query is provided (and not a segment), perform fuzzy search
+      if (args.length > 0 && !isSegment) {
         const query = args.join(' ')
         await ctx.reply('🔍 Searching...')
         const results = await findMarketFuzzy(query, 5)
@@ -1292,20 +1297,44 @@ export function registerCommands(bot: Telegraf) {
         return
       }
 
+      // Determine segment and display label
+      const segment = isSegment ? firstArg : 'hot'
+      const segmentLabels: Record<string, string> = {
+        'hot': '🔥 Hot Markets',
+        'trending': '📈 Trending Markets',
+        'breaking': '⚡ Breaking Markets',
+        'new': '🆕 New Markets',
+        'ending': '⏰ Ending Soon'
+      }
+      const displayLabel = segmentLabels[segment] || '🔥 Hot Markets'
+
       await ctx.reply('🔍 Loading markets...');
 
-      // Primary: active markets by volume
+      // Primary: active markets by volume or segment-specific order
       let markets: any[] = []
+      let orderBy: 'volume' | 'liquidity' | 'volume_24hr' | 'end_date_min' = 'volume'
+
+      // Set order based on segment
+      if (segment === 'trending') {
+        orderBy = 'volume_24hr'
+      } else if (segment === 'breaking') {
+        orderBy = 'volume_24hr'
+      } else if (segment === 'new') {
+        orderBy = 'volume' // Will filter by recent createdAt later
+      } else if (segment === 'ending') {
+        orderBy = 'end_date_min'
+      }
+
       try {
-        logger.info('markets: using gammaApi.getActiveMarkets(20, volume)')
-        markets = await gammaApi.getActiveMarkets(20, 'volume')
+        logger.info(`markets: using gammaApi.getActiveMarkets(20, ${orderBy})`)
+        markets = await gammaApi.getActiveMarkets(20, orderBy)
         const c = Array.isArray(markets) ? markets.length : -1
         logger.info(`markets: gammaApi active returned count=${c} type=${typeof markets}`)
       } catch (inner: any) {
         logger.error('markets: gammaApi active failed', { error: inner?.message || String(inner) })
         // Fallback to direct fetch with timeout
-        const url = 'https://gamma-api.polymarket.com/markets?active=true&limit=20&order=volume&ascending=false'
-        logger.info('markets: fallback fetch (active by volume)', { url })
+        const url = `https://gamma-api.polymarket.com/markets?active=true&limit=20&order=${orderBy}&ascending=false`
+        logger.info(`markets: fallback fetch (active by ${orderBy})`, { url })
         const controller = new AbortController();
         const to = setTimeout(() => controller.abort(), 7000);
         let res: Response
@@ -1373,6 +1402,24 @@ export function registerCommands(bot: Telegraf) {
       }
       markets = filtered
 
+      // Apply segment-specific filtering
+      if (segment === 'new' && markets.length > 0) {
+        // For "new", prioritize recently created markets
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
+        markets = markets.filter((m: any) => {
+          const createdAt = m?.createdAt ? Date.parse(m.createdAt) : NaN
+          return Number.isFinite(createdAt) && createdAt > sevenDaysAgo
+        })
+        logger.info(`markets: filtered for new markets (last 7 days), count=${markets.length}`)
+      } else if (segment === 'breaking' && markets.length > 0) {
+        // For "breaking", filter for high recent volume (volume_24hr)
+        markets = markets.filter((m: any) => {
+          const vol24hr = parseFloat(m?.volume_24hr || m?.volume24hr || '0')
+          return !isNaN(vol24hr) && vol24hr > 1000 // At least $1k in 24hr volume
+        })
+        logger.info(`markets: filtered for breaking markets (volume_24hr > 1000), count=${markets.length}`)
+      }
+
       // Secondary fallback: if empty, try trending as last resort and re-filter
       if (markets.length === 0) {
         try {
@@ -1408,7 +1455,7 @@ export function registerCommands(bot: Telegraf) {
       }
 
       const escapeMd = (s: string) => s.replace(/[\\*_`\[\]()]/g, '\\$&')
-      let message = '🔥 Hot Markets\n\n';
+      let message = `${displayLabel}\n\n`;
       const keyboard: { text: string; callback_data: string }[][] = []
 
       // Limit to 8 markets for display to avoid too-long messages
@@ -1472,7 +1519,12 @@ export function registerCommands(bot: Telegraf) {
         '💡 How to follow:\n' +
         '• Tap a follow command above to insert it\n' +
         '• Or copy a market id (0x…) from the event\n' +
-        '• Browse all: https://polymarket.com/markets';
+        '\n📂 Browse segments:\n' +
+        '• /markets trending - 24hr volume leaders\n' +
+        '• /markets breaking - High activity markets\n' +
+        '• /markets new - Recently created\n' +
+        '• /markets ending - Closing soon\n' +
+        '• More: https://polymarket.com/markets';
 
       await ctx.reply(message, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } as any });
     } catch (error: any) {
