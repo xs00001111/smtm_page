@@ -1365,11 +1365,12 @@ export function registerCommands(bot: Telegraf) {
         markets = markets ? [markets] as any : []
       }
 
-      // Keep only ACTIVE markets with future end_date and reasonable liquidity
+      // Keep only ACTIVE markets with future end_date, minimum volume and liquidity
       // Note: /markets endpoint doesn't include tokens array, so we can't filter on that here
       const before = markets.length
       const now = Date.now()
       const minLiquidity = parseFloat(process.env.MARKET_MIN_LIQUIDITY || '1000')
+      const minVolume = parseFloat(process.env.MARKET_MIN_VOLUME || '1000')
       let filtered = (markets || []).filter((m: any) => {
         const active = m?.active === true
         const closed = m?.closed === true
@@ -1380,25 +1381,14 @@ export function registerCommands(bot: Telegraf) {
         const futureEnd = Number.isFinite(endTime) && endTime > now
         const liq = parseFloat(m?.liquidity || '0')
         const hasLiq = !Number.isNaN(liq) && liq >= minLiquidity
-        return active && !closed && !resolved && !archived && futureEnd && hasLiq
+        const vol = parseFloat(m?.volume || '0')
+        const hasVol = !Number.isNaN(vol) && vol >= minVolume
+        return active && !closed && !resolved && !archived && futureEnd && hasLiq && hasVol
       })
-      logger.info(`markets: filtered ACTIVE+futureEnd+liq>=${minLiquidity} before=${before} after=${filtered.length}`)
+      logger.info(`markets: filtered ACTIVE+futureEnd+liq>=${minLiquidity}+vol>=${minVolume} before=${before} after=${filtered.length}`)
       if (filtered.length < 3 && before > 0) {
-        // relax liquidity threshold further
-        const relaxedMin = 100
-        filtered = (markets || []).filter((m: any) => {
-          const active = m?.active === true
-          const closed = m?.closed === true
-          const resolved = m?.resolved === true
-          const archived = m?.archived === true
-          const endIso = m?.end_date_iso || m?.endDateIso || m?.endDate || m?.end_date
-          const endTime = endIso ? Date.parse(endIso) : NaN
-          const futureEnd = Number.isFinite(endTime) && endTime > now
-          const liq = parseFloat(m?.liquidity || '0')
-          const hasLiq = !Number.isNaN(liq) && liq >= relaxedMin
-          return active && !closed && !resolved && !archived && futureEnd && hasLiq
-        })
-        logger.info(`markets: relaxed liquidity>=${relaxedMin} result=${filtered.length}`)
+        // Don't relax volume/liquidity - keep minimum standards
+        logger.info(`markets: only ${filtered.length} markets meet criteria, not relaxing standards`)
       }
       markets = filtered
 
@@ -1428,7 +1418,8 @@ export function registerCommands(bot: Telegraf) {
           markets = Array.isArray(alt) ? alt : []
           logger.info(`markets: trending fallback returned count=${markets.length}`)
           if (markets.length) {
-            const minLiquidity2 = parseFloat(process.env.MARKET_MIN_LIQUIDITY || '100')
+            const minLiquidity2 = parseFloat(process.env.MARKET_MIN_LIQUIDITY || '1000')
+            const minVolume2 = parseFloat(process.env.MARKET_MIN_VOLUME || '1000')
             const now2 = Date.now()
             markets = markets.filter((m: any)=>{
               const active = m?.active === true
@@ -1440,7 +1431,9 @@ export function registerCommands(bot: Telegraf) {
               const futureEnd = Number.isFinite(endTime) && endTime > now2
               const liq = parseFloat(m?.liquidity || '0')
               const hasLiq = !Number.isNaN(liq) && liq >= minLiquidity2
-              return active && !closed && !resolved && !archived && futureEnd && hasLiq
+              const vol = parseFloat(m?.volume || '0')
+              const hasVol = !Number.isNaN(vol) && vol >= minVolume2
+              return active && !closed && !resolved && !archived && futureEnd && hasLiq && hasVol
             })
             logger.info(`markets: trending fallback filtered to ${markets.length}`)
           }
