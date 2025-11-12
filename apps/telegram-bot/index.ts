@@ -89,8 +89,21 @@ async function start() {
       try {
         logger.info('Clearing any existing webhooks before polling...');
         await bot.telegram.deleteWebhook({ drop_pending_updates: true });
-        // Small delay to ensure webhook is fully cleared
-        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // RENDER DEPLOYMENT FIX: Add startup delay to allow old instance to die
+        // Render uses zero-downtime deployments (starts new before killing old)
+        // This causes 409 conflicts as both instances try to poll simultaneously
+        const isRender = Boolean(process.env.RENDER || process.env.RENDER_SERVICE_ID);
+        if (isRender) {
+          const startupDelay = 15000; // 15 seconds
+          logger.info(`Detected Render environment. Waiting ${startupDelay}ms for old instance to shutdown...`);
+          logger.warn('⚠️  RECOMMENDATION: Switch to webhook mode to eliminate 409 conflicts during deployments.');
+          logger.warn('⚠️  Set TELEGRAM_WEBHOOK_URL env var to: https://your-service.onrender.com/telegram-webhook');
+          await new Promise(resolve => setTimeout(resolve, startupDelay));
+        } else {
+          // Small delay to ensure webhook is fully cleared
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       } catch (err) {
         logger.warn('Failed to clear webhook (may not exist)', err);
       }
