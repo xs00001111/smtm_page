@@ -57,18 +57,21 @@ function esc(s: string) {
 // - condition id (0x...)
 // - polymarket event URL
 // - slug or free text
-async function resolveMarketFromInput(input: string): Promise<any | null> {
+async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise<any | null> {
   const looksLikeCond = /^0x[a-fA-F0-9]{64}$/
   const looksLikeUrl = /^https?:\/\//i
   try {
+    // 1. Try condition ID (0x...)
     if (looksLikeCond.test(input)) {
       return await gammaApi.getMarket(input)
     }
+
+    // 2. Try URL
     if (looksLikeUrl.test(input)) {
       try {
         const u = new URL(input)
         const parts = u.pathname.split('/').filter(Boolean)
-        // Expect /event/<slug>
+        // Expect /event/<slug> or /event/<slug>/<market>
         const idx = parts.findIndex(p=>p==='event')
         if (idx >= 0 && parts[idx+1]) {
           const slug = decodeURIComponent(parts[idx+1])
@@ -107,8 +110,14 @@ async function resolveMarketFromInput(input: string): Promise<any | null> {
         }
       } catch {}
     }
-    // Fallback to search/slug resolution
-    return await findMarket(input)
+
+    // 3. Fallback to fuzzy search/slug resolution (only if allowed)
+    if (allowFuzzy) {
+      return await findMarket(input)
+    }
+
+    logger.warn('resolveMarketFromInput: input not recognized as URL or ID', { input })
+    return null
   } catch (e) {
     logger.error('resolveMarketFromInput failed', { input, error: (e as any)?.message })
     return null
@@ -1134,7 +1143,7 @@ export function registerCommands(bot: Telegraf) {
   bot.command('overview', async (ctx) => {
     const args = ctx.message.text.split(' ').slice(1)
     if (args.length === 0) {
-      await ctx.reply('Usage: /overview <market_url|id|slug> — shows totals per side, holders, and current pricing.')
+      await ctx.reply('Usage: /overview <market_url|id>\n\nAccepts:\n• Full URL: https://polymarket.com/event/...\n• Condition ID: 0x...\n\nFor search, use /markets <query> instead.')
       return
     }
     const query = args.join(' ')
@@ -1147,11 +1156,12 @@ export function registerCommands(bot: Telegraf) {
 
       const commandPromise = (async () => {
         await ctx.reply('🔍 Loading market overview...')
-        logger.info('overview: resolving market from input', { query })
-        const market = await resolveMarketFromInput(query)
+        logger.info('overview: resolving market from input (strict mode)', { query })
+        // Strict mode: only accept URLs or condition IDs, no fuzzy search
+        const market = await resolveMarketFromInput(query, false)
         if (!market) {
           logger.warn('overview: market not found', { query })
-          await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.')
+          await ctx.reply('❌ Market not found.\n\nPlease provide:\n• Full market URL, or\n• Condition ID (0x...)\n\nFor search, use /markets <query> instead.')
           return
         }
 
