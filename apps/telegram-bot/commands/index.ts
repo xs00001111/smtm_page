@@ -1078,7 +1078,7 @@ export function registerCommands(bot: Telegraf) {
       const market = await resolveMarketFromInput(query)
       if (!market) { await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.'); return }
       const conditionId = market.condition_id || market.conditionId
-      const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 10 })
+      const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
       if (!holdersRes?.length) { await ctx.reply('❌ No holder data available for this market.'); return }
 
       // Build address -> outcome balances
@@ -1143,7 +1143,7 @@ export function registerCommands(bot: Telegraf) {
       const market = await resolveMarketFromInput(query)
       if (!market) { await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.'); return }
       const conditionId = market.condition_id || market.conditionId
-      const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 10 })
+      const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
       if (!holdersRes?.length) { await ctx.reply('❌ No holder data available for this market.'); return }
 
       // Process each outcome
