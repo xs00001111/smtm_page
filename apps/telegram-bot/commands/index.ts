@@ -852,24 +852,30 @@ export function registerCommands(bot: Telegraf) {
             await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
             return
           }
-          // Normalize input and try to resolve username/profile URL to address
-          let addr: string | undefined
-          const looksAddr = /^0x[a-fA-F0-9]{40}$/
-          if (looksAddr.test(q)) {
-            addr = q.toLowerCase()
-          } else {
-            try {
-              const parsed = parsePolymarketProfile(q)
-              if (parsed?.address) {
-                addr = parsed.address.toLowerCase()
-              } else {
-                const uname = (parsed?.username || q).replace(/^@/, '')
-                if (uname && uname.length >= 2) {
-                  addr = await resolveUsernameToAddress(uname)
-                }
+          // Exact match on leaderboard user_name first (no @)
+          try {
+            const leaderboard = await dataApi.getLeaderboard({ limit: 200 })
+            const exact = (leaderboard || []).filter(e => String(e.user_name || '').toLowerCase() === q.trim().toLowerCase())
+            if (exact.length > 0) {
+              let message = `🐋 Search Results (${exact.length})\n\n`
+              const keyboard: { text: string; callback_data: string }[][] = []
+              for (let i=0;i<exact.length;i++) {
+                const whale = exact[i]
+                const name = whale.user_name || 'Anonymous'
+                const short = whale.user_id.slice(0,6)+'...'+whale.user_id.slice(-4)
+                const pnl = whale.pnl > 0 ? `+$${Math.round(whale.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`
+                const vol = `$${Math.round(whale.vol).toLocaleString()}`
+                const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id)
+                message += `${i+1}. ${name} (${short})\n`
+                message += `   ID: ${whale.user_id}\n`
+                message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+                message += `   🔗 ${profileUrl}\n\n`
+                try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
               }
-            } catch {}
-          }
+              await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+              return
+            }
+          } catch {}
 
           // Fuzzy search by name/id (leaderboard)
           const results = await findWhaleFuzzy(q.replace(/^@/, ''), 5)
@@ -892,19 +898,6 @@ export function registerCommands(bot: Telegraf) {
               try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
             }
             message += '💡 Use /whales for global leaderboard or add a market id to scope.'
-            await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
-            return
-          }
-
-          // If fuzzy empty but an address resolved, show a direct result
-          if (addr) {
-            const short = addr.slice(0,6)+'...'+addr.slice(-4)
-            const url = getPolymarketProfileUrl(null, addr)
-            let message = `🐋 Trader Found\n\n`
-            message += `ID: ${addr}\n`
-            message += `🔗 ${url}\n\n`
-            const keyboard: { text: string; callback_data: string }[][] = []
-            try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${short}`, callback_data: `act:${tok}` }]) } catch {}
             await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
             return
           }
