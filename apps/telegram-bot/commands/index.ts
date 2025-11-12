@@ -72,8 +72,38 @@ async function resolveMarketFromInput(input: string): Promise<any | null> {
         const idx = parts.findIndex(p=>p==='event')
         if (idx >= 0 && parts[idx+1]) {
           const slug = decodeURIComponent(parts[idx+1])
+          // Try to find market by slug first
           const m = await findMarket(slug)
           if (m) return m
+
+          // If not found, this might be an event page with multiple markets
+          // Scrape the page to get the first market
+          try {
+            const resp = await fetch(input, {
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0)' }
+            })
+            if (resp.ok) {
+              const html = await resp.text()
+              const match = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/)
+              if (match && match[1]) {
+                const nextData = JSON.parse(match[1])
+                const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
+                for (const query of queries) {
+                  const markets = query?.state?.data
+                  if (Array.isArray(markets) && markets.length > 0 && markets[0]?.slug) {
+                    // Found markets array, use the first one
+                    const firstMarket = markets[0]
+                    logger.info('resolveMarketFromInput: extracted first market from event page', { slug: firstMarket.slug })
+                    // Now fetch the full market data by slug
+                    const fullMarket = await findMarket(firstMarket.slug)
+                    if (fullMarket) return fullMarket
+                  }
+                }
+              }
+            }
+          } catch (scrapeErr) {
+            logger.error('resolveMarketFromInput: scraping event page failed', { error: (scrapeErr as any)?.message })
+          }
         }
       } catch {}
     }
