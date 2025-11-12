@@ -205,12 +205,28 @@ export async function resolveUsernameToAddress(username: string): Promise<string
   }
   // 2) Try fetching profile page and regex the address
   try {
-    const encoded = encodeURIComponent('@' + uname)
-    const url = `https://polymarket.com/profile/${encoded}`
-    const resp = await fetch(url)
-    const html = await resp.text()
-    const m = html.match(/0x[a-fA-F0-9]{40}/)
-    if (m) return m[0]
+    const tryUrls = [
+      `https://polymarket.com/@${encodeURIComponent(uname)}`,
+      `https://polymarket.com/profile/${encodeURIComponent('@' + uname)}`,
+    ]
+    for (const url of tryUrls) {
+      try {
+        const resp = await fetch(url)
+        if (!resp.ok) continue
+        const html = await resp.text()
+        // Prefer explicit /profile/0x... links in the HTML
+        let m = html.match(/\/profile\/(0x[a-fA-F0-9]{40})/)
+        if (m && m[1]) return m[1].toLowerCase()
+        // Try NEXT_DATA JSON: user_id or userId fields
+        m = html.match(/"user[_]?id"\s*:\s*"(0x[a-fA-F0-9]{40})"/i)
+        if (m && m[1]) return m[1].toLowerCase()
+        // As a last resort, pick the first address in page
+        m = html.match(/0x[a-fA-F0-9]{40}/)
+        if (m && m[0]) return m[0].toLowerCase()
+      } catch (e) {
+        logger.error({ e, url }, 'resolveUsernameToAddress: fetch/parse failed for url')
+      }
+    }
   } catch (e) {
     logger.error({ e, username: uname }, 'resolveUsernameToAddress: html scrape failed')
   }
