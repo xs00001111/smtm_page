@@ -250,6 +250,9 @@ export async function resolveUsernameToAddressExact(username: string): Promise<s
         if (m && m[1]) return m[1].toLowerCase()
         m = html.match(/"user[_]?id"\s*:\s*"(0x[a-fA-F0-9]{40})"/i)
         if (m && m[1]) return m[1].toLowerCase()
+        // As a last resort, pick the first address in page
+        m = html.match(/0x[a-fA-F0-9]{40}/)
+        if (m && m[0]) return m[0].toLowerCase()
       } catch {}
     }
   } catch {}
