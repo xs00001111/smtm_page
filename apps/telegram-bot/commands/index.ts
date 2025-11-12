@@ -762,7 +762,7 @@ export function registerCommands(bot: Telegraf) {
                 } catch {}
                 msg += '\n'
               }
-              try { const tokAll = await actionFollowWhaleAllMany(addresses); keyboard.push([{ text: 'Follow All (Top 10)', callback_data: `act:${tokAll}` }]) } catch {}
+              try { const tokAll = await actionFollowWhaleAllMany(addresses); keyboard.push([{ text: 'Follow Top 10', callback_data: `act:${tokAll}` }]) } catch {}
               msg += '💡 Tip: Use /whales 0x<market_id> for market-specific whales.'
               await ctx.reply(msg, { reply_markup: { inline_keyboard: keyboard } as any })
               return
@@ -797,7 +797,7 @@ export function registerCommands(bot: Telegraf) {
           }
           try {
             const tokAll = await actionFollowWhaleAllMany(addresses)
-            keyboard.push([{ text: 'Follow All (Top 10)', callback_data: `act:${tokAll}` }])
+            keyboard.push([{ text: 'Follow Top 10', callback_data: `act:${tokAll}` }])
           } catch {}
           msg += '💡 Tip: For a specific market, run <code>/whales &lt;market_id&gt;</code> to list whales there with a market-specific follow command.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
@@ -828,7 +828,7 @@ export function registerCommands(bot: Telegraf) {
             message += `ID: ${addr}\n`
             message += `🔗 ${url}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
-            try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }]) } catch {}
+            try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${short}`, callback_data: `act:${tok}` }]) } catch {}
             await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
             return
           }
@@ -846,7 +846,7 @@ export function registerCommands(bot: Telegraf) {
               if (addr) {
                 const short = addr.slice(0,6)+'...'+addr.slice(-4)
                 const tok = await actionFollowWhaleAll(addr)
-                keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }])
+                keyboard.push([{ text: `Follow ${short}`, callback_data: `act:${tok}` }])
               }
             } catch {}
             await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
@@ -904,7 +904,7 @@ export function registerCommands(bot: Telegraf) {
             message += `ID: ${addr}\n`
             message += `🔗 ${url}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
-            try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }]) } catch {}
+            try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${short}`, callback_data: `act:${tok}` }]) } catch {}
             await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
             return
           }
@@ -948,10 +948,8 @@ export function registerCommands(bot: Telegraf) {
         msg += `   ${'<code>'+esc(`/follow ${addr}`)+'</code>'}\n`
         msg += `   ${'<code>'+esc(`/follow ${addr} ${market.condition_id}`)+'</code>'}\n`
         try {
-          const tokAll = await actionFollowWhaleAll(addr)
           const tokHere = await actionFollowWhaleMarket(addr, market.condition_id, market.question)
           keyboard.push([
-            { text: `Follow ${short} (All)`, callback_data: `act:${tokAll}` },
             { text: `Here`, callback_data: `act:${tokHere}` },
           ])
         } catch {}
@@ -1128,15 +1126,9 @@ export function registerCommands(bot: Telegraf) {
             keyboard.push([{ text: `Unfollow ${i}`, callback_data: `act:${tok}` }])
           } catch {}
         } else if (r.type === 'whale_all') {
-          const w = r.address_filter ? r.address_filter : 'wallet'
-          const short = w.length > 10 ? w.slice(0,6)+'...'+w.slice(-4) : w
-          msg += `${i}. 🐋 ${short} — ALL markets\n   ➖ Unfollow: /unfollow ${w}\n\n`
-          try {
-            if (r.address_filter) {
-              const tok = await actionUnfollowWhaleAll(r.address_filter)
-              keyboard.push([{ text: `Unfollow ${i}`, callback_data: `act:${tok}` }])
-            }
-          } catch {}
+          // Hide default all-markets follows from the list to reduce noise
+          i -= 1
+          continue
         } else {
           const w = r.address_filter ? r.address_filter : 'wallet'
           const short = w.length > 10 ? w.slice(0,6)+'...'+w.slice(-4) : w
