@@ -146,7 +146,7 @@ export class DataApiClient {
       } catch (err2) {
         console.error('getLeaderboard fallback fetch error:', (err2 as any)?.message || err2);
       }
-      // Attempt 3: scrape public leaderboard HTML as last resort
+      // Attempt 3: scrape public leaderboard HTML and parse __NEXT_DATA__ as last resort
       try {
         const url2 = 'https://polymarket.com/leaderboard';
         const res2 = await fetch(url2, {
@@ -158,6 +158,32 @@ export class DataApiClient {
         } as any);
         if (res2.ok) {
           const html = await res2.text();
+          // Try to parse __NEXT_DATA__ JSON which contains full leaderboard data
+          const match = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/);
+          if (match && match[1]) {
+            try {
+              const nextData = JSON.parse(match[1]);
+              const queries = nextData?.props?.pageProps?.dehydratedState?.queries || [];
+              for (const query of queries) {
+                const data = query?.state?.data;
+                if (Array.isArray(data) && data.length > 0 && data[0]?.proxyWallet) {
+                  // Found leaderboard data in __NEXT_DATA__
+                  const items: LeaderboardEntry[] = data.slice(0, limit).map((entry: any) => ({
+                    rank: String(entry.rank || 0),
+                    user_id: (entry.proxyWallet || '').toLowerCase(),
+                    user_name: entry.name || entry.pseudonym || '',
+                    vol: entry.volume || entry.amount || 0,
+                    pnl: entry.pnl || 0,
+                    profile_image: entry.profileImage || '',
+                  }));
+                  if (items.length) return items;
+                }
+              }
+            } catch (parseErr) {
+              console.error('getLeaderboard: __NEXT_DATA__ parse failed', (parseErr as any)?.message || parseErr);
+            }
+          }
+          // Fallback: extract addresses only if __NEXT_DATA__ parsing failed
           const addrs = Array.from(new Set((html.match(/0x[a-fA-F0-9]{40}/g) || [])));
           const items: LeaderboardEntry[] = addrs.slice(0, 10).map((a, i) => ({
             rank: String(i + 1),
