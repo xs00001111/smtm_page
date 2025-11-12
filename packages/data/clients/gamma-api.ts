@@ -82,13 +82,16 @@ export class GammaApiClient {
    * Search markets by query string
    * @param query - Search query
    * @param limit - Max results to return
-   * @returns Array of matching markets
+   * @returns Array of matching markets (active only by default)
    */
   async searchMarkets(query: string, limit = 20): Promise<GammaMarket[]> {
     const { data } = await this.client.get<GammaMarket[]>('/markets', {
       params: {
         search: query,
         limit,
+        active: true,
+        closed: false,
+        archived: false,
       },
     });
     return data;
