@@ -852,6 +852,32 @@ export function registerCommands(bot: Telegraf) {
             await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
             return
           }
+          // Exact match on leaderboard user_name first (case-insensitive)
+          try {
+            const leaderboard = await dataApi.getLeaderboard({ limit: 1000 })
+            const exact = (leaderboard || []).filter(e => String(e.user_name || '').toLowerCase() === q.trim().toLowerCase())
+            if (exact.length > 0) {
+              let message = `🐋 Search Results (${exact.length})\n\n`
+              const keyboard: { text: string; callback_data: string }[][] = []
+              for (let i=0;i<exact.length;i++) {
+                const whale = exact[i]
+                const name = whale.user_name || 'Anonymous'
+                const short = whale.user_id.slice(0,6)+'...'+whale.user_id.slice(-4)
+                const pnl = whale.pnl > 0 ? `+$${Math.round(whale.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`
+                const vol = `$${Math.round(whale.vol).toLocaleString()}`
+                const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id)
+                message += `${i+1}. ${name} (${short})\n`
+                message += `   ID: ${whale.user_id}\n`
+                message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+                message += `   Rank: #${whale.rank}\n`
+                message += `   🔗 ${profileUrl}\n\n`
+                try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
+              }
+              await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+              return
+            }
+          } catch {}
+
           // Exact profile handle across all users (via profile pages)
           try {
             const uname = q.trim()
