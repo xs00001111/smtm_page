@@ -232,3 +232,26 @@ export async function resolveUsernameToAddress(username: string): Promise<string
   }
   return undefined
 }
+
+// Exact-only resolver: do not use leaderboard fuzzy; rely on profile pages
+export async function resolveUsernameToAddressExact(username: string): Promise<string | undefined> {
+  const uname = username.replace(/^@/, '')
+  try {
+    const tryUrls = [
+      `https://polymarket.com/@${encodeURIComponent(uname)}`,
+      `https://polymarket.com/profile/${encodeURIComponent('@' + uname)}`,
+    ]
+    for (const url of tryUrls) {
+      try {
+        const resp = await fetch(url)
+        if (!resp.ok) continue
+        const html = await resp.text()
+        let m = html.match(/\/profile\/(0x[a-fA-F0-9]{40})/)
+        if (m && m[1]) return m[1].toLowerCase()
+        m = html.match(/"user[_]?id"\s*:\s*"(0x[a-fA-F0-9]{40})"/i)
+        if (m && m[1]) return m[1].toLowerCase()
+      } catch {}
+    }
+  } catch {}
+  return undefined
+}

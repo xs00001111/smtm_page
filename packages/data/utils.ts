@@ -349,3 +349,37 @@ export async function findWhaleFuzzy(query: string, limit = 5): Promise<any[]> {
     return [];
   }
 }
+
+/**
+ * Fuzzy search whales across a wider leaderboard pool (up to `pool` entries).
+ * Paginates the Data API leaderboard and applies Fuse on the combined set.
+ */
+export async function findWhaleFuzzyWide(query: string, limit = 5, pool = 1000): Promise<any[]> {
+  try {
+    const pageSize = 100
+    const pages = Math.ceil(Math.max(0, Math.min(pool, 1000)) / pageSize)
+    const all: any[] = []
+    for (let i = 0; i < pages; i++) {
+      const offset = i * pageSize
+      const page = await dataApi.getLeaderboard({ limit: pageSize, offset })
+      if (!page || page.length === 0) break
+      all.push(...page)
+      if (page.length < pageSize) break
+    }
+    if (all.length === 0) return []
+    const fuse = new Fuse(all, {
+      keys: [
+        { name: 'user_name', weight: 0.8 },
+        { name: 'user_id', weight: 0.2 }
+      ],
+      threshold: 0.3,
+      includeScore: true,
+      ignoreLocation: true,
+      minMatchCharLength: 2
+    })
+    return fuse.search(query, { limit }).map(r => r.item)
+  } catch (e) {
+    console.error('Whale fuzzy wide search failed:', e)
+    return []
+  }
+}
