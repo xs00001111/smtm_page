@@ -1142,52 +1142,102 @@ export function registerCommands(bot: Telegraf) {
       const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 10 })
       if (!holdersRes?.length) { await ctx.reply('❌ No holder data available for this market.'); return }
 
-      // Build outcome totals and holders
-      type Side = { outcome: string; tokenId: string; holders: number; totalBalance: number; price: number|null; bid?: number|null; ask?: number|null; spread?: number|null; depthBid?: number; depthAsk?: number }
-      const sides: Side[] = []
-      for (const token of market.tokens || []) {
-        const set = holdersRes.find(h=>h.token===token.token_id)
-        const holdersCount = set ? set.holders.length : 0
-        const totalBalance = set ? set.holders.reduce((s,h)=>s + (parseFloat(h.balance||'0')||0), 0) : 0
-        let price: number|null = null
-        let bid: number|null = null
-        let ask: number|null = null
-        let spread: number|null = null
-        let depthBid = 0
-        let depthAsk = 0
-        try {
-          const book = await clobApi.getOrderbook(token.token_id)
-          bid = book.bids?.length ? parseFloat(book.bids[0].price) : null
-          ask = book.asks?.length ? parseFloat(book.asks[0].price) : null
-          spread = bid!=null && ask!=null ? ask - bid : null
-          // Sum top-5 depth (shares)
-          depthBid = (book.bids || []).slice(0,5).reduce((s,l)=>s + (parseFloat(l.size||'0')||0), 0)
-          depthAsk = (book.asks || []).slice(0,5).reduce((s,l)=>s + (parseFloat(l.size||'0')||0), 0)
-          if (bid!=null && ask!=null) price = (bid+ask)/2
-        } catch {}
-        if (price==null) {
-          const p = parseFloat(token.price || 'NaN'); if (!isNaN(p)) price = p
-        }
-        sides.push({ outcome: token.outcome || token.token_id, tokenId: token.token_id, holders: holdersCount, totalBalance, price, bid, ask, spread, depthBid, depthAsk })
-      }
-
+      // Process each outcome
       const url = getPolymarketMarketUrl(market)
-      let msg = `📘 Market Overview — ${market.question}\n`
-      if (url) msg += `🔗 ${url}\n`
-      msg += `Based on top holders sample; totals are approximate.\n\n`
 
-      for (const s of sides) {
-        const val = (s.price!=null) ? Math.round(s.totalBalance * s.price) : null
-        const spreadPct = (s.spread!=null && s.price!=null) ? `${((s.spread/s.price)*100).toFixed(2)}%` : '—'
-        const bidStr = s.bid!=null ? `${(s.bid*100).toFixed(1)}%` : '—'
-        const askStr = s.ask!=null ? `${(s.ask*100).toFixed(1)}%` : '—'
-        msg += `• ${s.outcome}: holders ${s.holders}, shares ~${Math.round(s.totalBalance)}${s.price!=null?`, mid ${(s.price*100).toFixed(1)}%`:''}${val!=null?`, value ~$${val.toLocaleString()}`:''}\n`
-        msg += `   OB: bid ${bidStr} (${Math.round(s.depthBid||0)} sh) | ask ${askStr} (${Math.round(s.depthAsk||0)} sh) | spread ${s.spread!=null?(s.spread*100).toFixed(1)+'%':'—'} (${spreadPct})\n`
+      for (const token of market.tokens || []) {
+        const outcome = token.outcome || token.token_id
+        const set = holdersRes.find(h=>h.token===token.token_id)
+
+        // Get orderbook
+        let book: any = null
+        let midpoint: number|null = null
+        let spread: number|null = null
+        try {
+          book = await clobApi.getOrderbook(token.token_id)
+          const bestBid = book.bids?.length ? parseFloat(book.bids[0].price) : null
+          const bestAsk = book.asks?.length ? parseFloat(book.asks[0].price) : null
+          if (bestBid!=null && bestAsk!=null) {
+            midpoint = (bestBid + bestAsk) / 2
+            spread = bestAsk - bestBid
+          }
+        } catch {}
+
+        // Build orderbook overview message
+        let msg = `📊 Orderbook Overview\n\n${market.question} (${outcome})\n\n`
+        if (spread!=null && midpoint!=null) {
+          msg += `Spread: ${(spread*100).toFixed(1)}¢, Midpoint: ${(midpoint*100).toFixed(1)}¢\n\n`
+        }
+
+        if (book && (book.bids?.length || book.asks?.length)) {
+          msg += `<code>Price    Size     Total</code>\n`
+          msg += `<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>\n`
+
+          // Show top 4 asks (reversed order)
+          const asks = (book.asks || []).slice(0, 4).reverse()
+          for (const ask of asks) {
+            const price = (parseFloat(ask.price)*100).toFixed(1)
+            const size = Math.round(parseFloat(ask.size))
+            const total = Math.round(parseFloat(ask.price) * parseFloat(ask.size))
+            msg += `<code>${price.padStart(4)}¢  ${String(size).padStart(6)}   $${total}</code>\n`
+          }
+
+          msg += `<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>\n`
+
+          // Show top 4 bids
+          const bids = (book.bids || []).slice(0, 4)
+          for (const bid of bids) {
+            const price = (parseFloat(bid.price)*100).toFixed(1)
+            const size = Math.round(parseFloat(bid.size))
+            const total = Math.round(parseFloat(bid.price) * parseFloat(bid.size))
+            msg += `<code>${price.padStart(4)}¢  ${String(size).padStart(6)}   $${total}</code>\n`
+          }
+        } else {
+          msg += `No orderbook data available.\n`
+        }
+
+        await ctx.reply(msg, { parse_mode: 'HTML' })
+
+        // Build net position overview
+        if (set && set.holders.length > 0) {
+          // Build address -> share mapping
+          const positions = set.holders.map(h => ({
+            address: h.address,
+            shares: Math.round(parseFloat(h.balance || '0'))
+          })).filter(p => p.shares > 0).sort((a,b) => b.shares - a.shares).slice(0, 10)
+
+          let posMsg = `📊 Net Position Overview\n\n${market.question}\n\n🟢 ${outcome}\n\n`
+          positions.forEach((p, i) => {
+            const short = p.address.slice(0, 6) + '...' + p.address.slice(-4)
+            posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
+          })
+
+          // Check for opposite side positions
+          const oppositeToken = (market.tokens || []).find(t => t.token_id !== token.token_id)
+          if (oppositeToken) {
+            const oppositeSet = holdersRes.find(h=>h.token===oppositeToken.token_id)
+            if (oppositeSet && oppositeSet.holders.length > 0) {
+              const oppositePositions = oppositeSet.holders.map(h => ({
+                address: h.address,
+                shares: Math.round(parseFloat(h.balance || '0'))
+              })).filter(p => p.shares > 0).sort((a,b) => b.shares - a.shares).slice(0, 5)
+
+              const oppositeOutcome = oppositeToken.outcome || oppositeToken.token_id
+              if (oppositePositions.length > 0) {
+                posMsg += `\n🔴 ${oppositeOutcome}\n\n`
+                oppositePositions.forEach((p, i) => {
+                  const short = p.address.slice(0, 6) + '...' + p.address.slice(-4)
+                  posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
+                })
+              } else {
+                posMsg += `\n🔴 ${oppositeOutcome}\n\nEmpty\n`
+              }
+            }
+          }
+
+          await ctx.reply(posMsg)
+        }
       }
-
-      msg += '\nAverage entry & realized PnL for all users are not public. Summary uses order book data and top-holder aggregates.'
-
-      await ctx.reply(msg)
     } catch (e) {
       logger.error('overview command failed', e)
       await ctx.reply('❌ Failed to load overview. Try again later.')
