@@ -1480,10 +1480,31 @@ export function registerCommands(bot: Telegraf) {
         } catch {}
         const price = isNaN(priceNum) ? 'N/A' : (priceNum * 100).toFixed(1)
 
+        // Format volume with smart scaling
         const volNum = typeof market.volume === 'number' ? market.volume : parseFloat(market.volume || '0')
-        const volM = isNaN(volNum) ? '—' : (volNum / 1_000_000).toFixed(1)
+        let volDisplay = '—'
+        if (!isNaN(volNum)) {
+          if (volNum >= 1_000_000) {
+            volDisplay = `$${(volNum / 1_000_000).toFixed(1)}M`
+          } else if (volNum >= 1_000) {
+            volDisplay = `$${(volNum / 1_000).toFixed(1)}K`
+          } else {
+            volDisplay = `$${Math.round(volNum)}`
+          }
+        }
+
+        // Format liquidity with smart scaling
         const liqNum = typeof market.liquidity === 'number' ? market.liquidity : parseFloat(market.liquidity || '0')
-        const liqM = isNaN(liqNum) ? '—' : (liqNum / 1_000_000).toFixed(2)
+        let liqDisplay = '—'
+        if (!isNaN(liqNum)) {
+          if (liqNum >= 1_000_000) {
+            liqDisplay = `$${(liqNum / 1_000_000).toFixed(2)}M`
+          } else if (liqNum >= 1_000) {
+            liqDisplay = `$${(liqNum / 1_000).toFixed(1)}K`
+          } else {
+            liqDisplay = `$${Math.round(liqNum)}`
+          }
+        }
 
         // Get condition id (API uses camelCase conditionId)
         let cond: string | null = market?.conditionId || market?.condition_id || null
@@ -1498,8 +1519,8 @@ export function registerCommands(bot: Telegraf) {
         const url = getPolymarketMarketUrl(market)
         message += `${idx}. ${title}\n`
         message += `   📊 Price: ${price}%\n`
-        message += `   💰 Volume: $${volM}M\n`
-        message += `   🧊 Liquidity: $${liqM}M\n`
+        message += `   💰 Volume: ${volDisplay}\n`
+        message += `   🧊 Liquidity: ${liqDisplay}\n`
         if (url) { message += `   🔗 ${url}\n` }
         if (cond) {
           message += `   ➕ Follow: /follow ${cond}\n\n`
