@@ -1156,6 +1156,12 @@ export function registerCommands(bot: Telegraf) {
         }
 
         const conditionId = market.condition_id || market.conditionId
+        logger.info('overview: market resolved', {
+          conditionId,
+          question: market.question?.slice(0, 50),
+          hasTokens: !!market.tokens,
+          tokenCount: market.tokens?.length || 0
+        })
         logger.info('overview: fetching holders', { conditionId })
 
         const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
@@ -1169,6 +1175,16 @@ export function registerCommands(bot: Telegraf) {
         // Process each outcome (limit to first 2 to avoid timeouts)
         const url = getPolymarketMarketUrl(market)
         const tokensToProcess = (market.tokens || []).slice(0, 2)
+        logger.info('overview: tokens to process', {
+          hasTokens: !!market.tokens,
+          tokenCount: market.tokens?.length || 0,
+          tokensToProcessCount: tokensToProcess.length
+        })
+
+        if (tokensToProcess.length === 0) {
+          await ctx.reply('❌ This market has no tradeable outcomes. Try a different market.')
+          return
+        }
 
         for (const token of tokensToProcess) {
           const outcome = token.outcome || token.token_id
