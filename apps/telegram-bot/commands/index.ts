@@ -805,6 +805,41 @@ export function registerCommands(bot: Telegraf) {
       if (!market) {
         await ctx.reply('🔍 Searching top traders...')
         try {
+          // Explicit handling: @username and exact address
+          const raw = q.trim()
+          const looksAddrDirect = /^0x[a-fA-F0-9]{40}$/
+          if (looksAddrDirect.test(raw)) {
+            const addr = raw.toLowerCase()
+            const short = addr.slice(0,6)+'...'+addr.slice(-4)
+            const url = getPolymarketProfileUrl(null, addr)
+            let message = `🐋 Trader Found\n\n`
+            message += `ID: ${addr}\n`
+            message += `🔗 ${url}\n\n`
+            const keyboard: { text: string; callback_data: string }[][] = []
+            try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }]) } catch {}
+            await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+            return
+          }
+          const parsedForAt = parsePolymarketProfile(raw)
+          const hasAtInput = raw.startsWith('@') || Boolean(parsedForAt?.username)
+          if (hasAtInput) {
+            const uname = (parsedForAt?.username || raw).replace(/^@/, '')
+            const profileUrl = `https://polymarket.com/@${encodeURIComponent(uname)}`
+            let message = `🐋 Profile\n\n`
+            message += `Handle: @${uname}\n`
+            message += `🔗 ${profileUrl}\n\n`
+            const keyboard: { text: string; callback_data: string }[][] = []
+            try {
+              const addr = await resolveUsernameToAddress(uname)
+              if (addr) {
+                const short = addr.slice(0,6)+'...'+addr.slice(-4)
+                const tok = await actionFollowWhaleAll(addr)
+                keyboard.push([{ text: `Follow ${short} (All)`, callback_data: `act:${tok}` }])
+              }
+            } catch {}
+            await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
+            return
+          }
           // Normalize input and try to resolve username/profile URL to address
           let addr: string | undefined
           const looksAddr = /^0x[a-fA-F0-9]{40}$/
