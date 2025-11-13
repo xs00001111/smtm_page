@@ -60,6 +60,16 @@ function esc(s: string) {
 async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise<any | null> {
   const looksLikeCond = /^0x[a-fA-F0-9]{64}$/
   const looksLikeUrl = /^https?:\/\//i
+
+  logger.info('resolveMarketFromInput: checking input', {
+    input,
+    inputLength: input.length,
+    firstChars: input.slice(0, 20),
+    isCondId: looksLikeCond.test(input),
+    isUrl: looksLikeUrl.test(input),
+    trimmedIsUrl: looksLikeUrl.test(input.trim())
+  })
+
   try {
     // 1. Try condition ID (0x...)
     if (looksLikeCond.test(input)) {
