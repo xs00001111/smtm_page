@@ -206,6 +206,46 @@ export function registerCommands(bot: Telegraf) {
       //   } catch {}
       //   return
       // }
+
+      // Handle "Show More" for whales leaderboard
+      if (data === 'whales:showmore') {
+        await ctx.answerCbQuery('Loading more traders...')
+        try {
+          const leaderboard = await dataApi.getLeaderboard({ limit: 10 })
+          if (!leaderboard || leaderboard.length === 0) {
+            await ctx.reply('❌ Unable to load more traders. Try again later.')
+            return
+          }
+
+          let msg = '🐋 Top Traders (by PnL)\n\n'
+          const keyboard: { text: string; callback_data: string }[][] = []
+
+          let i = 0
+          for (const entry of leaderboard) {
+            i += 1
+            const short = entry.user_id.slice(0,6)+'...'+entry.user_id.slice(-4)
+            const name = entry.user_name || 'Anonymous'
+            const pnl = entry.pnl > 0 ? `+$${Math.round(entry.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(entry.pnl)).toLocaleString()}`
+            const vol = `$${Math.round(entry.vol).toLocaleString()}`
+            const profileUrl = getPolymarketProfileUrl(entry.user_name, entry.user_id)
+            msg += `${i}. ${name} (${short})\n`
+            msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+            msg += `   🔗 ${profileUrl}\n\n`
+            try {
+              const tok = await actionFollowWhaleAll(entry.user_id)
+              keyboard.push([{ text: `Follow ${i}`, callback_data: `act:${tok}` }])
+            } catch {}
+          }
+
+          msg += '💡 Tap Follow to get alerts for any of these traders.'
+          await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
+        } catch (e: any) {
+          logger.error('whales:showmore: failed to load full leaderboard', { error: e?.message })
+          await ctx.reply('❌ Unable to load more traders. Try again later.')
+        }
+        return
+      }
+
       if (!data.startsWith('act:')) return
       const id = data.slice(4)
       const rec = await resolveAction(id)
@@ -863,8 +903,14 @@ export function registerCommands(bot: Telegraf) {
           let msg = '🐋 Top Traders (by PnL)\n\n'
           const keyboard: { text: string; callback_data: string }[][] = []
           const addresses: string[] = []
+
+          // Show only first 2 whales initially for cleaner UI
+          const initialDisplay = 2
+          const displayCount = Math.min(initialDisplay, leaderboard.length)
+          const remaining = leaderboard.length - displayCount
+
           let i = 0
-          for (const entry of leaderboard) {
+          for (const entry of leaderboard.slice(0, displayCount)) {
             i += 1
             const short = entry.user_id.slice(0,6)+'...'+entry.user_id.slice(-4)
             const name = entry.user_name || 'Anonymous'
@@ -872,21 +918,21 @@ export function registerCommands(bot: Telegraf) {
             const vol = `$${Math.round(entry.vol).toLocaleString()}`
             const profileUrl = getPolymarketProfileUrl(entry.user_name, entry.user_id)
             msg += `${i}. ${name} (${short})\n`
-            msg += `   ID: ${entry.user_id}\n`
             msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
-            msg += `   🔗 ${profileUrl}\n`
-            msg += `   ${'<code>'+esc(`/follow ${entry.user_id}`)+'</code>'}\n\n`
+            msg += `   🔗 ${profileUrl}\n\n`
             addresses.push(entry.user_id)
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
               keyboard.push([{ text: `Follow ${i}`, callback_data: `act:${tok}` }])
             } catch {}
           }
-          try {
-            const tokAll = await actionFollowWhaleAllMany(addresses)
-            keyboard.push([{ text: 'Follow Top 10', callback_data: `act:${tokAll}` }])
-          } catch {}
-          msg += '💡 Tip: For a specific market, run <code>/whales &lt;market_id&gt;</code> to list whales there with a market-specific follow command.'
+
+          // Add "Show More" button if there are more whales
+          if (remaining > 0) {
+            keyboard.push([{ text: `📋 Show More (${remaining} remaining)`, callback_data: 'whales:showmore' }])
+          }
+
+          msg += '💡 Tap Follow to get alerts, or "Show More" to see more traders.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
           return
         } catch (e: any) {
