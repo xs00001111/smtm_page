@@ -71,10 +71,15 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
       try {
         const u = new URL(input)
         const parts = u.pathname.split('/').filter(Boolean)
-        // Expect /event/<slug> or /event/<slug>/<market>
+        // Expect /event/<event-slug> or /event/<event-slug>/<market-slug>
         const idx = parts.findIndex(p=>p==='event')
         if (idx >= 0 && parts[idx+1]) {
-          const slug = decodeURIComponent(parts[idx+1])
+          // If there's a market slug (parts[idx+2]), use that first
+          // Example: /event/maduro-out-in-2025/maduro-out-in-2025-411
+          //          parts[0]=event, parts[1]=event-slug, parts[2]=market-slug
+          let slug = parts[idx+2] ? decodeURIComponent(parts[idx+2]) : decodeURIComponent(parts[idx+1])
+          logger.info('resolveMarketFromInput: extracted slug from URL', { slug, hasMarketSlug: !!parts[idx+2] })
+
           // Try to find market by slug first
           const m = await findMarket(slug)
           if (m) return m
