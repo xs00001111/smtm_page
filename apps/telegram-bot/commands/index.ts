@@ -1248,7 +1248,22 @@ export function registerCommands(bot: Telegraf) {
         })
 
         if (tokensToProcess.length === 0) {
-          await ctx.reply('❌ This market has no tradeable outcomes. Try a different market.')
+          logger.error('overview: no tokens available after all attempts', {
+            conditionId,
+            marketKeys: Object.keys(market),
+            marketType: typeof market,
+            tokensValue: market.tokens,
+            url: query
+          })
+          await ctx.reply(
+            `❌ This market has no tradeable outcomes.\n\n` +
+            `Market ID: ${conditionId}\n\n` +
+            `This could mean:\n` +
+            `• Market is not yet active\n` +
+            `• Market has been closed\n` +
+            `• Data is temporarily unavailable\n\n` +
+            `Try a different market or check: ${url || 'https://polymarket.com'}`
+          )
           return
         }
 
