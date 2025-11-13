@@ -58,28 +58,36 @@ function esc(s: string) {
 // - polymarket event URL
 // - slug or free text
 async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise<any | null> {
+  // Defensive: trim input immediately
+  const trimmedInput = input.trim()
+
   const looksLikeCond = /^0x[a-fA-F0-9]{64}$/
   const looksLikeUrl = /^https?:\/\//i
 
-  logger.info('resolveMarketFromInput: checking input', {
-    input,
-    inputLength: input.length,
-    firstChars: input.slice(0, 20),
-    isCondId: looksLikeCond.test(input),
-    isUrl: looksLikeUrl.test(input),
-    trimmedIsUrl: looksLikeUrl.test(input.trim())
+  const isCondId = looksLikeCond.test(trimmedInput)
+  const isUrl = looksLikeUrl.test(trimmedInput)
+
+  logger.info('resolveMarketFromInput: input analysis', {
+    originalLength: input.length,
+    trimmedLength: trimmedInput.length,
+    firstChars: trimmedInput.slice(0, 30),
+    isCondId,
+    isUrl,
+    allowFuzzy
   })
 
   try {
     // 1. Try condition ID (0x...)
-    if (looksLikeCond.test(input)) {
-      return await gammaApi.getMarket(input)
+    if (isCondId) {
+      logger.info('resolveMarketFromInput: detected condition ID')
+      return await gammaApi.getMarket(trimmedInput)
     }
 
     // 2. Try URL
-    if (looksLikeUrl.test(input)) {
+    if (isUrl) {
+      logger.info('resolveMarketFromInput: detected URL, parsing...')
       try {
-        const u = new URL(input)
+        const u = new URL(trimmedInput)
         const parts = u.pathname.split('/').filter(Boolean)
         // Expect /event/<event-slug> or /event/<event-slug>/<market-slug>
         const idx = parts.findIndex(p=>p==='event')
@@ -97,7 +105,7 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
           // If not found, this might be an event page with multiple markets
           // Scrape the page to get the first market
           try {
-            const resp = await fetch(input, {
+            const resp = await fetch(trimmedInput, {
               headers: { 'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0)' }
             })
             if (resp.ok) {
@@ -128,13 +136,22 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
 
     // 3. Fallback to fuzzy search/slug resolution (only if allowed)
     if (allowFuzzy) {
-      return await findMarket(input)
+      logger.info('resolveMarketFromInput: trying fuzzy search fallback', { input: trimmedInput })
+      return await findMarket(trimmedInput)
     }
 
-    logger.warn('resolveMarketFromInput: input not recognized as URL or ID', { input })
+    logger.warn('resolveMarketFromInput: input not recognized as URL or ID', {
+      input: trimmedInput,
+      originalInput: input
+    })
     return null
   } catch (e) {
-    logger.error('resolveMarketFromInput failed', { input, error: (e as any)?.message })
+    logger.error('resolveMarketFromInput failed', {
+      input: trimmedInput,
+      originalInput: input,
+      error: (e as any)?.message,
+      stack: (e as any)?.stack
+    })
     return null
   }
 }
@@ -1156,12 +1173,16 @@ export function registerCommands(bot: Telegraf) {
 
   // Overview: positions by side with pricing + orderbook summary (public data)
   bot.command('overview', async (ctx) => {
-    const args = ctx.message.text.split(' ').slice(1)
+    // Handle multi-line input: split by whitespace (including newlines), filter empty, rejoin
+    const rawText = ctx.message.text
+    const parts = rawText.split(/\s+/).filter(Boolean) // Split by any whitespace
+    const args = parts.slice(1) // Remove command
+
     if (args.length === 0) {
       await ctx.reply('Usage: /overview <market_url|id>\n\nAccepts:\n• Full URL: https://polymarket.com/event/...\n• Condition ID: 0x...\n\nFor search, use /markets <query> instead.')
       return
     }
-    const query = args.join(' ')
+    const query = args.join(' ').trim() // Join and trim for safety
 
     try {
       // Wrap entire command in timeout (20 seconds - shorter for faster feedback)
