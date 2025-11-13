@@ -626,61 +626,73 @@ export function registerCommands(bot: Telegraf) {
 
   // Price command
   bot.command('price', async (ctx) => {
-    const args = ctx.message.text.split(' ').slice(1);
+    // Handle multi-line input: split by whitespace (including newlines), filter empty, rejoin
+    const rawText = ctx.message.text
+    const parts = rawText.split(/\s+/).filter(Boolean) // Split by any whitespace
+    const args = parts.slice(1) // Remove command
+
     if (args.length === 0) {
       await ctx.reply(
         'Usage:\n' +
-        '• /price <market_slug> — e.g., /price trump-2024\n' +
-        '• /price 0x<market_id> — direct market lookup\n' +
-        '• /price <search_term> — search by keywords\n\n' +
-        'Tip: Use /markets to find market slugs'
+        '• /price <market_url> — Full Polymarket URL\n' +
+        '• /price 0x<market_id> — Condition ID\n' +
+        '• /price <market_slug> — e.g., trump-2024\n' +
+        '• /price <search_term> — Search by keywords\n\n' +
+        'Tip: Use /markets to find markets'
       );
       return;
     }
 
-    const query = args.join(' ');
+    const query = args.join(' ').trim(); // Join and trim for safety
     const userId = ctx.from?.id;
     logger.info('Price command', { userId, query });
 
     try {
       await ctx.reply('🔍 Loading market...');
 
-      // Check if it's a condition ID
-      const looksLikeCond = /^0x[a-fA-F0-9]{64}$/.test(query);
-      let market: any = null;
-
-      if (looksLikeCond) {
-        // Direct lookup by condition ID
-        try {
-          market = await gammaApi.getMarket(query);
-          logger.info('price: resolved by condition id', { conditionId: query });
-        } catch (e: any) {
-          logger.error('price: getMarket failed', { conditionId: query, error: e?.message });
-        }
-      } else {
-        // Try as slug or search
-        try {
-          market = await findMarket(query);
-          logger.info('price: resolved by search/slug', { query, conditionId: market?.condition_id });
-        } catch (e: any) {
-          logger.error('price: findMarket failed', { query, error: e?.message });
-        }
-      }
+      // Use resolveMarketFromInput to handle URLs, IDs, slugs, and search
+      const market = await resolveMarketFromInput(query, true); // Allow fuzzy search
 
       if (!market) {
         await ctx.reply(
           `❌ No match for "${query}"\n\n` +
           'Try instead:\n' +
           '• /markets to browse trending\n' +
+          '• Full market URL from Polymarket\n' +
           '• Different keywords (e.g., "election")\n' +
           '• Full market ID (0x...)'
         );
         return;
       }
 
+      const conditionId = market.condition_id || market.conditionId;
+
+      logger.info('price: market resolved', {
+        conditionId,
+        hasTokens: !!market.tokens,
+        tokenCount: market.tokens?.length || 0
+      });
+
+      // If tokens are missing, try re-fetching by condition ID
+      if (!market.tokens || market.tokens.length === 0) {
+        logger.warn('price: market has no tokens, re-fetching by condition ID', { conditionId })
+        try {
+          const refetchedMarket = await gammaApi.getMarket(conditionId)
+          if (refetchedMarket && refetchedMarket.tokens && refetchedMarket.tokens.length > 0) {
+            logger.info('price: refetched market has tokens', {
+              tokenCount: refetchedMarket.tokens.length
+            })
+            Object.assign(market, refetchedMarket) // Merge in the tokens
+          } else {
+            logger.warn('price: refetched market also has no tokens')
+          }
+        } catch (refetchErr) {
+          logger.error('price: failed to refetch market', { error: refetchErr })
+        }
+      }
+
       // Extract price data
       const question = market.question || 'Unknown market';
-      const conditionId = market.condition_id || market.conditionId;
 
       // Parse outcome prices
       let outcomes: { outcome: string; price: number }[] = [];
