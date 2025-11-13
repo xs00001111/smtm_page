@@ -1206,8 +1206,28 @@ export function registerCommands(bot: Telegraf) {
           conditionId,
           question: market.question?.slice(0, 50),
           hasTokens: !!market.tokens,
-          tokenCount: market.tokens?.length || 0
+          tokenCount: market.tokens?.length || 0,
+          marketKeys: Object.keys(market).sort()
         })
+
+        // If tokens are missing, try re-fetching by condition ID
+        if (!market.tokens || market.tokens.length === 0) {
+          logger.warn('overview: market has no tokens, re-fetching by condition ID', { conditionId })
+          try {
+            const refetchedMarket = await gammaApi.getMarket(conditionId)
+            if (refetchedMarket && refetchedMarket.tokens && refetchedMarket.tokens.length > 0) {
+              logger.info('overview: refetched market has tokens', {
+                tokenCount: refetchedMarket.tokens.length
+              })
+              Object.assign(market, refetchedMarket) // Merge in the tokens
+            } else {
+              logger.warn('overview: refetched market also has no tokens')
+            }
+          } catch (refetchErr) {
+            logger.error('overview: failed to refetch market', { error: refetchErr })
+          }
+        }
+
         logger.info('overview: fetching holders', { conditionId })
 
         const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
