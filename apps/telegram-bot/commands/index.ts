@@ -1681,7 +1681,9 @@ export function registerCommands(bot: Telegraf) {
         return;
       }
 
-      const escapeMd = (s: string) => s.replace(/[\\*_`\[\]()]/g, '\\$&')
+      // Escape only characters that need escaping in Telegram Markdown: _ * [ ] ` \
+      // Note: Parentheses () do NOT need escaping in Telegram Markdown
+      const escapeMd = (s: string) => s.replace(/[\\*_`\[\]]/g, '\\$&')
       let message = `${displayLabel}\n\n`;
       const keyboard: { text: string; callback_data: string }[][] = []
 
