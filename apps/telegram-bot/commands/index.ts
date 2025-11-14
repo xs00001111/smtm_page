@@ -260,12 +260,13 @@ export function registerCommands(bot: Telegraf) {
               buttons.push({ text: `🐋 Follow`, callback_data: `act:${tok}` })
             } catch {}
             buttons.push({ text: `📊 Stats`, callback_data: `whale:stats:${entry.user_id}` })
-            keyboard.push(buttons)
-          }
 
-          // Add another "Show More" button if there are still more traders
-          if (remaining > 0) {
-            keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `whales:showmore:${displayEnd}` }])
+            // Add "Give me 1 more" on same row if there are more traders
+            if (remaining > 0) {
+              buttons.push({ text: `👀 Give me 1 more`, callback_data: `whales:showmore:${displayEnd}` })
+            }
+
+            keyboard.push(buttons)
           }
 
           msg += '💡 Tap 🐋 Follow to get alerts, or 📊 Stats for accurate all-time PnL.'
@@ -480,7 +481,7 @@ export function registerCommands(bot: Telegraf) {
               message += `   ➕ Follow: /follow ${cond}\n\n`
               try {
                 const tok = await actionFollowMarket(cond, market.question || 'Market')
-                followButton = { text: `Follow ${idx}`, callback_data: `act:${tok}` }
+                followButton = { text: `Follow`, callback_data: `act:${tok}` }
               } catch {}
             } else {
               message += `   ➕ Follow: /follow <copy market id from event>\n\n`
@@ -2071,7 +2072,7 @@ export function registerCommands(bot: Telegraf) {
         if (cond) {
           try {
             const tok = await actionFollowMarket(cond, market.question || 'Market')
-            followButton = { text: `Follow ${idx}`, callback_data: `act:${tok}` }
+            followButton = { text: `Follow`, callback_data: `act:${tok}` }
           } catch {}
         }
       }
