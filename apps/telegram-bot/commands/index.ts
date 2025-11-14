@@ -414,6 +414,7 @@ export function registerCommands(bot: Telegraf) {
           let message = `${displayLabel}\n\n`
           const keyboard: { text: string; callback_data: string }[][] = []
 
+          let followButton: { text: string; callback_data: string } | null = null
           for (let i = offset; i < displayEnd; i++) {
             const market = markets[i]
             const idx = i + 1
@@ -479,16 +480,23 @@ export function registerCommands(bot: Telegraf) {
               message += `   ➕ Follow: /follow ${cond}\n\n`
               try {
                 const tok = await actionFollowMarket(cond, market.question || 'Market')
-                keyboard.push([{ text: `Follow ${idx}`, callback_data: `act:${tok}` }])
+                followButton = { text: `Follow ${idx}`, callback_data: `act:${tok}` }
               } catch {}
             } else {
               message += `   ➕ Follow: /follow <copy market id from event>\n\n`
             }
           }
 
-          // Add another "Give me 1 more" button if there are still more markets
+          // Add buttons on same row: Follow + "Give me 1 more"
+          const buttonRow: { text: string; callback_data: string }[] = []
+          if (followButton) {
+            buttonRow.push(followButton)
+          }
           if (remaining > 0) {
-            keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayEnd}` }])
+            buttonRow.push({ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayEnd}` })
+          }
+          if (buttonRow.length > 0) {
+            keyboard.push(buttonRow)
           }
 
           message += '💡 Tap Follow to get alerts for any of these markets.'
@@ -1991,6 +1999,7 @@ export function registerCommands(bot: Telegraf) {
       const remaining = markets.length - displayCount
       const displayMarkets = markets.slice(0, displayCount)
 
+      let followButton: { text: string; callback_data: string } | null = null
       let idx = 0
       for (const market of displayMarkets as any[]) {
         idx += 1
@@ -2058,18 +2067,25 @@ export function registerCommands(bot: Telegraf) {
         } else {
           message += `   ➕ Follow: /follow <copy market id from event>\n\n`
         }
-        // Add one-tap button per market when we have a condition id
+        // Store follow button for later (to combine with "Give me 1 more" on same row)
         if (cond) {
           try {
             const tok = await actionFollowMarket(cond, market.question || 'Market')
-            keyboard.push([{ text: `Follow ${idx}`, callback_data: `act:${tok}` }])
+            followButton = { text: `Follow ${idx}`, callback_data: `act:${tok}` }
           } catch {}
         }
       }
 
-      // Add "Give me 1 more" button if there are more markets
+      // Add buttons on same row: Follow + "Give me 1 more"
+      const buttonRow: { text: string; callback_data: string }[] = []
+      if (followButton) {
+        buttonRow.push(followButton)
+      }
       if (remaining > 0) {
-        keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayCount}` }])
+        buttonRow.push({ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayCount}` })
+      }
+      if (buttonRow.length > 0) {
+        keyboard.push(buttonRow)
       }
 
       message += '💡 Tap Follow to get alerts, or "Give me 1 more" to see more markets.\n\n';
