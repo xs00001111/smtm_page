@@ -7,6 +7,7 @@ import { WebSocketMonitorService } from './services/websocket-monitor';
 import { botConfig } from './config/bot';
 import { loadSubscriptions } from './services/subscriptions';
 import { loadLinks } from './services/links';
+import { initAnalyticsLogging } from './services/analytics';
 
 const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
 
@@ -14,6 +15,7 @@ const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
 export const wsMonitor = new WebSocketMonitorService(bot);
 
 // Register all commands
+initAnalyticsLogging(bot);
 registerCommands(bot);
 
 // Error handling
