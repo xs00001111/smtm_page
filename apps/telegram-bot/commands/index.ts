@@ -917,8 +917,8 @@ export function registerCommands(bot: Telegraf) {
           const keyboard: { text: string; callback_data: string }[][] = []
           const addresses: string[] = []
 
-          // Show only first 2 whales initially for cleaner UI
-          const initialDisplay = 2
+          // Show only first whale initially for cleaner UI
+          const initialDisplay = 1
           const displayCount = Math.min(initialDisplay, leaderboard.length)
           const remaining = leaderboard.length - displayCount
 
