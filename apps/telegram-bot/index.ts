@@ -46,8 +46,6 @@ async function start() {
     await bot.telegram.setMyCommands([
       { command: 'start', description: 'Start the bot and see welcome message' },
       { command: 'help', description: 'Show help and available commands' },
-      { command: 'link', description: 'Link your Polymarket profile' },
-      { command: 'unlink', description: 'Unlink all connected profiles' },
       { command: 'stats', description: 'Show stats for an address or profile' },
       { command: 'profile_card', description: 'Create a profile card (self or others)' },
       { command: 'trade_card', description: 'Create a trade card' },
