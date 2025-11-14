@@ -1817,11 +1817,11 @@ export function registerCommands(bot: Telegraf) {
   bot.command('markets', async (ctx) => {
     const userId = ctx.from?.id;
     const args = ctx.message.text.split(' ').slice(1)
+    const firstArg = args[0]?.toLowerCase() // Declare outside try block for error logging
     logger.info('Markets command', { userId, argsLen: args.length });
 
     try {
       // Check for segment keywords (trending, breaking, new, ending)
-      const firstArg = args[0]?.toLowerCase()
       const segments = ['trending', 'breaking', 'new', 'ending']
       const isSegment = segments.includes(firstArg)
 
