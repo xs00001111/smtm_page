@@ -49,7 +49,7 @@ async function start() {
       { command: 'stats', description: 'Show stats for an address or profile' },
       { command: 'profile_card', description: 'Create a profile card (self or others)' },
       { command: 'trade_card', description: 'Create a trade card' },
-      { command: 'markets', description: 'Browse hot markets or search' },
+      { command: 'markets', description: 'Browse trending, breaking, new, or search' },
       { command: 'price', description: 'Get market price' },
       { command: 'net', description: 'Net positions by user for a market' },
       { command: 'overview', description: 'Market sides, holders, pricing' },

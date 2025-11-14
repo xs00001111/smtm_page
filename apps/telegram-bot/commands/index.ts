@@ -163,7 +163,7 @@ export function registerCommands(bot: Telegraf) {
     await ctx.reply(
       'Welcome to SMTM 🎯\n\n' +
         'Quick actions:\n' +
-        '• /markets [query] — hot markets or search\n' +
+        '• /markets [query] — trending, breaking, new, or search\n' +
         '• /whales [query] — leaderboard or search traders\n' +
         '• /price <market> — detailed price info\n' +
         '• /overview <market> — orderbook & positions\n' +
@@ -403,13 +403,12 @@ export function registerCommands(bot: Telegraf) {
           const displayMarkets = markets.slice(offset, displayEnd)
 
           const segmentLabels: Record<string, string> = {
-            'hot': '🔥 Hot Markets',
-            'trending': '📈 Trending Markets',
-            'breaking': '⚡ Breaking Markets',
-            'new': '🆕 New Markets',
+            'trending': '📈 Trending',
+            'breaking': '⚡ Breaking',
+            'new': '🆕 New',
             'ending': '⏰ Ending Soon'
           }
-          const displayLabel = segmentLabels[segment] || '🔥 Hot Markets'
+          const displayLabel = segmentLabels[segment] || '📈 Trending'
 
           const escapeMd = (s: string) => s.replace(/[\\*_`\[\]]/g, '\\$&')
           let message = `${displayLabel}\n\n`
@@ -1838,16 +1837,15 @@ export function registerCommands(bot: Telegraf) {
         return
       }
 
-      // Determine segment and display label
-      const segment = isSegment ? firstArg : 'hot'
+      // Determine segment and display label (default to 'trending' to match Polymarket UI)
+      const segment = isSegment ? firstArg : 'trending'
       const segmentLabels: Record<string, string> = {
-        'hot': '🔥 Hot Markets',
-        'trending': '📈 Trending Markets',
-        'breaking': '⚡ Breaking Markets',
-        'new': '🆕 New Markets',
+        'trending': '📈 Trending',
+        'breaking': '⚡ Breaking',
+        'new': '🆕 New',
         'ending': '⏰ Ending Soon'
       }
-      const displayLabel = segmentLabels[segment] || '🔥 Hot Markets'
+      const displayLabel = segmentLabels[segment] || '📈 Trending'
 
       await ctx.reply('🔍 Loading markets...');
 
@@ -2091,11 +2089,10 @@ export function registerCommands(bot: Telegraf) {
 
       message += '💡 Tap Follow to get alerts, or "Give me 1 more" to see more markets.\n\n';
       message +=
-        '📂 Browse segments:\n' +
-        '• /markets trending - 24hr volume leaders\n' +
-        '• /markets breaking - High activity markets\n' +
-        '• /markets new - Recently created\n' +
-        '• /markets ending - Closing soon';
+        '📂 Browse by category (matches Polymarket):\n' +
+        '• /markets - Trending (default)\n' +
+        '• /markets breaking - Breaking markets\n' +
+        '• /markets new - Newly created';
 
       await ctx.reply(message, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } as any });
     } catch (error: any) {
