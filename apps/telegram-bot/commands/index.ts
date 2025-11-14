@@ -220,7 +220,7 @@ export function registerCommands(bot: Telegraf) {
             return
           }
 
-          let msg = '🐋 Top Traders (by PnL)\n\n'
+          let msg = '🐳 Top Traders (by PnL)\n\n'
           const keyboard: { text: string; callback_data: string }[][] = []
 
           // Show 1 more trader at a time
@@ -257,7 +257,7 @@ export function registerCommands(bot: Telegraf) {
             const buttons: { text: string; callback_data: string }[] = []
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
-              buttons.push({ text: `🐋 Follow`, callback_data: `act:${tok}` })
+              buttons.push({ text: `🐳 Follow`, callback_data: `act:${tok}` })
             } catch {}
             buttons.push({ text: `📊 Stats`, callback_data: `whale:stats:${entry.user_id}` })
 
@@ -269,7 +269,7 @@ export function registerCommands(bot: Telegraf) {
             keyboard.push(buttons)
           }
 
-          msg += '💡 Tap 🐋 Follow to get alerts, or 📊 Stats for accurate all-time PnL.'
+          msg += '💡 Tap 🐳 Follow to get alerts, or 📊 Stats for accurate all-time PnL.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
         } catch (e: any) {
           logger.error('whales:showmore: failed to load leaderboard', { error: e?.message })
@@ -1134,7 +1134,7 @@ export function registerCommands(bot: Telegraf) {
                 await ctx.reply('❌ Unable to load leaderboard right now. Try a specific market: `/whales 0x<market_id>`\n\nBrowse: https://polymarket.com/leaderboard', { parse_mode: 'Markdown' })
                 return
               }
-              let msg = '🐋 Top Traders (fallback)\n\n'
+              let msg = '🐳 Top Traders (fallback)\n\n'
               const keyboard: { text: string; callback_data: string }[][] = []
               const addresses: string[] = []
               let i = 0
@@ -1163,7 +1163,7 @@ export function registerCommands(bot: Telegraf) {
             }
           }
 
-          let msg = '🐋 Top Traders (by PnL)\n\n'
+          let msg = '🐳 Top Traders (by PnL)\n\n'
           const keyboard: { text: string; callback_data: string }[][] = []
           const addresses: string[] = []
 
@@ -1202,7 +1202,7 @@ export function registerCommands(bot: Telegraf) {
             const buttons: { text: string; callback_data: string }[] = []
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
-              buttons.push({ text: `🐋 Follow`, callback_data: `act:${tok}` })
+              buttons.push({ text: `🐳 Follow`, callback_data: `act:${tok}` })
             } catch {}
             buttons.push({ text: `📊 Stats`, callback_data: `whale:stats:${entry.user_id}` })
             keyboard.push(buttons)
@@ -1214,7 +1214,7 @@ export function registerCommands(bot: Telegraf) {
             keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `whales:showmore:${nextOffset}` }])
           }
 
-          msg += '💡 Tap 🐋 Follow to get alerts, 📊 Stats for accurate PnL, or "Give me 1 more" to see more traders.'
+          msg += '💡 Tap 🐳 Follow to get alerts, 📊 Stats for accurate PnL, or "Give me 1 more" to see more traders.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
           return
         } catch (e: any) {
@@ -1239,7 +1239,7 @@ export function registerCommands(bot: Telegraf) {
             const addr = raw.toLowerCase()
             const short = addr.slice(0,6)+'...'+addr.slice(-4)
             const url = getPolymarketProfileUrl(null, addr)
-            let message = `🐋 Trader Found\n\n`
+            let message = `🐳 Trader Found\n\n`
             message += `ID: ${addr}\n`
             message += `🔗 ${url}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
@@ -1252,7 +1252,7 @@ export function registerCommands(bot: Telegraf) {
           if (hasAtInput) {
             const uname = (parsedForAt?.username || raw).replace(/^@/, '')
             const profileUrl = `https://polymarket.com/@${encodeURIComponent(uname)}`
-            let message = `🐋 Profile\n\n`
+            let message = `🐳 Profile\n\n`
             message += `Handle: @${uname}\n`
             message += `🔗 ${profileUrl}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
@@ -1279,7 +1279,7 @@ export function registerCommands(bot: Telegraf) {
               // If positive PnL, return immediately
               const hasPositivePnl = exact.some(e => e.pnl > 0)
               if (hasPositivePnl) {
-                let message = `🐋 Search Results (${exact.length})\n\n`
+                let message = `🐳 Search Results (${exact.length})\n\n`
                 const keyboard: { text: string; callback_data: string }[][] = []
                 for (let i=0;i<exact.length;i++) {
                   const whale = exact[i]
@@ -1332,7 +1332,7 @@ export function registerCommands(bot: Telegraf) {
           // 4. Decide what to show based on what we found
           // Priority: fuzzy results > profileMatch > exactMatch (negative PnL) > nothing
           if (results.length > 0) {
-            let message = `🐋 Search Results (${results.length})\n\n`
+            let message = `🐳 Search Results (${results.length})\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
             for (let i=0;i<results.length;i++) {
               const whale = results[i]
@@ -1357,7 +1357,7 @@ export function registerCommands(bot: Telegraf) {
           if (profileMatch) {
             const short = profileMatch.addr.slice(0,6)+'...'+profileMatch.addr.slice(-4)
             const profileUrl = `https://polymarket.com/@${encodeURIComponent(profileMatch.uname)}`
-            let message = `🐋 Profile\n\n`
+            let message = `🐳 Profile\n\n`
             message += `Handle: @${profileMatch.uname}\n`
             message += `ID: ${profileMatch.addr}\n`
             message += `🔗 ${profileUrl}\n\n`
@@ -1375,7 +1375,7 @@ export function registerCommands(bot: Telegraf) {
             const pnl = whale.pnl > 0 ? `+$${Math.round(whale.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`
             const vol = `$${Math.round(whale.vol).toLocaleString()}`
             const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id)
-            let message = `🐋 Exact Match\n\n`
+            let message = `🐳 Exact Match\n\n`
             message += `1. ${name} (${short})\n`
             message += `   ID: ${whale.user_id}\n`
             message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
@@ -1411,7 +1411,7 @@ export function registerCommands(bot: Telegraf) {
       let marketSlug = market.slug || market.market_slug || '';
       marketSlug = marketSlug.replace(/-(january|february|march|april|may|june|july|august|september|october|november|december)-\d+$/i, '');
       marketSlug = marketSlug.replace(/-\d+$/, '');
-      let msg = `🐋 Whales — ${market.question}\n`;
+      let msg = `🐳 Whales — ${market.question}\n`;
       if (marketSlug) {
         msg += `🔗 https://polymarket.com/event/${marketSlug}\n`;
       }
@@ -1736,7 +1736,7 @@ export function registerCommands(bot: Telegraf) {
         } else {
           const w = r.address_filter ? r.address_filter : 'wallet'
           const short = w.length > 10 ? w.slice(0,6)+'...'+w.slice(-4) : w
-          msg += `${i}. 🐋 ${r.market_name} — ${short}\n   Market ID: ${mid}\n   ➖ Unfollow: /unfollow ${w} ${mid}\n\n`
+          msg += `${i}. 🐳 ${r.market_name} — ${short}\n   Market ID: ${mid}\n   ➖ Unfollow: /unfollow ${w} ${mid}\n\n`
           try {
             if (r.address_filter) {
               const tok = await actionUnfollowWhaleMarket({ address: r.address_filter, tokenId: r.token_id || undefined, conditionId: r.market_condition_id || undefined, marketName: r.market_name })
@@ -2211,7 +2211,7 @@ export function registerCommands(bot: Telegraf) {
       '📖 Follow Command Usage:\n\n' +
       '🔔 Market price alerts:\n' +
       '• /follow 0x<market_id>\n\n' +
-      '🐋 Copy whale trades:\n' +
+      '🐳 Copy whale trades:\n' +
       '• /follow 0x<wallet> — ALL markets\n' +
       '• /follow 0x<wallet> 0x<market_id> — specific market\n\n' +
       '💡 Get market IDs from /markets'
