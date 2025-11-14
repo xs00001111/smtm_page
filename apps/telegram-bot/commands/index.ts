@@ -2154,7 +2154,11 @@ export function registerCommands(bot: Telegraf) {
 
       await ctx.reply(message, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } as any });
     } catch (error: any) {
-      logger.error('Error in markets command', { error: error?.message || error })
+      logger.error('Error in markets command', {
+        error: error?.message || String(error),
+        stack: error?.stack,
+        segment: firstArg || 'trending'
+      })
       await ctx.reply(
         '❌ Could not fetch markets right now. Please try again soon.\n' +
           'Browse directly: https://polymarket.com/markets'

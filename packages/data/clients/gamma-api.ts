@@ -105,7 +105,7 @@ export class GammaApiClient {
    */
   async getActiveMarkets(
     limit = 50,
-    order: 'liquidity' | 'volume' = 'volume'
+    order: 'liquidity' | 'volume' | 'volume_24hr' | 'end_date_min' = 'volume'
   ): Promise<GammaMarket[]> {
     return this.getMarkets({
       active: true,
