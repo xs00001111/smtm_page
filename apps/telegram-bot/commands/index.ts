@@ -208,9 +208,12 @@ export function registerCommands(bot: Telegraf) {
       // }
 
       // Handle "Show More" for whales leaderboard
-      if (data === 'whales:showmore') {
+      if (data.startsWith('whales:showmore:')) {
         await ctx.answerCbQuery('Loading more traders...')
         try {
+          // Parse offset from callback data (e.g., 'whales:showmore:2')
+          const offset = parseInt(data.split(':')[2] || '0', 10)
+
           const leaderboard = await dataApi.getLeaderboard({ limit: 10 })
           if (!leaderboard || leaderboard.length === 0) {
             await ctx.reply('❌ Unable to load more traders. Try again later.')
@@ -220,9 +223,14 @@ export function registerCommands(bot: Telegraf) {
           let msg = '🐋 Top Traders (by PnL)\n\n'
           const keyboard: { text: string; callback_data: string }[][] = []
 
-          let i = 0
-          for (const entry of leaderboard) {
-            i += 1
+          // Show 2 more traders at a time
+          const batchSize = 2
+          const displayEnd = Math.min(offset + batchSize, leaderboard.length)
+          const remaining = leaderboard.length - displayEnd
+
+          for (let idx = offset; idx < displayEnd; idx++) {
+            const entry = leaderboard[idx]
+            const i = idx + 1
             const short = entry.user_id.slice(0,6)+'...'+entry.user_id.slice(-4)
             const name = entry.user_name || 'Anonymous'
             const pnl = entry.pnl > 0 ? `+$${Math.round(entry.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(entry.pnl)).toLocaleString()}`
@@ -237,10 +245,15 @@ export function registerCommands(bot: Telegraf) {
             } catch {}
           }
 
+          // Add another "Show More" button if there are still more traders
+          if (remaining > 0) {
+            keyboard.push([{ text: `📋 Show More (${remaining} remaining)`, callback_data: `whales:showmore:${displayEnd}` }])
+          }
+
           msg += '💡 Tap Follow to get alerts for any of these traders.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
         } catch (e: any) {
-          logger.error('whales:showmore: failed to load full leaderboard', { error: e?.message })
+          logger.error('whales:showmore: failed to load leaderboard', { error: e?.message })
           await ctx.reply('❌ Unable to load more traders. Try again later.')
         }
         return
@@ -929,7 +942,8 @@ export function registerCommands(bot: Telegraf) {
 
           // Add "Show More" button if there are more whales
           if (remaining > 0) {
-            keyboard.push([{ text: `📋 Show More (${remaining} remaining)`, callback_data: 'whales:showmore' }])
+            const nextOffset = displayCount
+            keyboard.push([{ text: `📋 Show More (${remaining} remaining)`, callback_data: `whales:showmore:${nextOffset}` }])
           }
 
           msg += '💡 Tap Follow to get alerts, or "Show More" to see more traders.'
