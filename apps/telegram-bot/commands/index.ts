@@ -259,6 +259,176 @@ export function registerCommands(bot: Telegraf) {
         return
       }
 
+      // Handle "Show More" for markets
+      if (data.startsWith('markets:showmore:')) {
+        await ctx.answerCbQuery('Loading more markets...')
+        try {
+          // Parse segment and offset from callback data (e.g., 'markets:showmore:hot:1')
+          const parts = data.split(':')
+          const segment = parts[2] || 'hot'
+          const offset = parseInt(parts[3] || '0', 10)
+
+          // Re-fetch markets based on segment (same logic as /markets command)
+          let markets: any[] = []
+          let orderBy: 'volume' | 'liquidity' | 'volume_24hr' | 'end_date_min' = 'volume'
+
+          if (segment === 'trending' || segment === 'breaking') {
+            orderBy = 'volume_24hr'
+          } else if (segment === 'ending') {
+            orderBy = 'end_date_min'
+          }
+
+          try {
+            markets = await gammaApi.getActiveMarkets(20, orderBy)
+          } catch (inner: any) {
+            logger.error('markets:showmore: gammaApi active failed', { error: inner?.message })
+            await ctx.reply('❌ Unable to load more markets. Try again later.')
+            return
+          }
+
+          // Apply filters (same as command)
+          const now = Date.now()
+          const minLiquidity = parseFloat(process.env.MARKET_MIN_LIQUIDITY || '1000')
+          const minVolume = parseFloat(process.env.MARKET_MIN_VOLUME || '1000')
+          markets = markets.filter((m: any) => {
+            const active = m?.active === true
+            const closed = m?.closed === true
+            const resolved = m?.resolved === true
+            const archived = m?.archived === true
+            const endIso = m?.end_date_iso || m?.endDateIso || m?.endDate || m?.end_date
+            const endTime = endIso ? Date.parse(endIso) : NaN
+            const futureEnd = Number.isFinite(endTime) && endTime > now
+            const liq = parseFloat(m?.liquidity || '0')
+            const hasLiq = !Number.isNaN(liq) && liq >= minLiquidity
+            const vol = parseFloat(m?.volume || '0')
+            const hasVol = !Number.isNaN(vol) && vol >= minVolume
+            return active && !closed && !resolved && !archived && futureEnd && hasLiq && hasVol
+          })
+
+          // Apply segment-specific filtering
+          if (segment === 'new') {
+            const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
+            markets = markets.filter((m: any) => {
+              const createdAt = m?.createdAt ? Date.parse(m.createdAt) : NaN
+              return Number.isFinite(createdAt) && createdAt > sevenDaysAgo
+            })
+          } else if (segment === 'breaking') {
+            markets = markets.filter((m: any) => {
+              const vol24hr = parseFloat(m?.volume_24hr || m?.volume24hr || '0')
+              return !isNaN(vol24hr) && vol24hr > 1000
+            })
+          }
+
+          if (markets.length === 0) {
+            await ctx.reply('❌ No more markets available.')
+            return
+          }
+
+          // Show 2 more markets at a time
+          const batchSize = 2
+          const displayEnd = Math.min(offset + batchSize, markets.length)
+          const remaining = markets.length - displayEnd
+          const displayMarkets = markets.slice(offset, displayEnd)
+
+          const segmentLabels: Record<string, string> = {
+            'hot': '🔥 Hot Markets',
+            'trending': '📈 Trending Markets',
+            'breaking': '⚡ Breaking Markets',
+            'new': '🆕 New Markets',
+            'ending': '⏰ Ending Soon'
+          }
+          const displayLabel = segmentLabels[segment] || '🔥 Hot Markets'
+
+          const escapeMd = (s: string) => s.replace(/[\\*_`\[\]]/g, '\\$&')
+          let message = `${displayLabel}\n\n`
+          const keyboard: { text: string; callback_data: string }[][] = []
+
+          for (let i = offset; i < displayEnd; i++) {
+            const market = markets[i]
+            const idx = i + 1
+            const title = escapeMd(String(market.question || 'Untitled market'))
+
+            // Parse outcome prices
+            let priceNum = NaN
+            try {
+              const outcomePrices = market?.outcomePrices || market?.tokens?.[0]?.price
+              if (typeof outcomePrices === 'string') {
+                const prices = JSON.parse(outcomePrices)
+                if (Array.isArray(prices) && prices.length > 0) {
+                  priceNum = parseFloat(prices[0])
+                }
+              } else if (typeof outcomePrices === 'number') {
+                priceNum = outcomePrices
+              }
+            } catch {}
+            const price = isNaN(priceNum) ? 'N/A' : (priceNum * 100).toFixed(1)
+
+            // Format volume
+            const volNum = typeof market.volume === 'number' ? market.volume : parseFloat(market.volume || '0')
+            let volDisplay = '—'
+            if (!isNaN(volNum)) {
+              if (volNum >= 1_000_000) {
+                volDisplay = `$${(volNum / 1_000_000).toFixed(1)}M`
+              } else if (volNum >= 1_000) {
+                volDisplay = `$${(volNum / 1_000).toFixed(1)}K`
+              } else {
+                volDisplay = `$${Math.round(volNum)}`
+              }
+            }
+
+            // Format liquidity
+            const liqNum = typeof market.liquidity === 'number' ? market.liquidity : parseFloat(market.liquidity || '0')
+            let liqDisplay = '—'
+            if (!isNaN(liqNum)) {
+              if (liqNum >= 1_000_000) {
+                liqDisplay = `$${(liqNum / 1_000_000).toFixed(2)}M`
+              } else if (liqNum >= 1_000) {
+                liqDisplay = `$${(liqNum / 1_000).toFixed(1)}K`
+              } else {
+                liqDisplay = `$${Math.round(liqNum)}`
+              }
+            }
+
+            // Get condition id
+            let cond: string | null = market?.conditionId || market?.condition_id || null
+            if (!cond) {
+              try {
+                const via = market?.market_slug || market?.slug || title
+                cond = await gammaApi.findConditionId(String(via))
+              } catch {}
+            }
+
+            const url = getPolymarketMarketUrl(market)
+            message += `${idx}. ${title}\n`
+            message += `   📊 Price: ${price}%\n`
+            message += `   💰 Volume: ${volDisplay}\n`
+            message += `   🧊 Liquidity: ${liqDisplay}\n`
+            if (url) { message += `   🔗 ${url}\n` }
+            if (cond) {
+              message += `   ➕ Follow: /follow ${cond}\n\n`
+              try {
+                const tok = await actionFollowMarket(cond, market.question || 'Market')
+                keyboard.push([{ text: `Follow ${idx}`, callback_data: `act:${tok}` }])
+              } catch {}
+            } else {
+              message += `   ➕ Follow: /follow <copy market id from event>\n\n`
+            }
+          }
+
+          // Add another "Give me 2 more" button if there are still more markets
+          if (remaining > 0) {
+            keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `markets:showmore:${segment}:${displayEnd}` }])
+          }
+
+          message += '💡 Tap Follow to get alerts for any of these markets.'
+          await ctx.reply(message, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } as any })
+        } catch (e: any) {
+          logger.error('markets:showmore: failed to load markets', { error: e?.message })
+          await ctx.reply('❌ Unable to load more markets. Try again later.')
+        }
+        return
+      }
+
       if (!data.startsWith('act:')) return
       const id = data.slice(4)
       const rec = await resolveAction(id)
@@ -1726,8 +1896,12 @@ export function registerCommands(bot: Telegraf) {
       let message = `${displayLabel}\n\n`;
       const keyboard: { text: string; callback_data: string }[][] = []
 
-      // Limit to 8 markets for display to avoid too-long messages
-      const displayMarkets = markets.slice(0, 8)
+      // Show only first market initially for cleaner UI
+      const initialDisplay = 1
+      const displayCount = Math.min(initialDisplay, markets.length)
+      const remaining = markets.length - displayCount
+      const displayMarkets = markets.slice(0, displayCount)
+
       let idx = 0
       for (const market of displayMarkets as any[]) {
         idx += 1
@@ -1804,16 +1978,18 @@ export function registerCommands(bot: Telegraf) {
         }
       }
 
+      // Add "Give me 2 more" button if there are more markets
+      if (remaining > 0) {
+        keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `markets:showmore:${segment}:${displayCount}` }])
+      }
+
+      message += '💡 Tap Follow to get alerts, or "Give me 2 more" to see more markets.\n\n';
       message +=
-        '💡 How to follow:\n' +
-        '• Tap a follow command above to insert it\n' +
-        '• Or copy a market id (0x…) from the event\n' +
-        '\n📂 Browse segments:\n' +
+        '📂 Browse segments:\n' +
         '• /markets trending - 24hr volume leaders\n' +
         '• /markets breaking - High activity markets\n' +
         '• /markets new - Recently created\n' +
-        '• /markets ending - Closing soon\n' +
-        '• More: https://polymarket.com/markets';
+        '• /markets ending - Closing soon';
 
       await ctx.reply(message, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } as any });
     } catch (error: any) {
