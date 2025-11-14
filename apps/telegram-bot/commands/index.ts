@@ -249,13 +249,18 @@ export function registerCommands(bot: Telegraf) {
             }
 
             msg += `${i}. ${name} (${short})\n`
-            msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+            msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr}\n`
             msg += `   🔗 ${profileUrl}\n\n`
+
+            // Add buttons: Follow and Detailed Stats
+            const buttons: { text: string; callback_data: string }[] = []
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
-              keyboard.push([{ text: `Follow ${i}`, callback_data: `act:${tok}` }])
+              buttons.push({ text: `Follow ${i}`, callback_data: `act:${tok}` })
             } catch {}
+            buttons.push({ text: `📊 Detailed Stats ${i}`, callback_data: `whale:stats:${entry.user_id}` })
+            keyboard.push(buttons)
           }
 
           // Add another "Show More" button if there are still more traders
@@ -263,11 +268,64 @@ export function registerCommands(bot: Telegraf) {
             keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `whales:showmore:${displayEnd}` }])
           }
 
-          msg += '💡 Tap Follow to get alerts for any of these traders.'
+          msg += '💡 Tap Follow to get alerts, or Detailed Stats for accurate all-time PnL.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
         } catch (e: any) {
           logger.error('whales:showmore: failed to load leaderboard', { error: e?.message })
           await ctx.reply('❌ Unable to load more traders. Try again later.')
+        }
+        return
+      }
+
+      // Handle "Detailed Stats" for whale traders
+      if (data.startsWith('whale:stats:')) {
+        await ctx.answerCbQuery('Calculating accurate PnL...')
+        try {
+          const userId = data.split(':')[2]
+          if (!userId) {
+            await ctx.reply('❌ Invalid trader ID')
+            return
+          }
+
+          // Fetch accurate PnL
+          const { totalPnL, realizedPnL, unrealizedPnL, currentValue } = await dataApi.getUserAccuratePnL(userId)
+
+          // Fetch win rate
+          const { wins, total, winRate } = await dataApi.getUserWinRate(userId, 500)
+
+          // Get profile info
+          const short = userId.slice(0, 6) + '...' + userId.slice(-4)
+          const profileUrl = getPolymarketProfileUrl(null, userId)
+
+          // Format numbers
+          const formatPnL = (pnl: number) => {
+            if (pnl >= 0) {
+              return `+$${Math.round(pnl).toLocaleString()}`
+            } else {
+              return `-$${Math.abs(Math.round(pnl)).toLocaleString()}`
+            }
+          }
+
+          let msg = `📊 Detailed Trader Stats\n\n`
+          msg += `Trader: ${short}\n`
+          msg += `🔗 ${profileUrl}\n\n`
+          msg += `💰 All-Time PnL: ${formatPnL(totalPnL)}\n`
+          msg += `   ├─ Realized: ${formatPnL(realizedPnL)}\n`
+          msg += `   └─ Unrealized: ${formatPnL(unrealizedPnL)}\n\n`
+          msg += `💎 Current Value: $${Math.round(currentValue).toLocaleString()}\n`
+          msg += `🎯 Win Rate: ${winRate.toFixed(1)}% (${wins}/${total} markets)\n\n`
+          msg += `ℹ️ Note: Leaderboard uses ranked PnL, which may differ from all-time PnL.`
+
+          const keyboard: { text: string; callback_data: string }[][] = []
+          try {
+            const tok = await actionFollowWhaleAll(userId)
+            keyboard.push([{ text: `Follow This Trader`, callback_data: `act:${tok}` }])
+          } catch {}
+
+          await ctx.reply(msg, { reply_markup: { inline_keyboard: keyboard } as any })
+        } catch (e: any) {
+          logger.error('whale:stats: failed to fetch detailed stats', { error: e?.message })
+          await ctx.reply('❌ Unable to load detailed stats. Try again later.')
         }
         return
       }
@@ -1126,14 +1184,19 @@ export function registerCommands(bot: Telegraf) {
             }
 
             msg += `${i}. ${name} (${short})\n`
-            msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+            msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr}\n`
             msg += `   🔗 ${profileUrl}\n\n`
             addresses.push(entry.user_id)
+
+            // Add buttons: Follow and Detailed Stats
+            const buttons: { text: string; callback_data: string }[] = []
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
-              keyboard.push([{ text: `Follow ${i}`, callback_data: `act:${tok}` }])
+              buttons.push({ text: `Follow ${i}`, callback_data: `act:${tok}` })
             } catch {}
+            buttons.push({ text: `📊 Detailed Stats ${i}`, callback_data: `whale:stats:${entry.user_id}` })
+            keyboard.push(buttons)
           }
 
           // Add "Show More" button if there are more whales
@@ -1142,7 +1205,7 @@ export function registerCommands(bot: Telegraf) {
             keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `whales:showmore:${nextOffset}` }])
           }
 
-          msg += '💡 Tap Follow to get alerts, or tap "Give me 2 more" to see more traders.'
+          msg += '💡 Tap Follow to get alerts, Detailed Stats for accurate PnL, or "Give me 2 more" to see more traders.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
           return
         } catch (e: any) {
