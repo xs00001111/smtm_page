@@ -247,7 +247,7 @@ export function registerCommands(bot: Telegraf) {
 
           // Add another "Show More" button if there are still more traders
           if (remaining > 0) {
-            keyboard.push([{ text: `📋 Show More (${remaining} remaining)`, callback_data: `whales:showmore:${displayEnd}` }])
+            keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `whales:showmore:${displayEnd}` }])
           }
 
           msg += '💡 Tap Follow to get alerts for any of these traders.'
@@ -943,10 +943,10 @@ export function registerCommands(bot: Telegraf) {
           // Add "Show More" button if there are more whales
           if (remaining > 0) {
             const nextOffset = displayCount
-            keyboard.push([{ text: `📋 Show More (${remaining} remaining)`, callback_data: `whales:showmore:${nextOffset}` }])
+            keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `whales:showmore:${nextOffset}` }])
           }
 
-          msg += '💡 Tap Follow to get alerts, or "Show More" to see more traders.'
+          msg += '💡 Tap Follow to get alerts, or tap "Give me 2 more" to see more traders.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
           return
         } catch (e: any) {
