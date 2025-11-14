@@ -303,6 +303,60 @@ export class DataApiClient {
       return { wins: 0, total: 0, winRate: 0 };
     }
   }
+
+  /**
+   * Calculate more accurate all-time PnL for a user
+   * PnL = Sum of all closed position PnL + Sum of open position PnL
+   * Note: The leaderboard API often shows different (lower) values than actual all-time PnL
+   * @param user - User's Ethereum address (0x...)
+   * @returns Object with calculated PnL, realized PnL, unrealized PnL
+   */
+  async getUserAccuratePnL(
+    user: string
+  ): Promise<{ totalPnL: number; realizedPnL: number; unrealizedPnL: number; currentValue: number }> {
+    try {
+      // Fetch all closed positions (realized PnL)
+      const closedPositions = await this.getClosedPositions(user, 1000);
+
+      // Calculate realized PnL from closed positions
+      let realizedPnL = 0;
+      if (closedPositions && closedPositions.length > 0) {
+        for (const position of closedPositions) {
+          realizedPnL += parseFloat(position.pnl || '0');
+        }
+      }
+
+      // Fetch current portfolio value
+      const userValue = await this.getUserValue(user);
+      const currentValue = parseFloat(userValue.value || '0');
+
+      // Fetch open positions to calculate unrealized PnL
+      const openPositions = await this.getUserPositions({ user, limit: 500 });
+      let unrealizedPnL = 0;
+      if (openPositions && openPositions.length > 0) {
+        for (const position of openPositions) {
+          unrealizedPnL += parseFloat(position.pnl || '0');
+        }
+      }
+
+      const totalPnL = realizedPnL + unrealizedPnL;
+
+      return {
+        totalPnL,
+        realizedPnL,
+        unrealizedPnL,
+        currentValue
+      };
+    } catch (error) {
+      console.error(`Failed to calculate accurate PnL for ${user}:`, error);
+      return {
+        totalPnL: 0,
+        realizedPnL: 0,
+        unrealizedPnL: 0,
+        currentValue: 0
+      };
+    }
+  }
 }
 
 // Export singleton instance
