@@ -132,4 +132,42 @@ export function initAnalyticsLogging(bot: Telegraf) {
     }
     return next()
   })
+
+  // Track inline queries (bot used in inline mode)
+  bot.on('inline_query', async (ctx, next) => {
+    try {
+      const iq: any = (ctx as any).inlineQuery
+      const userId = ctx.from?.id ? Number(ctx.from.id) : undefined
+      if (!iq || !userId) return next()
+
+      const payload = {
+        p_telegram_user_id: userId,
+        p_username: ctx.from?.username ?? null,
+        p_language_code: (ctx.from as any)?.language_code ?? null,
+        p_is_bot: Boolean((ctx.from as any)?.is_bot),
+        p_telegram_chat_id: null,
+        p_chat_type: null,
+        p_chat_title: null,
+        p_command: 'inline_query',
+        p_args: { query: iq.query || '', offset: iq.offset || '' },
+        p_bot_id: null,
+        p_telegram_message_id: null,
+        p_meta: {
+          update_type: ctx.updateType,
+          update_id: (ctx as any).update?.update_id,
+          inline_query_id: iq.id,
+          chat_type: iq.chat_type || null,
+        },
+      }
+
+      try {
+        await postRpc('analytics_log_command', payload)
+      } catch (e) {
+        logger.warn({ err: (e as any)?.message }, 'analytics_log_inline_query failed')
+      }
+    } catch (e) {
+      logger.warn({ err: (e as any)?.message }, 'analytics inline_query middleware error')
+    }
+    return next()
+  })
 }
