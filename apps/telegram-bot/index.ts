@@ -7,7 +7,7 @@ import { WebSocketMonitorService } from './services/websocket-monitor';
 import { botConfig } from './config/bot';
 import { loadSubscriptions } from './services/subscriptions';
 import { loadLinks } from './services/links';
-import { initAnalyticsLogging } from './services/analytics';
+import { initAnalyticsLogging, logAnalyticsError } from './services/analytics';
 
 const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
 
@@ -22,6 +22,8 @@ registerCommands(bot);
 bot.catch((err, ctx) => {
   logger.error({ err, update: ctx.update }, 'Bot error');
   console.error('Bot runtime error:', err);
+  // Log to analytics (best-effort)
+  void logAnalyticsError(ctx, err);
   try {
     ctx.reply('An error occurred. Please try again later.').catch(() => {});
   } catch {}

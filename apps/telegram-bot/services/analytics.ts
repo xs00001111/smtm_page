@@ -78,6 +78,39 @@ export function initAnalyticsLogging(bot: Telegraf) {
             }
           }
         }
+        else if (typeof m.text === 'string') {
+          // Non-command text message; log as 'message'
+          const from = ctx.from
+          const chat = ctx.chat
+          const userId = from?.id ? Number(from.id) : undefined
+          const chatId = chat?.id != null ? Number(chat.id) : undefined
+
+          if (userId) {
+            const truncated = m.text.length > 200 ? m.text.slice(0, 200) + '…' : m.text
+            const payload = {
+              p_telegram_user_id: userId,
+              p_username: from?.username ?? null,
+              p_language_code: (from as any)?.language_code ?? null,
+              p_is_bot: Boolean((from as any)?.is_bot),
+              p_telegram_chat_id: chatId ?? null,
+              p_chat_type: (chat as any)?.type ?? null,
+              p_chat_title: (chat as any)?.title ?? null,
+              p_command: 'message',
+              p_args: { text: truncated, length: m.text.length },
+              p_bot_id: null,
+              p_telegram_message_id: m.message_id ?? null,
+              p_meta: {
+                update_type: ctx.updateType,
+                update_id: (ctx as any).update?.update_id,
+              },
+            }
+            try {
+              await postRpc('analytics_log_command', payload)
+            } catch (e) {
+              logger.warn({ err: (e as any)?.message }, 'analytics_log_message failed')
+            }
+          }
+        }
       }
     } catch (e) {
       logger.warn({ err: (e as any)?.message }, 'analytics middleware error')
@@ -170,4 +203,37 @@ export function initAnalyticsLogging(bot: Telegraf) {
     }
     return next()
   })
+}
+
+// Optional helper to log handled errors with context
+export async function logAnalyticsError(ctx: any, err: any) {
+  try {
+    if (!supabaseAvailable()) return
+    const from = ctx?.from
+    const chat = ctx?.chat
+    const userId = from?.id ? Number(from.id) : undefined
+    const chatId = chat?.id != null ? Number(chat.id) : undefined
+    if (!userId) return
+    const payload = {
+      p_telegram_user_id: userId,
+      p_username: from?.username ?? null,
+      p_language_code: (from as any)?.language_code ?? null,
+      p_is_bot: Boolean((from as any)?.is_bot),
+      p_telegram_chat_id: chatId ?? null,
+      p_chat_type: (chat as any)?.type ?? null,
+      p_chat_title: (chat as any)?.title ?? null,
+      p_command: 'error',
+      p_args: { message: String(err?.message || err), name: String(err?.name || 'Error') },
+      p_bot_id: null,
+      p_telegram_message_id: (ctx as any)?.message?.message_id ?? null,
+      p_meta: {
+        update_type: ctx?.updateType,
+        update_id: (ctx as any)?.update?.update_id,
+        stack: (err && err.stack) ? String(err.stack).slice(0, 2000) : null,
+      },
+    }
+    await postRpc('analytics_log_command', payload)
+  } catch (e) {
+    logger.warn({ err: (e as any)?.message }, 'analytics_log_error failed')
+  }
 }
