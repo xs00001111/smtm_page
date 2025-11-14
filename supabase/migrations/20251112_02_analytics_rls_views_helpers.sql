@@ -48,18 +48,18 @@ ORDER BY uses DESC;
 -- 3) Helper: single-call logger with upserts
 -- Place in public schema for PostgREST RPC exposure; operates on analytics tables.
 CREATE OR REPLACE FUNCTION public.analytics_log_command(
-  p_telegram_user_id  bigint,
-  p_username          text DEFAULT NULL,
-  p_language_code     text DEFAULT NULL,
-  p_is_bot            boolean DEFAULT false,
-  p_telegram_chat_id  bigint DEFAULT NULL,
-  p_chat_type         text DEFAULT NULL,           -- private|group|supergroup|channel
-  p_chat_title        text DEFAULT NULL,
-  p_command           text,
-  p_args              jsonb DEFAULT NULL,
-  p_bot_id            text DEFAULT NULL,
-  p_telegram_message_id bigint DEFAULT NULL,
-  p_meta              jsonb DEFAULT NULL
+  p_telegram_user_id     bigint,
+  p_username             text,
+  p_language_code        text,
+  p_is_bot               boolean,
+  p_telegram_chat_id     bigint,
+  p_chat_type            text,           -- private|group|supergroup|channel
+  p_chat_title           text,
+  p_command              text,
+  p_args                 jsonb,
+  p_bot_id               text,
+  p_telegram_message_id  bigint,
+  p_meta                 jsonb
 ) RETURNS bigint
 LANGUAGE plpgsql
 SECURITY DEFINER
