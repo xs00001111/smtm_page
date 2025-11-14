@@ -253,13 +253,13 @@ export function registerCommands(bot: Telegraf) {
             msg += `   🎯 Win Rate: ${winRateStr}\n`
             msg += `   🔗 ${profileUrl}\n\n`
 
-            // Add buttons: Follow and Detailed Stats
+            // Add buttons: Follow and Detailed Stats (on same row)
             const buttons: { text: string; callback_data: string }[] = []
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
-              buttons.push({ text: `Follow ${i}`, callback_data: `act:${tok}` })
+              buttons.push({ text: `🐋 Follow`, callback_data: `act:${tok}` })
             } catch {}
-            buttons.push({ text: `📊 Detailed Stats ${i}`, callback_data: `whale:stats:${entry.user_id}` })
+            buttons.push({ text: `📊 Stats`, callback_data: `whale:stats:${entry.user_id}` })
             keyboard.push(buttons)
           }
 
@@ -268,7 +268,7 @@ export function registerCommands(bot: Telegraf) {
             keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `whales:showmore:${displayEnd}` }])
           }
 
-          msg += '💡 Tap Follow to get alerts, or Detailed Stats for accurate all-time PnL.'
+          msg += '💡 Tap 🐋 Follow to get alerts, or 📊 Stats for accurate all-time PnL.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
         } catch (e: any) {
           logger.error('whales:showmore: failed to load leaderboard', { error: e?.message })
@@ -1189,13 +1189,13 @@ export function registerCommands(bot: Telegraf) {
             msg += `   🔗 ${profileUrl}\n\n`
             addresses.push(entry.user_id)
 
-            // Add buttons: Follow and Detailed Stats
+            // Add buttons: Follow and Detailed Stats (on same row)
             const buttons: { text: string; callback_data: string }[] = []
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
-              buttons.push({ text: `Follow ${i}`, callback_data: `act:${tok}` })
+              buttons.push({ text: `🐋 Follow`, callback_data: `act:${tok}` })
             } catch {}
-            buttons.push({ text: `📊 Detailed Stats ${i}`, callback_data: `whale:stats:${entry.user_id}` })
+            buttons.push({ text: `📊 Stats`, callback_data: `whale:stats:${entry.user_id}` })
             keyboard.push(buttons)
           }
 
@@ -1205,7 +1205,7 @@ export function registerCommands(bot: Telegraf) {
             keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `whales:showmore:${nextOffset}` }])
           }
 
-          msg += '💡 Tap Follow to get alerts, Detailed Stats for accurate PnL, or "Give me 2 more" to see more traders.'
+          msg += '💡 Tap 🐋 Follow to get alerts, 📊 Stats for accurate PnL, or "Give me 2 more" to see more traders.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
           return
         } catch (e: any) {
