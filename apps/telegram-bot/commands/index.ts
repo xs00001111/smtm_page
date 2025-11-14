@@ -1310,17 +1310,20 @@ export function registerCommands(bot: Telegraf) {
           return
         }
 
-        // Process each outcome (limit to first 2 to avoid timeouts)
+        // Process only YES outcome
         const url = getPolymarketMarketUrl(market)
-        const tokensToProcess = (market.tokens || []).slice(0, 2)
-        logger.info('overview: tokens to process', {
+        const yesToken = (market.tokens || []).find(t =>
+          (t.outcome || '').toLowerCase() === 'yes'
+        )
+
+        logger.info('overview: looking for YES token', {
           hasTokens: !!market.tokens,
           tokenCount: market.tokens?.length || 0,
-          tokensToProcessCount: tokensToProcess.length
+          foundYes: !!yesToken
         })
 
-        if (tokensToProcess.length === 0) {
-          logger.error('overview: no tokens available after all attempts', {
+        if (!yesToken) {
+          logger.error('overview: no YES token found', {
             conditionId,
             marketKeys: Object.keys(market),
             marketType: typeof market,
@@ -1339,31 +1342,31 @@ export function registerCommands(bot: Telegraf) {
           return
         }
 
-        for (const token of tokensToProcess) {
-          const outcome = token.outcome || token.token_id
-          const set = holdersRes.find(h=>h.token===token.token_id)
-          logger.info('overview: processing token', { tokenId: token.token_id, outcome })
+        const token = yesToken
+        const outcome = token.outcome || token.token_id
+        const set = holdersRes.find(h=>h.token===token.token_id)
+        logger.info('overview: processing YES token', { tokenId: token.token_id, outcome })
 
-          // Get orderbook
-          let book: any = null
-          let midpoint: number|null = null
-          let spread: number|null = null
-          try {
-            logger.info('overview: fetching orderbook', { tokenId: token.token_id })
-            book = await clobApi.getOrderbook(token.token_id)
-            logger.info('overview: orderbook fetched', { tokenId: token.token_id, hasBids: !!book?.bids?.length, hasAsks: !!book?.asks?.length })
-            const bestBid = book.bids?.length ? parseFloat(book.bids[0].price) : null
-            const bestAsk = book.asks?.length ? parseFloat(book.asks[0].price) : null
-            if (bestBid!=null && bestAsk!=null) {
-              midpoint = (bestBid + bestAsk) / 2
-              spread = bestAsk - bestBid
-            }
-          } catch (err) {
-            logger.error('overview: orderbook fetch failed', { tokenId: token.token_id, error: err })
+        // Get orderbook
+        let book: any = null
+        let midpoint: number|null = null
+        let spread: number|null = null
+        try {
+          logger.info('overview: fetching orderbook', { tokenId: token.token_id })
+          book = await clobApi.getOrderbook(token.token_id)
+          logger.info('overview: orderbook fetched', { tokenId: token.token_id, hasBids: !!book?.bids?.length, hasAsks: !!book?.asks?.length })
+          const bestBid = book.bids?.length ? parseFloat(book.bids[0].price) : null
+          const bestAsk = book.asks?.length ? parseFloat(book.asks[0].price) : null
+          if (bestBid!=null && bestAsk!=null) {
+            midpoint = (bestBid + bestAsk) / 2
+            spread = bestAsk - bestBid
           }
+        } catch (err) {
+          logger.error('overview: orderbook fetch failed', { tokenId: token.token_id, error: err })
+        }
 
-          // Build orderbook overview message
-          let msg = `📊 Orderbook Overview\n\n${market.question} (${outcome})\n\n`
+        // Build orderbook overview message
+        let msg = `📊 Orderbook Overview <b>(YES)</b>\n\n${market.question}\n\n`
           if (spread!=null && midpoint!=null) {
             msg += `Spread: ${(spread*100).toFixed(1)}¢, Midpoint: ${(midpoint*100).toFixed(1)}¢\n\n`
           }
@@ -1395,51 +1398,27 @@ export function registerCommands(bot: Telegraf) {
             msg += `No orderbook data available.\n`
           }
 
-          logger.info('overview: sending orderbook message', { tokenId: token.token_id })
-          await ctx.reply(msg, { parse_mode: 'HTML' })
-          logger.info('overview: orderbook message sent', { tokenId: token.token_id })
+        logger.info('overview: sending orderbook message', { tokenId: token.token_id })
+        await ctx.reply(msg, { parse_mode: 'HTML' })
+        logger.info('overview: orderbook message sent', { tokenId: token.token_id })
 
-          // Build net position overview
-          if (set && set.holders.length > 0) {
-            // Build address -> share mapping
-            const positions = set.holders.map(h => ({
-              address: h.address,
-              shares: Math.round(parseFloat(h.balance || '0'))
-            })).filter(p => p.shares > 0).sort((a,b) => b.shares - a.shares).slice(0, 10)
+        // Build net position overview (YES only)
+        if (set && set.holders.length > 0) {
+          // Build address -> share mapping
+          const positions = set.holders.map(h => ({
+            address: h.address,
+            shares: Math.round(parseFloat(h.balance || '0'))
+          })).filter(p => p.shares > 0).sort((a,b) => b.shares - a.shares).slice(0, 10)
 
-            let posMsg = `📊 Net Position Overview\n\n${market.question}\n\n🟢 ${outcome}\n\n`
-            positions.forEach((p, i) => {
-              const short = p.address.slice(0, 6) + '...' + p.address.slice(-4)
-              posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
-            })
+          let posMsg = `📊 Net Position Overview <b>(YES)</b>\n\n${market.question}\n\n`
+          positions.forEach((p, i) => {
+            const short = p.address.slice(0, 6) + '...' + p.address.slice(-4)
+            posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
+          })
 
-            // Check for opposite side positions
-            const oppositeToken = (market.tokens || []).find(t => t.token_id !== token.token_id)
-            if (oppositeToken) {
-              const oppositeSet = holdersRes.find(h=>h.token===oppositeToken.token_id)
-              if (oppositeSet && oppositeSet.holders.length > 0) {
-                const oppositePositions = oppositeSet.holders.map(h => ({
-                  address: h.address,
-                  shares: Math.round(parseFloat(h.balance || '0'))
-                })).filter(p => p.shares > 0).sort((a,b) => b.shares - a.shares).slice(0, 5)
-
-                const oppositeOutcome = oppositeToken.outcome || oppositeToken.token_id
-                if (oppositePositions.length > 0) {
-                  posMsg += `\n🔴 ${oppositeOutcome}\n\n`
-                  oppositePositions.forEach((p, i) => {
-                    const short = p.address.slice(0, 6) + '...' + p.address.slice(-4)
-                    posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
-                  })
-                } else {
-                  posMsg += `\n🔴 ${oppositeOutcome}\n\nEmpty\n`
-                }
-              }
-            }
-
-            logger.info('overview: sending position message', { tokenId: token.token_id })
-            await ctx.reply(posMsg)
-            logger.info('overview: position message sent', { tokenId: token.token_id })
-          }
+          logger.info('overview: sending position message', { tokenId: token.token_id })
+          await ctx.reply(posMsg, { parse_mode: 'HTML' })
+          logger.info('overview: position message sent', { tokenId: token.token_id })
         }
         logger.info('overview: command completed successfully')
       })()
