@@ -335,9 +335,9 @@ export function registerCommands(bot: Telegraf) {
       if (data.startsWith('markets:showmore:')) {
         await ctx.answerCbQuery('Loading more markets...')
         try {
-          // Parse segment and offset from callback data (e.g., 'markets:showmore:hot:1')
+          // Parse segment and offset from callback data (e.g., 'markets:showmore:trending:1')
           const parts = data.split(':')
-          const segment = parts[2] || 'hot'
+          const segment = parts[2] || 'trending'
           const offset = parseInt(parts[3] || '0', 10)
 
           // Re-fetch markets based on segment (same logic as /markets command)
@@ -350,8 +350,11 @@ export function registerCommands(bot: Telegraf) {
             orderBy = 'end_date_min'
           }
 
+          // For breaking, fetch more markets to calculate price changes
+          const fetchLimit = segment === 'breaking' ? 50 : 20
+
           try {
-            markets = await gammaApi.getActiveMarkets(20, orderBy)
+            markets = await gammaApi.getActiveMarkets(fetchLimit, orderBy)
           } catch (inner: any) {
             logger.error('markets:showmore: gammaApi active failed', { error: inner?.message })
             await ctx.reply('❌ Unable to load more markets. Try again later.')
@@ -385,10 +388,32 @@ export function registerCommands(bot: Telegraf) {
               return Number.isFinite(createdAt) && createdAt > sevenDaysAgo
             })
           } else if (segment === 'breaking') {
-            markets = markets.filter((m: any) => {
-              const vol24hr = parseFloat(m?.volume_24hr || m?.volume24hr || '0')
-              return !isNaN(vol24hr) && vol24hr > 1000
-            })
+            // Calculate 24hr price changes and sort by magnitude (same as main command)
+            const marketsWithChange = await Promise.all(
+              markets.slice(0, 30).map(async (m: any) => {
+                try {
+                  const tokenId = m?.tokens?.[0]?.token_id
+                  if (!tokenId) return { market: m, priceChange: 0 }
+
+                  const history = await clobApi.getPricesHistory({ market: tokenId, interval: '1d', fidelity: 10 })
+                  if (!history?.history || history.history.length < 2) {
+                    return { market: m, priceChange: 0 }
+                  }
+
+                  const oldPrice = history.history[0].p
+                  const newPrice = history.history[history.history.length - 1].p
+                  const priceChange = Math.abs(newPrice - oldPrice)
+
+                  return { market: m, priceChange }
+                } catch (error) {
+                  return { market: m, priceChange: 0 }
+                }
+              })
+            )
+
+            markets = marketsWithChange
+              .sort((a, b) => b.priceChange - a.priceChange)
+              .map(item => item.market)
           }
 
           if (markets.length === 0) {
@@ -1857,22 +1882,25 @@ export function registerCommands(bot: Telegraf) {
       if (segment === 'trending') {
         orderBy = 'volume_24hr'
       } else if (segment === 'breaking') {
-        orderBy = 'volume_24hr'
+        orderBy = 'volume_24hr' // Fetch by volume first, then sort by price change
       } else if (segment === 'new') {
         orderBy = 'volume' // Will filter by recent createdAt later
       } else if (segment === 'ending') {
         orderBy = 'end_date_min'
       }
 
+      // For breaking, fetch more markets to calculate price changes
+      const fetchLimit = segment === 'breaking' ? 50 : 20
+
       try {
-        logger.info(`markets: using gammaApi.getActiveMarkets(20, ${orderBy})`)
-        markets = await gammaApi.getActiveMarkets(20, orderBy)
+        logger.info(`markets: using gammaApi.getActiveMarkets(${fetchLimit}, ${orderBy})`)
+        markets = await gammaApi.getActiveMarkets(fetchLimit, orderBy)
         const c = Array.isArray(markets) ? markets.length : -1
         logger.info(`markets: gammaApi active returned count=${c} type=${typeof markets}`)
       } catch (inner: any) {
         logger.error('markets: gammaApi active failed', { error: inner?.message || String(inner) })
         // Fallback to direct fetch with timeout
-        const url = `https://gamma-api.polymarket.com/markets?active=true&limit=20&order=${orderBy}&ascending=false`
+        const url = `https://gamma-api.polymarket.com/markets?active=true&limit=${fetchLimit}&order=${orderBy}&ascending=false`
         logger.info(`markets: fallback fetch (active by ${orderBy})`, { url })
         const controller = new AbortController();
         const to = setTimeout(() => controller.abort(), 7000);
@@ -1941,12 +1969,42 @@ export function registerCommands(bot: Telegraf) {
         })
         logger.info(`markets: filtered for new markets (last 7 days), count=${markets.length}`)
       } else if (segment === 'breaking' && markets.length > 0) {
-        // For "breaking", filter for high recent volume (volume_24hr)
-        markets = markets.filter((m: any) => {
-          const vol24hr = parseFloat(m?.volume_24hr || m?.volume24hr || '0')
-          return !isNaN(vol24hr) && vol24hr > 1000 // At least $1k in 24hr volume
-        })
-        logger.info(`markets: filtered for breaking markets (volume_24hr > 1000), count=${markets.length}`)
+        // For "breaking", calculate 24hr price changes and sort by magnitude
+        logger.info(`markets: calculating price changes for ${markets.length} breaking candidates`)
+
+        const marketsWithChange = await Promise.all(
+          markets.slice(0, 30).map(async (m: any) => {
+            try {
+              // Get first token ID for price history
+              const tokenId = m?.tokens?.[0]?.token_id
+              if (!tokenId) return { market: m, priceChange: 0 }
+
+              // Fetch 1-day price history
+              const history = await clobApi.getPricesHistory({ market: tokenId, interval: '1d', fidelity: 10 })
+
+              if (!history?.history || history.history.length < 2) {
+                return { market: m, priceChange: 0 }
+              }
+
+              // Calculate price change from 24h ago to now
+              const oldPrice = history.history[0].p
+              const newPrice = history.history[history.history.length - 1].p
+              const priceChange = Math.abs(newPrice - oldPrice)
+
+              return { market: m, priceChange }
+            } catch (error) {
+              logger.warn(`Failed to calculate price change for market`, { error: (error as any)?.message })
+              return { market: m, priceChange: 0 }
+            }
+          })
+        )
+
+        // Sort by price change (descending) and take top 20
+        markets = marketsWithChange
+          .sort((a, b) => b.priceChange - a.priceChange)
+          .map(item => item.market)
+
+        logger.info(`markets: sorted by price change for breaking markets, count=${markets.length}`)
       }
 
       // Secondary fallback: if empty, try trending as last resort and re-filter
