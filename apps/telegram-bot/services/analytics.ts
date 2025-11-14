@@ -84,5 +84,52 @@ export function initAnalyticsLogging(bot: Telegraf) {
     }
     return next()
   })
-}
 
+  // Track callback button interactions
+  bot.on('callback_query', async (ctx, next) => {
+    try {
+      const cq: any = (ctx as any).callbackQuery
+      const data: string | undefined = cq?.data
+      if (!data) return next()
+
+      const from = ctx.from
+      const chatId = (cq?.message && cq.message.chat && cq.message.chat.id != null)
+        ? Number(cq.message.chat.id)
+        : undefined
+
+      const userId = from?.id ? Number(from.id) : undefined
+      if (userId) {
+        const parts = data.split(':')
+        const inferred = parts[0] || 'callback'
+
+        const payload = {
+          p_telegram_user_id: userId,
+          p_username: from?.username ?? null,
+          p_language_code: (from as any)?.language_code ?? null,
+          p_is_bot: Boolean((from as any)?.is_bot),
+          p_telegram_chat_id: chatId ?? null,
+          p_chat_type: (cq?.message as any)?.chat?.type ?? null,
+          p_chat_title: (cq?.message as any)?.chat?.title ?? null,
+          p_command: inferred,
+          p_args: { callback_data: data, parts },
+          p_bot_id: null,
+          p_telegram_message_id: (cq?.message as any)?.message_id ?? null,
+          p_meta: {
+            update_type: ctx.updateType,
+            update_id: (ctx as any).update?.update_id,
+            inline_message_id: cq?.inline_message_id || null,
+          },
+        }
+
+        try {
+          await postRpc('analytics_log_command', payload)
+        } catch (e) {
+          logger.warn({ err: (e as any)?.message }, 'analytics_log_callback failed')
+        }
+      }
+    } catch (e) {
+      logger.warn({ err: (e as any)?.message }, 'analytics callback middleware error')
+    }
+    return next()
+  })
+}
