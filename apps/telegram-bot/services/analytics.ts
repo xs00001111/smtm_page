@@ -39,6 +39,11 @@ function parseCommandFromText(text: string | undefined, entities?: any[]): { com
 }
 
 export function initAnalyticsLogging(bot: Telegraf) {
+  if (!supabaseAvailable()) {
+    logger.info('Analytics disabled: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set');
+  } else {
+    logger.info('Analytics enabled: logging commands, callbacks, inline queries, messages, and errors');
+  }
   // Best-effort middleware: logs each command message via RPC
   bot.use(async (ctx, next) => {
     try {
