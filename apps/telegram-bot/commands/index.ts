@@ -344,14 +344,12 @@ export function registerCommands(bot: Telegraf) {
           let markets: any[] = []
           let orderBy: 'volume' | 'liquidity' | 'volume_24hr' | 'end_date_min' = 'volume'
 
-          if (segment === 'trending' || segment === 'breaking') {
-            orderBy = 'volume_24hr'
-          } else if (segment === 'ending') {
-            orderBy = 'end_date_min'
-          }
+          // Note: Gamma API only reliably supports 'volume' and 'liquidity' ordering
+          // Always use 'volume' and do client-side sorting for other segments
+          orderBy = 'volume'
 
-          // For breaking, fetch more markets to calculate price changes
-          const fetchLimit = segment === 'breaking' ? 50 : 20
+          // For breaking and ending, fetch more markets to calculate/sort
+          const fetchLimit = (segment === 'breaking' || segment === 'ending') ? 50 : 20
 
           try {
             markets = await gammaApi.getActiveMarkets(fetchLimit, orderBy)
@@ -414,6 +412,15 @@ export function registerCommands(bot: Telegraf) {
             markets = marketsWithChange
               .sort((a, b) => b.priceChange - a.priceChange)
               .map(item => item.market)
+          } else if (segment === 'ending') {
+            // Sort by end_date_iso (ascending - soonest first)
+            markets = markets.sort((a: any, b: any) => {
+              const aEnd = a?.end_date_iso || a?.endDateIso || a?.endDate || a?.end_date
+              const bEnd = b?.end_date_iso || b?.endDateIso || b?.endDate || b?.end_date
+              const aTime = aEnd ? Date.parse(aEnd) : Infinity
+              const bTime = bEnd ? Date.parse(bEnd) : Infinity
+              return aTime - bTime
+            })
           }
 
           if (markets.length === 0) {
@@ -1879,18 +1886,20 @@ export function registerCommands(bot: Telegraf) {
       let orderBy: 'volume' | 'liquidity' | 'volume_24hr' | 'end_date_min' = 'volume'
 
       // Set order based on segment
+      // Note: Gamma API only reliably supports 'volume' and 'liquidity' ordering
+      // Use 'volume' and do client-side sorting/filtering for other segments
       if (segment === 'trending') {
-        orderBy = 'volume_24hr'
+        orderBy = 'volume' // Use total volume as proxy for trending
       } else if (segment === 'breaking') {
-        orderBy = 'volume_24hr' // Fetch by volume first, then sort by price change
+        orderBy = 'volume' // Fetch by volume first, then sort by price change
       } else if (segment === 'new') {
         orderBy = 'volume' // Will filter by recent createdAt later
       } else if (segment === 'ending') {
-        orderBy = 'end_date_min'
+        orderBy = 'volume' // Will sort by end_date client-side
       }
 
-      // For breaking, fetch more markets to calculate price changes
-      const fetchLimit = segment === 'breaking' ? 50 : 20
+      // For breaking and ending, fetch more markets to calculate/sort
+      const fetchLimit = (segment === 'breaking' || segment === 'ending') ? 50 : 20
 
       try {
         logger.info(`markets: using gammaApi.getActiveMarkets(${fetchLimit}, ${orderBy})`)
@@ -2005,6 +2014,16 @@ export function registerCommands(bot: Telegraf) {
           .map(item => item.market)
 
         logger.info(`markets: sorted by price change for breaking markets, count=${markets.length}`)
+      } else if (segment === 'ending' && markets.length > 0) {
+        // For "ending", sort by end_date_iso (ascending - soonest first)
+        markets = markets.sort((a: any, b: any) => {
+          const aEnd = a?.end_date_iso || a?.endDateIso || a?.endDate || a?.end_date
+          const bEnd = b?.end_date_iso || b?.endDateIso || b?.endDate || b?.end_date
+          const aTime = aEnd ? Date.parse(aEnd) : Infinity
+          const bTime = bEnd ? Date.parse(bEnd) : Infinity
+          return aTime - bTime // Ascending - soonest first
+        })
+        logger.info(`markets: sorted by end_date for ending soon markets, count=${markets.length}`)
       }
 
       // Secondary fallback: if empty, try trending as last resort and re-filter
