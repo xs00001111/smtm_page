@@ -254,6 +254,55 @@ export class DataApiClient {
     await Promise.all(promises);
     return results;
   }
+
+  /**
+   * Calculate win rate for a user
+   * Win rate = (Number of Markets with Net Profit) / (Total Number of Markets Traded)
+   * @param user - User's Ethereum address (0x...)
+   * @param limit - Max number of closed positions to fetch (default 500)
+   * @returns Object with wins, total markets, and win rate percentage
+   */
+  async getUserWinRate(
+    user: string,
+    limit = 500
+  ): Promise<{ wins: number; total: number; winRate: number }> {
+    try {
+      const closedPositions = await this.getClosedPositions(user, limit);
+
+      if (!closedPositions || closedPositions.length === 0) {
+        return { wins: 0, total: 0, winRate: 0 };
+      }
+
+      // Group positions by market and calculate net PnL per market
+      const marketPnL = new Map<string, number>();
+
+      for (const position of closedPositions) {
+        const market = position.market;
+        const pnl = parseFloat(position.pnl || '0');
+
+        if (!marketPnL.has(market)) {
+          marketPnL.set(market, 0);
+        }
+        marketPnL.set(market, (marketPnL.get(market) || 0) + pnl);
+      }
+
+      // Count markets with positive net PnL
+      let wins = 0;
+      for (const netPnL of marketPnL.values()) {
+        if (netPnL > 0) {
+          wins++;
+        }
+      }
+
+      const total = marketPnL.size;
+      const winRate = total > 0 ? (wins / total) * 100 : 0;
+
+      return { wins, total, winRate };
+    } catch (error) {
+      console.error(`Failed to calculate win rate for ${user}:`, error);
+      return { wins: 0, total: 0, winRate: 0 };
+    }
+  }
 }
 
 // Export singleton instance

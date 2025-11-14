@@ -236,8 +236,21 @@ export function registerCommands(bot: Telegraf) {
             const pnl = entry.pnl > 0 ? `+$${Math.round(entry.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(entry.pnl)).toLocaleString()}`
             const vol = `$${Math.round(entry.vol).toLocaleString()}`
             const profileUrl = getPolymarketProfileUrl(entry.user_name, entry.user_id)
+
+            // Fetch win rate
+            let winRateStr = '—'
+            try {
+              const { winRate } = await dataApi.getUserWinRate(entry.user_id, 500)
+              if (winRate > 0) {
+                winRateStr = `${winRate.toFixed(1)}%`
+              }
+            } catch (e) {
+              logger.warn('Failed to fetch win rate', { user: entry.user_id, error: (e as any)?.message })
+            }
+
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+            msg += `   🎯 Win Rate: ${winRateStr}\n`
             msg += `   🔗 ${profileUrl}\n\n`
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
@@ -1100,8 +1113,21 @@ export function registerCommands(bot: Telegraf) {
             const pnl = entry.pnl > 0 ? `+$${Math.round(entry.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(entry.pnl)).toLocaleString()}`
             const vol = `$${Math.round(entry.vol).toLocaleString()}`
             const profileUrl = getPolymarketProfileUrl(entry.user_name, entry.user_id)
+
+            // Fetch win rate
+            let winRateStr = '—'
+            try {
+              const { winRate } = await dataApi.getUserWinRate(entry.user_id, 500)
+              if (winRate > 0) {
+                winRateStr = `${winRate.toFixed(1)}%`
+              }
+            } catch (e) {
+              logger.warn('Failed to fetch win rate', { user: entry.user_id, error: (e as any)?.message })
+            }
+
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+            msg += `   🎯 Win Rate: ${winRateStr}\n`
             msg += `   🔗 ${profileUrl}\n\n`
             addresses.push(entry.user_id)
             try {
