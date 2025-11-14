@@ -223,8 +223,8 @@ export function registerCommands(bot: Telegraf) {
           let msg = '🐋 Top Traders (by PnL)\n\n'
           const keyboard: { text: string; callback_data: string }[][] = []
 
-          // Show 2 more traders at a time
-          const batchSize = 2
+          // Show 1 more trader at a time
+          const batchSize = 1
           const displayEnd = Math.min(offset + batchSize, leaderboard.length)
           const remaining = leaderboard.length - displayEnd
 
@@ -265,7 +265,7 @@ export function registerCommands(bot: Telegraf) {
 
           // Add another "Show More" button if there are still more traders
           if (remaining > 0) {
-            keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `whales:showmore:${displayEnd}` }])
+            keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `whales:showmore:${displayEnd}` }])
           }
 
           msg += '💡 Tap 🐋 Follow to get alerts, or 📊 Stats for accurate all-time PnL.'
@@ -395,8 +395,8 @@ export function registerCommands(bot: Telegraf) {
             return
           }
 
-          // Show 2 more markets at a time
-          const batchSize = 2
+          // Show 1 more market at a time
+          const batchSize = 1
           const displayEnd = Math.min(offset + batchSize, markets.length)
           const remaining = markets.length - displayEnd
           const displayMarkets = markets.slice(offset, displayEnd)
@@ -486,9 +486,9 @@ export function registerCommands(bot: Telegraf) {
             }
           }
 
-          // Add another "Give me 2 more" button if there are still more markets
+          // Add another "Give me 1 more" button if there are still more markets
           if (remaining > 0) {
-            keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `markets:showmore:${segment}:${displayEnd}` }])
+            keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayEnd}` }])
           }
 
           message += '💡 Tap Follow to get alerts for any of these markets.'
@@ -1202,10 +1202,10 @@ export function registerCommands(bot: Telegraf) {
           // Add "Show More" button if there are more whales
           if (remaining > 0) {
             const nextOffset = displayCount
-            keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `whales:showmore:${nextOffset}` }])
+            keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `whales:showmore:${nextOffset}` }])
           }
 
-          msg += '💡 Tap 🐋 Follow to get alerts, 📊 Stats for accurate PnL, or "Give me 2 more" to see more traders.'
+          msg += '💡 Tap 🐋 Follow to get alerts, 📊 Stats for accurate PnL, or "Give me 1 more" to see more traders.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
           return
         } catch (e: any) {
@@ -2067,12 +2067,12 @@ export function registerCommands(bot: Telegraf) {
         }
       }
 
-      // Add "Give me 2 more" button if there are more markets
+      // Add "Give me 1 more" button if there are more markets
       if (remaining > 0) {
-        keyboard.push([{ text: `👀 Give me 2 more`, callback_data: `markets:showmore:${segment}:${displayCount}` }])
+        keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayCount}` }])
       }
 
-      message += '💡 Tap Follow to get alerts, or "Give me 2 more" to see more markets.\n\n';
+      message += '💡 Tap Follow to get alerts, or "Give me 1 more" to see more markets.\n\n';
       message +=
         '📂 Browse segments:\n' +
         '• /markets trending - 24hr volume leaders\n' +
