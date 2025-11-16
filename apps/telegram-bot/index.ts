@@ -8,6 +8,7 @@ import { botConfig } from './config/bot';
 import { loadSubscriptions } from './services/subscriptions';
 import { loadLinks } from './services/links';
 import { initAnalyticsLogging, logAnalyticsError } from './services/analytics';
+import { startResolutionMonitor } from './services/resolution-monitor';
 
 const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
 
@@ -67,6 +68,8 @@ async function start() {
     // Restore stored data before deciding to start WS
     await loadLinks();
     await loadSubscriptions(wsMonitor);
+    // Start resolution monitor to notify winners and auto-unfollow
+    startResolutionMonitor(wsMonitor);
 
     // Only start WS if enabled and there are active subscriptions; otherwise lazy-start
     const status = wsMonitor.getStatus();

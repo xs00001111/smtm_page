@@ -2226,6 +2226,79 @@ export function registerCommands(bot: Telegraf) {
     const userId = ctx.from!.id
     const looksLikeAddress = (s: string) => /^0x[a-fA-F0-9]{40}$/.test(s)
     const looksLikeCond = (s: string) => /^0x[a-fA-F0-9]{64}$/.test(s)
+    const looksLikeUrl = (s: string) => /^https?:\/\//i.test(s)
+    const looksLikeHandle = (s: string) => /^@?[-_A-Za-z0-9]{3,}$/i.test(s)
+
+    // New: Follow by URL (market or profile) or @handle
+    if (args.length >= 1 && (looksLikeUrl(args[0]) || args[0].startsWith('@'))) {
+      try {
+        // Case A: Profile URL or @handle -> whale follow (all markets or specific market via 2nd arg)
+        const maybeProfile = args[0]
+        let wallet: string | undefined
+        if (looksLikeUrl(maybeProfile)) {
+          try {
+            const u = new URL(maybeProfile)
+            if (u.hostname.includes('polymarket.com') && u.pathname.includes('/profile')) {
+              const { parsePolymarketProfile, resolveUsernameToAddress } = await import('../services/links')
+              const parsed = parsePolymarketProfile(maybeProfile)
+              if (parsed?.address) wallet = parsed.address
+              else if (parsed?.username) wallet = await resolveUsernameToAddress(parsed.username)
+            }
+          } catch {}
+        } else if (maybeProfile.startsWith('@') || looksLikeHandle(maybeProfile)) {
+          const { resolveUsernameToAddress } = await import('../services/links')
+          wallet = await resolveUsernameToAddress(maybeProfile.replace(/^@/, ''))
+        }
+
+        // If we successfully resolved a wallet, treat as whale follow
+        if (wallet && /^0x[a-fA-F0-9]{40}$/i.test(wallet)) {
+          // If second arg provided, try to treat as market (URL or condition id)
+          if (args[1]) {
+            const marketInput = args[1]
+            const market = looksLikeCond(marketInput) ? await (async()=>({ condition_id: marketInput, tokens: [{ token_id: null }], question: '' }))() : await resolveMarketFromInput(marketInput)
+            if (!market) { await ctx.reply('❌ Could not resolve the market from your input.'); return }
+            const conditionId = (market as any).condition_id || (market as any).conditionId
+            let tokenId = (market as any)?.tokens?.[0]?.token_id as string | undefined
+            if (!tokenId && conditionId) {
+              try { const m = await gammaApi.getMarket(conditionId); tokenId = m?.tokens?.[0]?.token_id } catch {}
+            }
+            const name = (market as any)?.question || 'Market'
+            if (!conditionId) { await ctx.reply('❌ Market not found from URL/input.'); return }
+            const ok = wsMonitor.subscribePendingWhale(userId, conditionId, name, botConfig.websocket.whaleTrademinSize, wallet)
+            const { addWhaleSubscription } = await import('../services/subscriptions')
+            await addWhaleSubscription(userId, tokenId || '', name, botConfig.websocket.whaleTrademinSize, wallet, conditionId)
+            await ctx.reply(`✅ Following whale ${wallet.slice(0,6)}...${wallet.slice(-4)} on this market!`)
+            return
+          }
+          // No market specified -> whale across all markets
+          const ok = wsMonitor.subscribeToWhaleTradesAll(userId, wallet, botConfig.websocket.whaleTrademinSize)
+          const { addWhaleSubscriptionAll } = await import('../services/subscriptions')
+          await addWhaleSubscriptionAll(userId, wallet, botConfig.websocket.whaleTrademinSize)
+          await ctx.reply(`✅ Following whale ${wallet.slice(0,6)}...${wallet.slice(-4)} on all markets!`)
+          return
+        }
+
+        // Case B: Market URL -> price alerts
+        if (looksLikeUrl(args[0])) {
+          const market = await resolveMarketFromInput(args[0])
+          if (!market) { await ctx.reply('❌ Could not resolve a market from that URL.'); return }
+          const conditionId = (market as any).condition_id
+          const tokenId = (market as any)?.tokens?.[0]?.token_id
+          const name = (market as any)?.question || 'Market'
+          if (!tokenId || !conditionId) { await ctx.reply('❌ Market is not ready for alerts yet.'); return }
+          const ok = wsMonitor.subscribeToMarket(userId, tokenId, name, botConfig.websocket.priceChangeThreshold)
+          if (!ok) { await ctx.reply('⚠️ You are already following this market.'); return }
+          const { addMarketSubscription } = await import('../services/subscriptions')
+          await addMarketSubscription(userId, tokenId, name, conditionId, botConfig.websocket.priceChangeThreshold)
+          await ctx.reply(`✅ Price alerts enabled for: ${name}`)
+          return
+        }
+      } catch (e) {
+        logger.error('follow by URL/handle failed', { err: (e as any)?.message })
+        await ctx.reply('❌ Could not process your input. Try a Polymarket URL, @handle, 0x<address>, or 0x<market_id>.')
+        return
+      }
+    }
 
     // Case 1: Follow a market (price alerts)
     if (args.length === 1 && looksLikeCond(args[0])) {
