@@ -663,6 +663,36 @@ export function registerCommands(bot: Telegraf) {
     );
   });
 
+  // Debug: send a test price alert based on an existing market subscription
+  bot.command('debug_price', async (ctx) => {
+    try {
+      const ok = await wsMonitor.debugSendPrice(ctx.from!.id)
+      if (ok) {
+        await ctx.reply('✅ Sent a test price alert based on your current follows.')
+      } else {
+        await ctx.reply('ℹ️ No market follows found. Use /follow <conditionId> or tap Follow in markets to add one.')
+      }
+    } catch (e) {
+      logger.error('debug_price failed', e)
+      await ctx.reply('❌ Failed to send test price alert.')
+    }
+  })
+
+  // Debug: send a test whale alert based on an existing whale subscription
+  bot.command('debug_whale', async (ctx) => {
+    try {
+      const ok = await wsMonitor.debugSendWhale(ctx.from!.id)
+      if (ok) {
+        await ctx.reply('✅ Sent a test whale alert based on your current follows.')
+      } else {
+        await ctx.reply('ℹ️ No whale follows found. Use /follow or whale follow buttons to add one.')
+      }
+    } catch (e) {
+      logger.error('debug_whale failed', e)
+      await ctx.reply('❌ Failed to send test whale alert.')
+    }
+  })
+
   // Survey: gauge interest in arbitrage & spread farming feature
   // HIDDEN: Auth not ready yet
   // bot.command('survey', async (ctx) => {
