@@ -47,7 +47,13 @@ export function startResolutionMonitor(ws: WebSocketMonitorService) {
     return
   }
 
-  async function scanResolutions(nearOnly: boolean) {
+  const baseEveryMin = Math.max(1, parseInt(env.RESOLUTION_SCAN_BASE_MINUTES || '10', 10))
+  const nearEveryMin = Math.max(1, parseInt(env.RESOLUTION_SCAN_NEAR_MINUTES || '2', 10))
+  const nearWindowMs = Math.max(1, parseInt(env.RESOLUTION_NEAR_WINDOW_HOURS || '24', 10)) * 60 * 60 * 1000
+  const finalEverySec = Math.max(5, parseInt(env.RESOLUTION_SCAN_FINAL_SECONDS || '30', 10))
+  const finalWindowMs = Math.max(1, parseInt(env.RESOLUTION_FINAL_WINDOW_MINUTES || '60', 10)) * 60 * 1000
+
+  async function scanResolutions(mode: 'all' | 'near' | 'final') {
     try {
       // Fetch follows once
       const follows = await sb<FollowRow[]>(
@@ -64,16 +70,18 @@ export function startResolutionMonitor(ws: WebSocketMonitorService) {
       if (byCondition.size === 0) return
 
       const now = Date.now()
-      const soonMs = 24 * 60 * 60 * 1000
 
       for (const [conditionId, rows] of byCondition) {
         try {
           const m: any = await gammaApi.getMarket(conditionId)
           const endIso = m?.end_date_iso || m?.endDateIso || m?.end_date
           const endTime = endIso ? Date.parse(endIso) : NaN
-          if (nearOnly) {
-            const isSoon = Number.isFinite(endTime) && endTime - now <= soonMs
+          if (mode === 'near') {
+            const isSoon = Number.isFinite(endTime) && endTime - now <= nearWindowMs
             if (!isSoon) continue
+          } else if (mode === 'final') {
+            const isFinal = Number.isFinite(endTime) && endTime - now <= finalWindowMs
+            if (!isFinal) continue
           }
 
           const isResolved = m?.resolved === true || (Array.isArray(m?.tokens) && m.tokens.some((t: any) => t.winner === true))
@@ -115,10 +123,18 @@ export function startResolutionMonitor(ws: WebSocketMonitorService) {
     }
   }
 
-  // Baseline: every 10 minutes
-  cron.schedule('*/10 * * * *', () => scanResolutions(false))
-  // High-frequency: every 2 minutes for markets ending within 24h
-  cron.schedule('*/2 * * * *', () => scanResolutions(true))
+  // Baseline scan (all markets): every N minutes
+  cron.schedule(`*/${baseEveryMin} * * * *`, () => scanResolutions('all'))
+  // Near-end scan (within configurable hours): every M minutes
+  cron.schedule(`*/${nearEveryMin} * * * *`, () => scanResolutions('near'))
+  // Final scan (within last window): every S seconds (6-field cron)
+  cron.schedule(`*/${finalEverySec} * * * * *`, () => scanResolutions('final'))
 
-  logger.info('Resolution monitor started (10m baseline, 2m for near-end markets)')
+  logger.info('Resolution monitor started', {
+    baseEveryMin,
+    nearEveryMin,
+    nearWindowHours: Math.round(nearWindowMs / 3600000),
+    finalEverySec,
+    finalWindowMin: Math.round(finalWindowMs / 60000),
+  })
 }
