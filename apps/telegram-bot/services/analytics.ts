@@ -130,6 +130,12 @@ export function initAnalyticsLogging(bot: Telegraf) {
       const data: string | undefined = cq?.data
       if (!data) return next()
 
+      // Skip generic action-token callbacks here. We'll log the resolved
+      // action type in the handler after token is resolved.
+      if (typeof data === 'string' && data.startsWith('act:')) {
+        return next()
+      }
+
       const from = ctx.from
       const chatId = (cq?.message && cq.message.chat && cq.message.chat.id != null)
         ? Number(cq.message.chat.id)
@@ -208,6 +214,38 @@ export function initAnalyticsLogging(bot: Telegraf) {
     }
     return next()
   })
+}
+
+// Log a specific action with explicit command name (e.g., follow_market)
+export async function logActionEvent(ctx: any, command: string, args?: any) {
+  try {
+    if (!supabaseAvailable()) return
+    const from = ctx?.from
+    const chat = ctx?.chat || (ctx?.message && ctx.message.chat)
+    const userId = from?.id ? Number(from.id) : undefined
+    const chatId = chat?.id != null ? Number(chat.id) : undefined
+    if (!userId) return
+    const payload = {
+      p_telegram_user_id: userId,
+      p_username: from?.username ?? null,
+      p_language_code: (from as any)?.language_code ?? null,
+      p_is_bot: Boolean((from as any)?.is_bot),
+      p_telegram_chat_id: chatId ?? null,
+      p_chat_type: (chat as any)?.type ?? null,
+      p_chat_title: (chat as any)?.title ?? null,
+      p_command: command,
+      p_args: args ?? null,
+      p_bot_id: null,
+      p_telegram_message_id: (ctx as any)?.message?.message_id ?? (ctx as any)?.callbackQuery?.message?.message_id ?? null,
+      p_meta: {
+        update_type: ctx?.updateType,
+        update_id: (ctx as any)?.update?.update_id,
+      },
+    }
+    await postRpc('analytics_log_command', payload)
+  } catch (e) {
+    logger.warn({ err: (e as any)?.message }, 'analytics logActionEvent failed')
+  }
 }
 
 // Optional helper to log handled errors with context

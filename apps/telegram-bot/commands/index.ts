@@ -6,6 +6,7 @@ import { wsMonitor } from '../index';
 import { botConfig } from '../config/bot';
 import { linkPolymarketAddress, linkPolymarketUsername, unlinkAll, getLinks, parsePolymarketProfile, resolveUsernameToAddress, resolveUsernameToAddressExact } from '../services/links';
 import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, resolveAction, actionUnfollowMarket, actionUnfollowWhaleAll, actionUnfollowWhaleMarket, actionFollowWhaleAllMany } from '../services/actions';
+import { logActionEvent } from '../services/analytics';
 import { recordSurveyResponse } from '../services/survey';
 
 /**
@@ -551,18 +552,22 @@ export function registerCommands(bot: Telegraf) {
         const ok = wsMonitor.subscribePendingMarket(userId, conditionId, marketName || 'Market', botConfig.websocket.priceChangeThreshold)
         const { addMarketSubscription } = await import('../services/subscriptions')
         await addMarketSubscription(userId, '', marketName || 'Market', conditionId, botConfig.websocket.priceChangeThreshold)
+        // Analytics: record resolved action type
+        void logActionEvent(ctx, 'follow_market', { conditionId, marketName, ok })
         await ctx.answerCbQuery(ok ? '✅ Following market!' : 'Already following')
       } else if (rec.type === 'follow_whale_all') {
         const { address } = rec.data
         const ok = wsMonitor.subscribeToWhaleTradesAll(userId, address, botConfig.websocket.whaleTrademinSize)
         const { addWhaleSubscriptionAll } = await import('../services/subscriptions')
         await addWhaleSubscriptionAll(userId, address, botConfig.websocket.whaleTrademinSize)
+        void logActionEvent(ctx, 'follow_whale_all', { address, ok })
         await ctx.answerCbQuery(ok ? '✅ Following whale (all markets)!' : 'Already following')
       } else if (rec.type === 'follow_whale_market') {
         const { address, conditionId, marketName } = rec.data
         const ok = wsMonitor.subscribePendingWhale(userId, conditionId, marketName || 'Market', botConfig.websocket.whaleTrademinSize, address)
         const { addWhaleSubscription } = await import('../services/subscriptions')
         await addWhaleSubscription(userId, '', marketName || 'Market', botConfig.websocket.whaleTrademinSize, address, conditionId)
+        void logActionEvent(ctx, 'follow_whale_market', { address, conditionId, marketName, ok })
         await ctx.answerCbQuery(ok ? '✅ Following whale on market!' : 'Already following')
       } else if (rec.type === 'follow_whale_all_many') {
         const { addresses } = rec.data as { addresses: string[] }
@@ -580,6 +585,7 @@ export function registerCommands(bot: Telegraf) {
             }
           }
           await ctx.answerCbQuery(okCount > 0 ? `✅ Following ${okCount} whales` : 'No new follows')
+          void logActionEvent(ctx, 'follow_whale_all_many', { count: okCount })
           if (okCount > 0) await ctx.reply(`✅ Following ${okCount} whales (all markets)`)
         } catch {
           await ctx.answerCbQuery('❌ Failed to follow all')
@@ -592,6 +598,7 @@ export function registerCommands(bot: Telegraf) {
           const { removeMarketSubscription, removePendingMarketByCondition } = await import('../services/subscriptions')
           if (tokenId) await removeMarketSubscription(userId, tokenId)
           if (conditionId) await removePendingMarketByCondition(userId, conditionId)
+          void logActionEvent(ctx, 'unfollow_market', { tokenId, conditionId, marketName, ok })
           await ctx.answerCbQuery(`✅ Unfollowed${marketName ? ` ${marketName}` : ''}`)
         } catch {
           await ctx.answerCbQuery('❌ Failed to unfollow')
@@ -602,6 +609,7 @@ export function registerCommands(bot: Telegraf) {
           wsMonitor.unsubscribeFromWhaleTradesAll(userId, address)
           const { removeWhaleSubscriptionAll } = await import('../services/subscriptions')
           await removeWhaleSubscriptionAll(userId, address)
+          void logActionEvent(ctx, 'unfollow_whale_all', { address })
           await ctx.answerCbQuery('✅ Unfollowed whale (all)')
         } catch { await ctx.answerCbQuery('❌ Failed to unfollow') }
       } else if (rec.type === 'unfollow_whale_market') {
@@ -611,6 +619,7 @@ export function registerCommands(bot: Telegraf) {
           const { removeWhaleSubscription, removePendingWhaleByCondition } = await import('../services/subscriptions')
           if (tokenId) await removeWhaleSubscription(userId, tokenId)
           if (conditionId) await removePendingWhaleByCondition(userId, conditionId, address)
+          void logActionEvent(ctx, 'unfollow_whale_market', { address, tokenId, conditionId, marketName })
           await ctx.answerCbQuery(`✅ Unfollowed${marketName ? ` ${marketName}` : ''}`)
         } catch { await ctx.answerCbQuery('❌ Failed to unfollow') }
       }
