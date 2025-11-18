@@ -10,7 +10,11 @@ import { loadLinks } from './services/links';
 import { initAnalyticsLogging, logAnalyticsError } from './services/analytics';
 import { startResolutionMonitor } from './services/resolution-monitor';
 
-const bot = new Telegraf(env.TELEGRAM_BOT_TOKEN);
+const token = env.TELEGRAM_BOT_TOKEN
+if (!token) {
+  throw new Error('TELEGRAM_BOT_TOKEN is required to run the Telegram bot')
+}
+const bot = new Telegraf(token);
 
 // Initialize WebSocket monitoring service
 export const wsMonitor = new WebSocketMonitorService(bot);

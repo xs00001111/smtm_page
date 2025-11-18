@@ -5,7 +5,8 @@ dotenv.config();
 
 const envSchema = z.object({
   TIMEZONE: z.string().default('America/New_York'),
-  TELEGRAM_BOT_TOKEN: z.string(),
+  // Make optional so non-bot processes (e.g., Next dev) don't fail parsing
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
   DISCORD_BOT_TOKEN: z.string().optional(),
   POLYMARKET_MARKETS_URL: z.string().url().default('https://gamma-api.polymarket.com/markets'),
   POLYMARKET_PRICES_URL: z.string().url().default('https://clob.polymarket.com/prices-history'),
