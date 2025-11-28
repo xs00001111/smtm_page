@@ -16,6 +16,7 @@ const envSchema = z.object({
   POLYMARKET_API_PASSPHRASE: z.string().optional(),
   // WebSocket settings
   WEBSOCKET_ENABLED: z.string().default('true'),
+  WEBSOCKET_INCLUDE_AGG_ORDERBOOK: z.string().default('false'),
   PRICE_CHANGE_THRESHOLD: z.string().default('5'),
   WHALE_TRADE_MIN_SIZE: z.string().default('1000'),
   TELEGRAM_SUBSCRIPTIONS_FILE: z.string().default('apps/telegram-bot/data/subscriptions.csv'),
@@ -42,6 +43,7 @@ export const env = envSchema.parse({
   POLYMARKET_API_SECRET: process.env.POLYMARKET_API_SECRET,
   POLYMARKET_API_PASSPHRASE: process.env.POLYMARKET_API_PASSPHRASE,
   WEBSOCKET_ENABLED: process.env.WEBSOCKET_ENABLED || 'true',
+  WEBSOCKET_INCLUDE_AGG_ORDERBOOK: process.env.WEBSOCKET_INCLUDE_AGG_ORDERBOOK || 'false',
   PRICE_CHANGE_THRESHOLD: process.env.PRICE_CHANGE_THRESHOLD || '5',
   WHALE_TRADE_MIN_SIZE: process.env.WHALE_TRADE_MIN_SIZE || '1000',
   TELEGRAM_SUBSCRIPTIONS_FILE: process.env.TELEGRAM_SUBSCRIPTIONS_FILE || 'apps/telegram-bot/data/subscriptions.csv',

@@ -20,7 +20,7 @@ The implementation uses Polymarket's official `@polymarket/real-time-data-client
 1. **clob_market** - Market data (NO AUTH REQUIRED)
    - `price_change` - Real-time price updates
    - `last_trade_price` - Latest trade prices
-   - `agg_orderbook` - Orderbook aggregations
+   - `agg_orderbook` - Orderbook aggregations (optional, enable via `WEBSOCKET_INCLUDE_AGG_ORDERBOOK=true`)
    - `tick_size_change` - Tick size updates
 
 2. **activity** - Trade activity (NO AUTH REQUIRED)
@@ -40,6 +40,7 @@ Add these to your `.env` file:
 ```bash
 # WebSocket Settings
 WEBSOCKET_ENABLED=true
+WEBSOCKET_INCLUDE_AGG_ORDERBOOK=false
 PRICE_CHANGE_THRESHOLD=5        # Alert when price changes by 5%
 WHALE_TRADE_MIN_SIZE=1000       # Alert for trades >= $1000
 
@@ -55,6 +56,7 @@ POLYMARKET_API_PASSPHRASE=
 - **Whale Trade Minimum**: $1,000 USD
 - **Max Reconnection Attempts**: 10
 - **Initial Reconnection Delay**: 5 seconds (exponential backoff)
+- **Include Aggregated Orderbook**: false (set to true to enrich pressure metrics)
 
 ## 💬 Telegram Commands
 

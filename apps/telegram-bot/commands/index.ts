@@ -189,6 +189,40 @@ export function registerCommands(bot: Telegraf) {
     try {
       const data = (ctx.callbackQuery as any)?.data as string | undefined
       if (!data) return
+      // Alpha pagination
+      if (data.startsWith('alpha:more:')) {
+        await ctx.answerCbQuery('Loading more alpha...')
+        const parts = data.split(':')
+        const offset = parseInt(parts[2] || '1', 10)
+        const tokenIdsArg = parts[3] ? parts[3].split(',') : undefined
+        const { AlphaAggregator } = await import('../services/alpha-aggregator')
+        const list = AlphaAggregator.getLatest(offset + 1, tokenIdsArg)
+        if (list.length <= offset) {
+          await ctx.reply('No more alpha right now. Check back soon!')
+          return
+        }
+        const a = list[list.length - 1 - offset]
+        const title = a.marketName || 'Alpha'
+        const wallet = a.wallet ? (a.wallet.slice(0,6)+'...'+a.wallet.slice(-4)) : ''
+        let msg = `✨ <b>${title}</b>\n\n`
+        if (a.kind === 'whale') {
+          const rec = a.data?.recommendation ? ` (${a.data.recommendation})` : ''
+          msg += `🐋 Whale Alpha: <b>${a.alpha}</b>${rec}\n`
+          if (a.data?.whaleScore != null) msg += `WhaleScore: ${a.data.whaleScore}\n`
+          if (a.data?.weightedNotionalUsd != null) msg += `Value: $${Number(a.data.weightedNotionalUsd).toLocaleString()}\n`
+          if (wallet) msg += `Wallet: <code>${wallet}</code>\n`
+        } else if (a.kind === 'smart_skew') {
+          msg += `⚖️ Smart-Skew Alpha: <b>${a.alpha}</b>\n${a.summary}\n`
+        } else if (a.kind === 'insider') {
+          msg += `🕵️ Insider Alpha: <b>${a.alpha}</b>\n${a.summary}\n`
+        }
+        const when = new Date(a.ts).toISOString().replace('T',' ').slice(0, 19) + 'Z'
+        msg += `\n🕒 ${when}`
+        const nextOffset = offset + 1
+        const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:${nextOffset}${tokenIdsArg && tokenIdsArg.length?':'+tokenIdsArg.join(','):''}` }]] }
+        await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
+        return
+      }
       // Survey responses (interest poll) - HIDDEN: Auth not ready yet
       // if (data.startsWith('survey:')) {
       //   const answer = data.slice('survey:'.length) as 'yes'|'maybe'|'no'
@@ -1772,6 +1806,117 @@ export function registerCommands(bot: Telegraf) {
         logger.error('overview command failed', e)
         await ctx.reply('❌ Failed to load overview. Try again later.')
       }
+    }
+  })
+
+  // Alpha: return the freshest alpha found (optionally filter by market)
+  bot.command('alpha', async (ctx) => {
+    try {
+      const parts = ctx.message.text.split(/\s+/).filter(Boolean)
+      const query = parts.slice(1).join(' ').trim()
+      let tokenIds: string[] | undefined
+      let marketTitle: string | undefined
+
+      if (query) {
+        // Try to resolve market and collect its token IDs to filter alpha
+        const market = await resolveMarketFromInput(query)
+        if (market && Array.isArray(market.tokens) && market.tokens.length > 0) {
+          tokenIds = market.tokens.map((t: any) => t.token_id).filter(Boolean)
+          marketTitle = market.question
+        }
+      }
+
+      const { AlphaAggregator } = await import('../services/alpha-aggregator')
+      const latest = AlphaAggregator.getLatest(1, tokenIds)
+      if (latest.length === 0) {
+        await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')
+        return
+      }
+
+      const a = latest[0]
+      const title = marketTitle || a.marketName || 'Fresh Alpha'
+      // Try to build a market URL
+      let marketUrl: string | null = null
+      if (query) {
+        const market = await resolveMarketFromInput(query)
+        if (market) marketUrl = getPolymarketMarketUrl(market)
+      } else if (a.conditionId) {
+        try { const m = await gammaApi.getMarket(a.conditionId); marketUrl = getPolymarketMarketUrl(m) } catch {}
+      }
+      const wallet = a.wallet ? (a.wallet.slice(0,6)+'...'+a.wallet.slice(-4)) : ''
+      let msg = `✨ <b>${title}</b>\n\n`
+      if (a.kind === 'whale') {
+        const rec = a.data?.recommendation ? ` (${a.data.recommendation})` : ''
+        msg += `🐋 Whale Alpha: <b>${a.alpha}</b>${rec}\n`
+        if (a.data?.whaleScore != null) msg += `WhaleScore: ${a.data.whaleScore}\n`
+        if (a.data?.weightedNotionalUsd != null) msg += `Value: $${Number(a.data.weightedNotionalUsd).toLocaleString()}\n`
+        if (wallet) {
+          const profileUrl = getPolymarketProfileUrl(null, a.wallet!)
+          msg += `Wallet: <code>${wallet}</code>\n`
+          msg += `🔗 <a href="${esc(profileUrl)}">Profile</a>\n`
+        }
+      } else if (a.kind === 'smart_skew') {
+        msg += `⚖️ Smart-Skew Alpha: <b>${a.alpha}</b>\n${a.summary}\n`
+      } else if (a.kind === 'insider') {
+        msg += `🕵️ Insider Alpha: <b>${a.alpha}</b>\n${a.summary}\n`
+      }
+      if (marketUrl) msg += `\n🔗 <a href="${esc(marketUrl)}">Market</a>`
+
+      const when = new Date(a.ts).toISOString().replace('T',' ').slice(0, 19) + 'Z'
+      msg += `\n🕒 ${when}`
+      const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:1${tokenIds && tokenIds.length?':'+tokenIds.join(','):''}` }]] }
+      await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
+    } catch (e) {
+      logger.error('alpha command failed', e)
+      await ctx.reply('❌ Failed to fetch alpha. Try again later.')
+    }
+  })
+
+  // Alpha pagination via inline button
+  bot.on('callback_query', async (ctx, next) => {
+    try {
+      const data = (ctx.callbackQuery as any)?.data as string | undefined
+      if (!data) return await next()
+      if (!data.startsWith('alpha:more:')) return await next()
+      await ctx.answerCbQuery('Loading more alpha...')
+      const parts = data.split(':')
+      const offset = parseInt(parts[2] || '1', 10)
+      const tokenIdsArg = parts[3] ? parts[3].split(',') : undefined
+      const { AlphaAggregator } = await import('../services/alpha-aggregator')
+      const list = AlphaAggregator.getLatest(offset + 1, tokenIdsArg)
+      if (list.length <= offset) {
+        await ctx.reply('No more alpha right now. Check back soon!')
+        return
+      }
+      const a = list[list.length - 1 - offset]
+      const title = a.marketName || 'Alpha'
+      // Build market URL if possible
+      let marketUrl: string | null = null
+      if (a.conditionId) {
+        try { const m = await gammaApi.getMarket(a.conditionId); marketUrl = getPolymarketMarketUrl(m) } catch {}
+      }
+      const wallet = a.wallet ? (a.wallet.slice(0,6)+'...'+a.wallet.slice(-4)) : ''
+      let msg = `✨ <b>${title}</b>\n\n`
+      if (a.kind === 'whale') {
+        const rec = a.data?.recommendation ? ` (${a.data.recommendation})` : ''
+        msg += `🐋 Whale Alpha: <b>${a.alpha}</b>${rec}\n`
+        if (a.data?.whaleScore != null) msg += `WhaleScore: ${a.data.whaleScore}\n`
+        if (a.data?.weightedNotionalUsd != null) msg += `Value: $${Number(a.data.weightedNotionalUsd).toLocaleString()}\n`
+        if (wallet) msg += `Wallet: <code>${wallet}</code>\n`
+      } else if (a.kind === 'smart_skew') {
+        msg += `⚖️ Smart-Skew Alpha: <b>${a.alpha}</b>\n${a.summary}\n`
+      } else if (a.kind === 'insider') {
+        msg += `🕵️ Insider Alpha: <b>${a.alpha}</b>\n${a.summary}\n`
+      }
+      if (marketUrl) msg += `\n🔗 <a href="${esc(marketUrl)}">Market</a>`
+      const when = new Date(a.ts).toISOString().replace('T',' ').slice(0, 19) + 'Z'
+      msg += `\n🕒 ${when}`
+      const nextOffset = offset + 1
+      const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:${nextOffset}${tokenIdsArg && tokenIdsArg.length?':'+tokenIdsArg.join(','):''}` }]] }
+      await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
+    } catch (e) {
+      logger.error('alpha:more failed', e)
+      try { await ctx.answerCbQuery('Error loading more alpha') } catch {}
     }
   })
 

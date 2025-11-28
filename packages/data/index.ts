@@ -8,3 +8,5 @@ export * from './clients/clob-api';
 
 // Export utilities
 export * from './utils';
+export * from './whales';
+export * from './alpha';

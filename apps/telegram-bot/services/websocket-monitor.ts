@@ -7,7 +7,8 @@ import { RealTimeDataClient } from '@polymarket/real-time-data-client';
 import type { Message } from '@polymarket/real-time-data-client';
 import { Telegraf } from 'telegraf';
 import { logger } from '../utils/logger';
-import { gammaApi, dataApi } from '@smtm/data';
+import { gammaApi, dataApi, WhaleDetector } from '@smtm/data';
+import { AlphaAggregator } from './alpha-aggregator';
 import { updateMarketToken, updateWhaleToken } from './subscriptions';
 import { botConfig } from '../config/bot';
 import { formatPrice, formatVolume, formatAddress } from '@smtm/data';
@@ -189,6 +190,15 @@ export class WebSocketMonitorService {
         const market = await gammaApi.getMarket(conditionId)
         if (market?.tokens && market.tokens.length > 0) {
           tokenId = market.tokens[0].token_id
+          // Register market pair (YES/NO) for alpha aggregator if available
+          try {
+            const yes = (market.tokens || []).find((t:any) => (t.outcome||'').toLowerCase() === 'yes')?.token_id
+            const no  = (market.tokens || []).find((t:any) => (t.outcome||'').toLowerCase() === 'no')?.token_id
+            if (yes && no) {
+              const { AlphaAggregator } = await import('./alpha-aggregator')
+              AlphaAggregator.registerMarketPair(conditionId, yes, no, market.question)
+            }
+          } catch {}
         }
         if (!tokenId) {
           const holders = await dataApi.getTopHolders({ market: conditionId, limit: 1, minBalance: 1 })
@@ -452,6 +462,8 @@ export class WebSocketMonitorService {
       await this.handlePriceChange(message);
     } else if (message.type === 'last_trade_price') {
       await this.handleLastTradePrice(message);
+    } else if (message.type === 'agg_orderbook') {
+      await this.handleAggOrderbook(message)
     }
   }
 
@@ -508,6 +520,38 @@ export class WebSocketMonitorService {
   }
 
   /**
+   * Handle aggregated orderbook messages (top-of-book + aggregated depth)
+   */
+  private async handleAggOrderbook(message: Message): Promise<void> {
+    const payload = message.payload as any
+    const tokenId = payload.asset_id || payload.token_id
+    if (!tokenId) return
+    const ts = Date.now()
+
+    // Accept a few possible shapes: arrays of { price, size } or compact { p, s }
+    const bids: Array<any> = Array.isArray(payload.bids) ? payload.bids : []
+    const asks: Array<any> = Array.isArray(payload.asks) ? payload.asks : []
+    const topBid = bids.length ? parseFloat((bids[0].price ?? bids[0].p) || '0') : NaN
+    const topAsk = asks.length ? parseFloat((asks[0].price ?? asks[0].p) || '0') : NaN
+
+    // Sum first 5 levels for a quick imbalance proxy
+    const levels = 5
+    const depthBid = bids.slice(0, levels).reduce((acc, l) => acc + parseFloat((l.size ?? l.s) || '0') * parseFloat((l.price ?? l.p) || '0'), 0)
+    const depthAsk = asks.slice(0, levels).reduce((acc, l) => acc + parseFloat((l.size ?? l.s) || '0') * parseFloat((l.price ?? l.p) || '0'), 0)
+    const denom = depthBid + depthAsk
+    const imbalance = denom > 0 ? (depthBid - depthAsk) / denom : null
+
+    this.orderbookState.set(tokenId, {
+      ts,
+      bid: Number.isFinite(topBid) ? topBid : null,
+      ask: Number.isFinite(topAsk) ? topAsk : null,
+      depthBid,
+      depthAsk,
+      imbalance,
+    })
+  }
+
+  /**
    * Handle trade activity messages
    */
   private async handleTradeMessage(message: Message): Promise<void> {
@@ -521,6 +565,11 @@ export class WebSocketMonitorService {
       logger.warn('Invalid trade payload', payload);
       return;
     }
+
+    // Feed detector for global whale ingestion (in-memory)
+    try { WhaleDetector.handleTradeMessage(payload) } catch {}
+    // Feed alpha aggregator (whale alpha for now)
+    try { await AlphaAggregator.onTrade(payload) } catch {}
 
     // Check market-specific whale subscriptions
     const subscriptions = this.whaleSubscriptions.get(tokenId);
@@ -810,6 +859,21 @@ export class WebSocketMonitorService {
       });
     }
 
+    // Optional: aggregated orderbook for enrichment
+    if (botConfig.websocket.includeAggOrderbook) {
+      const ids = new Set<string>()
+      for (const id of this.marketSubscriptions.keys()) ids.add(id)
+      for (const id of this.whaleSubscriptions.keys()) ids.add(id)
+      for (const id of this.observerTokenIds) ids.add(id)
+      if (ids.size > 0) {
+        subscriptions.push({
+          topic: 'clob_market',
+          type: 'agg_orderbook',
+          filters: JSON.stringify({ asset_ids: Array.from(ids) }),
+        })
+      }
+    }
+
     try {
       this.client.subscribe({ subscriptions });
       logger.info('Updated WebSocket subscriptions', {
@@ -861,6 +925,8 @@ export class WebSocketMonitorService {
 
     // Cap maximum delay at 5 minutes and add small jitter to avoid thundering herd
     delay = Math.min(delay, 300000);
+  // Lightweight orderbook/imbalance cache (enrichment only)
+  private orderbookState: Map<string, { ts: number; bid: number | null; ask: number | null; depthBid: number; depthAsk: number; imbalance: number | null }> = new Map()
     const jitter = 0.2; // 20% jitter
     const factor = 1 + (Math.random() * 2 - 1) * jitter;
     delay = Math.floor(delay * factor);

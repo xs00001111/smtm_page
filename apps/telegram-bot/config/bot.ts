@@ -18,6 +18,7 @@ export const botConfig = {
   // WebSocket settings
   websocket: {
     enabled: env.WEBSOCKET_ENABLED === 'true',
+    includeAggOrderbook: (env as any).WEBSOCKET_INCLUDE_AGG_ORDERBOOK === 'true',
     priceChangeThreshold: parseFloat(env.PRICE_CHANGE_THRESHOLD),
     whaleTrademinSize: parseFloat(env.WHALE_TRADE_MIN_SIZE),
   },
