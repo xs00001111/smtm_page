@@ -1,5 +1,6 @@
 import { buildWhaleAlphaForTrade, classifyWhale, computeSmartSkewAlpha, computeInsiderAlpha } from '@smtm/data'
 import { logger } from '../utils/logger'
+import { botConfig } from '../config/bot'
 
 export type AlphaKind = 'whale' | 'smart_skew' | 'insider'
 
@@ -26,6 +27,9 @@ class AlphaAggregatorImpl {
   private lastSkewEmit: Map<string, number> = new Map() // conditionId -> ts
   private lastScanTs = 0
   private skewIntervalMs = 30_000
+  private lastWhaleEmit: Map<string, number> = new Map() // key: cond|token + wallet
+  private lastInsiderEmit: Map<string, number> = new Map() // key: cond + wallet
+  private lastEventByKey: Map<string, { ts: number; alpha: number }> = new Map()
 
   getLatest(limit = 1, tokenIds?: string[]): AlphaEvent[] {
     let src = this.buffer
@@ -57,12 +61,21 @@ class AlphaAggregatorImpl {
       // Try enrich with market mapping
       const condId = this.tokenToCond.get(tokenId)
       const pair = condId ? this.pairs.get(condId) : undefined
+      // Cooldown/dedupe for whale by market/wallet
+      const whaleKey = `${condId || tokenId}|${wallet}`
+      const nowTs = Date.now()
+      const lastTs = this.lastWhaleEmit.get(whaleKey) || 0
+      if (nowTs - lastTs < botConfig.alphaCooldowns.whale * 1000) return
+      const dedupeKey = `whale|${whaleKey}`
+      const prev = this.lastEventByKey.get(dedupeKey)
+      if (prev && (nowTs - prev.ts) < 30000 && Math.abs(prev.alpha - alpha.alpha) < 3) return
+
       const title = `Whale ${alpha.recommendation === 'copy' ? 'BUY/SELL' : ''} Alpha ${alpha.alpha}`
       const summary = `whaleScore ${alpha.whaleScore} • ${alpha.recommendation} • $${alpha.weightedNotionalUsd.toLocaleString()}`
 
       const event: AlphaEvent = {
-        id: `${Date.now()}-${tokenId}-${wallet}-${Math.round(alpha.alpha)}`,
-        ts: Date.now(),
+        id: `${nowTs}-${tokenId}-${wallet}-${Math.round(alpha.alpha)}`,
+        ts: nowTs,
         kind: 'whale',
         tokenId,
         conditionId: condId,
@@ -79,6 +92,8 @@ class AlphaAggregatorImpl {
         },
       }
       this.push(event)
+      this.lastWhaleEmit.set(whaleKey, nowTs)
+      this.lastEventByKey.set(dedupeKey, { ts: nowTs, alpha: alpha.alpha })
     } catch (e) {
       logger.warn('alpha-aggregator onTrade failed', { err: (e as any)?.message })
     }
@@ -105,7 +120,7 @@ class AlphaAggregatorImpl {
       try {
         const skew = await computeSmartSkewAlpha({ yesTokenId: pair.yes, noTokenId: pair.no })
         const last = this.lastSkewEmit.get(condId) || 0
-        const cooldownMs = 180_000 // 3 minutes
+        const cooldownMs = Math.max(30_000, botConfig.alphaCooldowns.skew * 1000)
         if (skew.trigger && now - last >= cooldownMs) {
           const title = pair.title || 'Market'
           const directionEmoji = skew.direction === 'YES' ? '✅' : '❌'
@@ -161,6 +176,13 @@ class AlphaAggregatorImpl {
           cluster,
         })
         if (insider.trigger) {
+          // Cooldown/dedupe per (market,wallet)
+          const key = `${condId}|${e.wallet}`
+          const prevTs = this.lastInsiderEmit.get(key) || 0
+          if (now - prevTs < botConfig.alphaCooldowns.insider * 1000) continue
+          const dedupeKey2 = `insider|${key}`
+          const prev2 = this.lastEventByKey.get(dedupeKey2)
+          if (prev2 && (now - prev2.ts) < 30000 && Math.abs(prev2.alpha - insider.insiderScore) < 3) continue
           const title = pair.title || 'Market'
           const summary = `Score ${insider.insiderScore} • Skew ${(skewRes?.skew ?? 0).toFixed(2)} • Cluster ${cluster.count} / ${(cluster.durationMs/1000).toFixed(1)}s • $${Math.round(cluster.notionalUsd).toLocaleString()}`
           this.push({
@@ -176,6 +198,8 @@ class AlphaAggregatorImpl {
             summary,
             data: { insider, skew: skewRes, cluster },
           })
+          this.lastInsiderEmit.set(key, now)
+          this.lastEventByKey.set(dedupeKey2, { ts: now, alpha: insider.insiderScore })
         }
       }
     } catch {}

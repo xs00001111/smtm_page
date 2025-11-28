@@ -23,6 +23,13 @@ export const botConfig = {
     whaleTrademinSize: parseFloat(env.WHALE_TRADE_MIN_SIZE),
   },
 
+  // Alpha cooldowns (in seconds)
+  alphaCooldowns: {
+    whale: Math.max(10, parseInt((env as any).ALPHA_COOLDOWN_WHALE_SECONDS || '90', 10)),
+    skew: Math.max(30, parseInt((env as any).ALPHA_COOLDOWN_SKEW_SECONDS || '240', 10)),
+    insider: Math.max(30, parseInt((env as any).ALPHA_COOLDOWN_INSIDER_SECONDS || '240', 10)),
+  },
+
   // Polymarket CLOB API credentials (optional)
   polymarket: {
     apiKey: env.POLYMARKET_API_KEY,
