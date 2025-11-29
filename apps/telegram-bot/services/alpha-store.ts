@@ -8,7 +8,7 @@ function supabaseAvailable() {
 
 function key() { return env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || '' }
 
-async function sb<T>(path: string, init?: RequestInit): Promise<T> {
+async function sb<T>(path: string, init?: RequestInit, schema: string = 'public'): Promise<T> {
   const url = `${env.SUPABASE_URL}/rest/v1/${path}`
   const res = await fetch(url, {
     ...(init || {}),
@@ -17,6 +17,10 @@ async function sb<T>(path: string, init?: RequestInit): Promise<T> {
       Authorization: `Bearer ${key()}`,
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
+      // PostgREST schema targeting: Accept-Profile for reads, Content-Profile for writes
+      ...(init?.method && init.method.toUpperCase() !== 'GET'
+        ? { 'Content-Profile': schema }
+        : { 'Accept-Profile': schema }),
       ...(init?.headers as any),
     },
   } as any)
@@ -34,7 +38,7 @@ export async function persistAlphaEvent(ev: AlphaEvent): Promise<void> {
   }
   try {
     const body = [mapAlphaEvent(ev)]
-    await sb('analytics.alpha_event', { method: 'POST', body: JSON.stringify(body) })
+    await sb('alpha_event', { method: 'POST', body: JSON.stringify(body) }, 'analytics')
     logger.info(`alpha:store persisted kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''} alpha=${ev.alpha}`)
   } catch (e) {
     const err = (e as any)?.message || String(e)
@@ -61,9 +65,9 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
     ]
     if (opts?.conditionId) params.push(`condition_id=eq.${encodeURIComponent(opts.conditionId)}`)
     if (opts?.tokenIds && opts.tokenIds.length) params.push(`token_id=in.(${opts.tokenIds.map(encodeURIComponent).join(',')})`)
-    const path = `analytics.alpha_event?${params.join('&')}`
-    logger.info(`alpha:store fetch path ${path}`)
-    const rows = await sb<any[]>(path)
+    const path = `alpha_event?${params.join('&')}`
+    logger.info(`alpha:store fetch path schema=analytics ${path}`)
+    const rows = await sb<any[]>(path, undefined, 'analytics')
     logger.info(`alpha:store fetch ok rows=${rows?.length || 0}`)
     return rows.map(r => ({
       id: `${new Date(r.created_at).getTime()}-${r.token_id || ''}-${r.wallet || ''}-${r.alpha}`,
