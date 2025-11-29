@@ -1843,8 +1843,17 @@ export function registerCommands(bot: Telegraf) {
         logger.info('alpha:buffer empty, trying Supabase/store + fallbacks', { tokenIds: tokenIds?.length || 0, query: query || null })
         // Fallback: hit CLOB API for recent big orders (real trades)
         const { findRecentBigOrders } = await import('@smtm/data')
-        const bigs = await findRecentBigOrders({ tokenIds, minNotionalUsd: 10_000, withinMs: 15*60*1000, perTokenLimit: 50 })
-        logger.info('alpha:fallback big orders', { count: bigs.length })
+        let bigs = await findRecentBigOrders({ tokenIds, minNotionalUsd: 2000, withinMs: 15*60*1000, perTokenLimit: 50 })
+        logger.info('alpha:fallback big orders', { count: bigs.length, threshold: 2000 })
+        if (!bigs.length) {
+          // Try largest trade even if below threshold
+          const any = await findRecentBigOrders({ tokenIds, minNotionalUsd: 0, withinMs: 15*60*1000, perTokenLimit: 50 })
+          logger.info('alpha:fallback any orders', { count: any.length })
+          if (any.length) {
+            any.sort((a,b)=>b.notional - a.notional)
+            bigs = [any[0]]
+          }
+        }
         if (!bigs.length) {
           // Last-resort: show most recent buffered trade if any
           const { TradeBuffer, buildWhaleAlphaForTrade } = await import('@smtm/data')
@@ -1866,7 +1875,8 @@ export function registerCommands(bot: Telegraf) {
         }
         const b = bigs[0]
         const notionalStr = `$${Math.round(b.notional).toLocaleString()}`
-        let msg = `✨ <b>Big Order Detected</b>\n\n`
+        const titleText = b.notional >= 2000 ? 'Big Order Detected' : 'Largest Recent Trade'
+        let msg = `✨ <b>${titleText}</b>\n\n`
         msg += `${b.side || 'TRADE'} ${notionalStr} @ ${(b.price*100).toFixed(1)}¢\n`
         // Try to attach market link if possible
         try {
