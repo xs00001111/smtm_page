@@ -851,13 +851,17 @@ export class WebSocketMonitorService {
     }
 
     // Subscribe to activity/trades for whale monitoring and aggregator
-    if (this.whaleSubscriptions.size > 0 || this.observerTokenIds.size > 0) {
+    // Include marketSubscriptions tokens so aggregator can see trades even if users only follow prices
+    if (this.whaleSubscriptions.size > 0 || this.observerTokenIds.size > 0 || this.marketSubscriptions.size > 0) {
+      const activityIds = new Set<string>([
+        ...this.whaleSubscriptions.keys(),
+        ...this.observerTokenIds,
+        ...this.marketSubscriptions.keys(),
+      ])
       subscriptions.push({
         topic: 'activity',
         type: 'trades',
-        filters: JSON.stringify({
-          asset_ids: Array.from(new Set<string>([...this.whaleSubscriptions.keys(), ...this.observerTokenIds])),
-        }),
+        filters: JSON.stringify({ asset_ids: Array.from(activityIds) }),
       });
     }
 

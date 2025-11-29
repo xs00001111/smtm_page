@@ -2,6 +2,7 @@ import { Telegraf } from 'telegraf';
 import { env } from '@smtm/shared/env';
 import { logger } from './utils/logger';
 import { registerCommands } from './commands';
+import { gammaApi } from '@smtm/data';
 import { startPriceMonitoring } from './services/price-monitor';
 import { WebSocketMonitorService } from './services/websocket-monitor';
 import { botConfig } from './config/bot';
@@ -73,6 +74,19 @@ async function start() {
     // Restore stored data before deciding to start WS
     await loadLinks();
     await loadSubscriptions(wsMonitor);
+    // Pre-warm observer assets with trending markets to receive trade activity quickly
+    try {
+      const trending = await gammaApi.getTrendingMarkets(6)
+      const tokenIds: string[] = []
+      for (const m of trending) {
+        for (const t of (m.tokens || [])) {
+          if (t?.token_id) tokenIds.push(t.token_id)
+        }
+      }
+      if (tokenIds.length) wsMonitor.setObserverAssets(tokenIds)
+    } catch (e) {
+      logger.warn('Failed to pre-warm observer assets', (e as any)?.message || e)
+    }
     // Start resolution monitor to notify winners and auto-unfollow
     startResolutionMonitor(wsMonitor);
 
