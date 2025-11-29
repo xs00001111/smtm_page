@@ -13,8 +13,9 @@ try {
   const polyClient = require('@polymarket/clob-client');
   ClobClient = polyClient.ClobClient;
   ApiKeyCreds = polyClient.ApiKeyCreds;
-} catch {
-  // Official client not available, will fall back to axios
+  console.log('[CLOB] ✓ Official @polymarket/clob-client package loaded');
+} catch (e) {
+  console.log('[CLOB] ✗ Official client package not available:', (e as any)?.message);
 }
 
 /**
@@ -36,16 +37,33 @@ export class ClobApiClient {
     this.apiSecret = credentials?.apiSecret || process.env.POLYMARKET_API_SECRET;
     this.apiPassphrase = credentials?.apiPassphrase || process.env.POLYMARKET_API_PASSPHRASE;
 
+    // Log credential availability (without exposing values)
+    console.log('[CLOB] Credential check:', {
+      hasApiKey: !!this.apiKey,
+      hasApiSecret: !!this.apiSecret,
+      hasApiPassphrase: !!this.apiPassphrase,
+      hasClientClass: !!ClobClient,
+      hasCredsClass: !!ApiKeyCreds,
+    });
+
     // Initialize official client if credentials and package are available
     if (ClobClient && ApiKeyCreds && this.apiKey && this.apiSecret && this.apiPassphrase) {
       try {
+        console.log('[CLOB] Attempting to initialize official client...');
         const creds = new ApiKeyCreds(this.apiKey, this.apiSecret, this.apiPassphrase);
         // Chain ID 137 = Polygon mainnet (Polymarket's chain)
         this.officialClient = new ClobClient(this.baseURL, 137, undefined, creds);
-        console.log('[CLOB] Using official authenticated client');
+        console.log('[CLOB] ✓ Official authenticated client initialized successfully');
       } catch (e) {
-        console.warn('[CLOB] Failed to initialize official client:', (e as any)?.message);
+        console.error('[CLOB] ✗ Failed to initialize official client:', (e as any)?.message, (e as any)?.stack);
       }
+    } else {
+      const missing = [];
+      if (!ClobClient || !ApiKeyCreds) missing.push('package');
+      if (!this.apiKey) missing.push('POLYMARKET_API_KEY');
+      if (!this.apiSecret) missing.push('POLYMARKET_API_SECRET');
+      if (!this.apiPassphrase) missing.push('POLYMARKET_API_PASSPHRASE');
+      console.log('[CLOB] ⚠ Skipping official client - missing:', missing.join(', '));
     }
 
     // Always create axios fallback
@@ -96,11 +114,15 @@ export class ClobApiClient {
     // Try official authenticated client first
     if (this.officialClient) {
       try {
+        console.log(`[CLOB] Using official client for getTrades (assetId: ${assetId.slice(0, 10)}...)`);
         const trades = await this.officialClient.getTrades({ asset_id: assetId, limit });
+        console.log(`[CLOB] ✓ Official client returned ${trades?.length || 0} trades`);
         return trades;
       } catch (e) {
-        console.warn('[CLOB] Official client getTrades failed, falling back to axios:', (e as any)?.message);
+        console.error('[CLOB] ✗ Official client getTrades failed:', (e as any)?.message, 'falling back to axios');
       }
+    } else {
+      console.log(`[CLOB] ⚠ No official client available, using public axios endpoint for assetId: ${assetId.slice(0, 10)}...`);
     }
 
     // Fallback to public axios endpoint
@@ -110,6 +132,7 @@ export class ClobApiClient {
         limit,
       },
     });
+    console.log(`[CLOB] Axios returned ${data?.length || 0} trades`);
     return data;
   }
 
