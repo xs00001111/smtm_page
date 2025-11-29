@@ -81,6 +81,32 @@ class WhaleDetectorImpl {
             break
           }
         }
+
+        // Fallback to Supabase if Polymarket API failed
+        if (next.size === 0) {
+          try {
+            const supabaseUrl = process.env.SUPABASE_URL
+            const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+            if (supabaseUrl && supabaseKey) {
+              console.log('[whale.watchlist] falling back to Supabase snapshot...')
+              const url = `${supabaseUrl}/rest/v1/top_trader_daily?select=wallet,rank&order=day_utc.desc,rank.asc&limit=${target}`
+              const res = await fetch(url, { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } } as any)
+              if (res.ok) {
+                const json: any[] = await res.json()
+                if (json && json.length > 0) {
+                  for (const r of json) {
+                    const addr = (r.wallet || '').toLowerCase()
+                    if (addr && addr.startsWith('0x') && addr.length === 42) next.add(addr)
+                  }
+                  console.log('[whale.watchlist] Supabase fallback succeeded, loaded', next.size, 'addresses')
+                }
+              }
+            }
+          } catch (e) {
+            console.log('[whale.watchlist] Supabase fallback error', (e as any)?.message || e)
+          }
+        }
+
         if (next.size > 0) this.watchlist = next
         console.log('[whale.watchlist] size=', next.size, ' sample=', Array.from(next).slice(0, 10))
       } catch (e) {

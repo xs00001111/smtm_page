@@ -390,34 +390,42 @@ export async function progressiveLiveScan(params?: {
   try {
     const trending = await gammaApi.getTrendingMarkets(Math.min(40, maxMarkets)).catch(()=>[] as any[])
     const active = await gammaApi.getActiveMarkets(maxMarkets, 'volume').catch(()=>[] as any[])
+    log('progressive.markets_fetched', { trending: trending.length, active: active.length })
     const tokenIds: string[] = []
     const seen = new Set<string>()
     const addTokens = (arr:any[]) => { for (const m of arr) for (const t of (m.tokens || [])) if (t?.token_id && !seen.has(t.token_id)) { seen.add(t.token_id); tokenIds.push(t.token_id) } }
     addTokens(trending); addTokens(active)
-    log('progressive.tokens', { count: tokenIds.length, sample: tokenIds.slice(0,25) })
+    log('progressive.tokens', { count: tokenIds.length, sample: tokenIds.slice(0,25), trendingSample: trending.slice(0,2), activeSample: active.slice(0,2) })
     // Aggressive token enrichment: fetch Gamma details for each condition, then fallback to CLOB markets
     const conds: string[] = []
     const addCond = (arr:any[]) => { for (const m of arr) if (m?.condition_id) conds.push(m.condition_id) }
     addCond(trending); addCond(active)
     const maxConds = Math.min(200, conds.length)
-    log('progressive.resolve_tokens_start', { conditions: maxConds })
-    for (let i=0; i<maxConds; i++) {
-      const cid = conds[i]
-      try {
-        const mkt = await gammaApi.getMarket(cid)
-        let added = 0
-        for (const t of (mkt?.tokens || [])) {
-          const id = (t as any)?.token_id
-          if (id && !seen.has(id)) { seen.add(id); tokenIds.push(id); added++ }
+    log('progressive.resolve_tokens_start', { conditions: maxConds, condsSample: conds.slice(0, 5) })
+    // If we already have tokens from initial extraction, skip expensive per-condition resolution
+    // unless we need more coverage
+    const shouldResolve = tokenIds.length < 50 && maxConds > 0
+    log('progressive.should_resolve', { shouldResolve, currentTokens: tokenIds.length, conditions: maxConds })
+    if (shouldResolve) {
+      for (let i=0; i<Math.min(maxConds, 50); i++) {
+        const cid = conds[i]
+        try {
+          const mkt = await gammaApi.getMarket(cid)
+          let added = 0
+          for (const t of (mkt?.tokens || [])) {
+            const id = (t as any)?.token_id
+            if (id && !seen.has(id)) { seen.add(id); tokenIds.push(id); added++ }
+          }
+          log('progressive.resolve_condition', { idx: i+1, conditionId: cid, added })
+        } catch (e) {
+          log('progressive.resolve_condition_error', { conditionId: cid, err: String((e as any)?.message || e) })
         }
-        log('progressive.resolve_condition', { idx: i+1, conditionId: cid, added })
-      } catch (e) {
-        log('progressive.resolve_condition_error', { conditionId: cid, err: String((e as any)?.message || e) })
       }
     }
     // Fallback to CLOB markets if still empty
-    if (tokenIds.length === 0) {
-      for (let i=0; i<Math.min(200, conds.length); i++) {
+    if (tokenIds.length === 0 && conds.length > 0) {
+      log('progressive.fallback_clob', { conditionsToTry: Math.min(50, conds.length) })
+      for (let i=0; i<Math.min(50, conds.length); i++) {
         const cid = conds[i]
         try {
           const mkt: any = await (await import('./clients/clob-api')).clobApi.getMarket(cid)
@@ -427,12 +435,43 @@ export async function progressiveLiveScan(params?: {
             if (id && !seen.has(id)) { seen.add(id); tokenIds.push(id); added++ }
           }
           log('progressive.resolve_clob_market', { idx: i+1, conditionId: cid, added })
+          if (tokenIds.length >= 20) break // Stop once we have enough
         } catch (e) {
           log('progressive.resolve_clob_error', { conditionId: cid, err: String((e as any)?.message || e) })
         }
       }
     }
     log('progressive.tokens_after_resolve', { count: tokenIds.length, sample: tokenIds.slice(0,25) })
+    // Last resort: if we have NO tokens but DO have conditions, aggressively fetch from CLOB
+    if (tokenIds.length === 0 && conds.length > 0) {
+      log('progressive.last_resort_clob', { trying: Math.min(20, conds.length) })
+      for (let i = 0; i < Math.min(20, conds.length); i++) {
+        try {
+          const mkt: any = await (await import('./clients/clob-api')).clobApi.getMarket(conds[i])
+          if (mkt?.tokens) {
+            for (const t of mkt.tokens) {
+              const id = t?.token_id
+              if (id && !seen.has(id)) {
+                seen.add(id)
+                tokenIds.push(id)
+              }
+            }
+            if (tokenIds.length > 0) {
+              log('progressive.last_resort_success', { conditionId: conds[i], tokensFound: tokenIds.length })
+              break
+            }
+          }
+        } catch (e) {
+          // Silent fail, try next
+        }
+      }
+    }
+    if (tokenIds.length === 0) {
+      log('progressive.no_tokens', { trendingCount: trending.length, activeCount: active.length, condsCount: conds.length })
+      log('progressive.result_empty', { reason: 'no_tokens', elapsedMs: Date.now()-t0 })
+      return null
+    }
+    log('progressive.final_token_count', { count: tokenIds.length, sample: tokenIds.slice(0, 10) })
     let best: any = null
     for (let i=0;i<tokenIds.length;i++) {
       const tokenId = tokenIds[i]
