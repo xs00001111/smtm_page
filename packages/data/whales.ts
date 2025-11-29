@@ -63,6 +63,8 @@ class WhaleDetectorImpl {
     // Background refresh of top-PnL wallets (best-effort, public endpoints)
     const refresh = async () => {
       try {
+        // eslint-disable-next-line no-console
+        console.log('[whale.watchlist] refreshing leaderboard...')
         const list = await dataApi.getLeaderboard({ limit: this.opts.leaderboardSize })
         const next = new Set<string>()
         for (const e of list || []) {
@@ -70,8 +72,11 @@ class WhaleDetectorImpl {
           if (addr) next.add(addr)
         }
         if (next.size > 0) this.watchlist = next
+        // eslint-disable-next-line no-console
+        console.log('[whale.watchlist] size=', next.size, ' sample=', Array.from(next).slice(0, 10))
       } catch (e) {
-        // swallow; keep prior watchlist
+        // eslint-disable-next-line no-console
+        console.log('[whale.watchlist] refresh failed', (e as any)?.message || e)
       }
     }
     refresh().catch(() => {})

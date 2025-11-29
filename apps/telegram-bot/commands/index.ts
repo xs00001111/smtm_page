@@ -1843,11 +1843,17 @@ export function registerCommands(bot: Telegraf) {
         logger.info('alpha:buffer empty, trying Supabase/store + fallbacks', { tokenIds: tokenIds?.length || 0, query: query || null })
         // Fallback: hit CLOB API for recent big orders (real trades)
         const { findRecentBigOrders } = await import('@smtm/data')
-        let bigs = await findRecentBigOrders({ tokenIds, minNotionalUsd: 2000, withinMs: 15*60*1000, perTokenLimit: 50 })
+        let bigs = await findRecentBigOrders({
+          tokenIds,
+          minNotionalUsd: 2000,
+          withinMs: 15*60*1000,
+          perTokenLimit: 50,
+          onLog: (m, ctx) => logger.info(`alpha:big ${m}`, ctx || {})
+        })
         logger.info('alpha:fallback big orders', { count: bigs.length, threshold: 2000 })
         if (!bigs.length) {
           // Try largest trade even if below threshold
-          const any = await findRecentBigOrders({ tokenIds, minNotionalUsd: 0, withinMs: 15*60*1000, perTokenLimit: 50 })
+          const any = await findRecentBigOrders({ tokenIds, minNotionalUsd: 0, withinMs: 15*60*1000, perTokenLimit: 50, onLog: (m, ctx) => logger.info(`alpha:any ${m}`, ctx || {}) })
           logger.info('alpha:fallback any orders', { count: any.length })
           if (any.length) {
             any.sort((a,b)=>b.notional - a.notional)

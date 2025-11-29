@@ -154,18 +154,25 @@ export interface SmartSkewResult {
   }
 }
 
-export async function computeSmartSkewAlpha(params: { yesTokenId: string; noTokenId: string }, cfg?: SmartSkewConfig & WhaleScoreConfig & WhaleStatsOptions): Promise<SmartSkewResult> {
+export async function computeSmartSkewAlpha(
+  params: { yesTokenId: string; noTokenId: string },
+  cfg?: (SmartSkewConfig & WhaleScoreConfig & WhaleStatsOptions) & { onLog?: (msg: string, ctx?: any) => void }
+): Promise<SmartSkewResult> {
+  const log = cfg?.onLog || (() => {})
   const whaleScoreThreshold = cfg?.whaleScoreThreshold ?? 65
   const windowMs = cfg?.windowMs ?? 30 * 60 * 1000
   const minSmartPoolUsd = cfg?.minSmartPoolUsd ?? 3000
   const maxWallets = cfg?.maxWallets ?? 50
+  log('skew.start', { yes: params.yesTokenId, no: params.noTokenId, windowMs, whaleScoreThreshold, minSmartPoolUsd, maxWallets })
 
   // Gather recent raw trades for both tokens
   const maxScan = 2000
   const all = TradeBuffer.getTrades(maxScan, { sinceMs: windowMs, tokenIds: [params.yesTokenId, params.noTokenId] })
+  log('skew.trades_window', { count: all.length })
 
   // Identify unique wallets in window (cap to reduce API calls)
   const wallets = Array.from(new Set(all.map((e) => (e.wallet || '').toLowerCase()).filter(Boolean))).slice(0, maxWallets)
+  log('skew.wallets_sample', { count: wallets.length, sample: wallets.slice(0, 10) })
 
   // Score wallets
   const walletScores = new Map<string, number>()
@@ -177,6 +184,7 @@ export async function computeSmartSkewAlpha(params: { yesTokenId: string; noToke
       walletScores.set(w, 0)
     }
   }
+  log('skew.wallet_scores', { evaluated: walletScores.size })
 
   // Aggregate volumes by whale vs retail
   let yesWhale = 0, noWhale = 0, yesRetail = 0, noRetail = 0
@@ -190,6 +198,7 @@ export async function computeSmartSkewAlpha(params: { yesTokenId: string; noToke
       if (isWhale) noWhale += v; else noRetail += v
     }
   }
+  log('skew.volumes', { yesWhale, noWhale, yesRetail, noRetail })
 
   const smartPoolUsd = yesWhale + noWhale
   const denom = yesWhale + noWhale
@@ -201,6 +210,7 @@ export async function computeSmartSkewAlpha(params: { yesTokenId: string; noToke
   const rawAlpha = 60 + (skew - 0.75) * 180
   const alpha = clamp(Math.round(rawAlpha), 0, 100)
   const trigger = skew >= 0.75 && smartPoolUsd >= minSmartPoolUsd
+  log('skew.result', { direction, skew, skewYes, smartPoolUsd, trigger, alpha })
 
   return {
     direction,
@@ -229,10 +239,12 @@ export async function findRecentBigOrders(params?: {
   minNotionalUsd?: number
   withinMs?: number
   perTokenLimit?: number
+  onLog?: (msg: string, ctx?: any) => void
 }): Promise<Array<{ ts: number; tokenId: string; marketId?: string; side: 'BUY'|'SELL'|string; price: number; size: number; notional: number }>> {
   const minNotionalUsd = params?.minNotionalUsd ?? 10_000
   const withinMs = params?.withinMs ?? 10 * 60 * 1000 // 10 minutes
   const perTokenLimit = params?.perTokenLimit ?? 50
+  const log = params?.onLog || (() => {})
   let tokenIds = params?.tokenIds
   if (!tokenIds || tokenIds.length === 0) {
     try {
@@ -243,22 +255,27 @@ export async function findRecentBigOrders(params?: {
   }
   tokenIds = tokenIds || []
   const cutoff = Date.now() - withinMs
+  log('big_orders.start', { minNotionalUsd, withinMs, cutoff, perTokenLimit, tokenIdsCount: tokenIds.length, sample: tokenIds.slice(0, 20) })
   const results: Array<{ ts: number; tokenId: string; marketId?: string; side: 'BUY'|'SELL'|string; price: number; size: number; notional: number }> = []
   for (const tokenId of tokenIds) {
     try {
       const trades = await clobApi.getTrades(tokenId, perTokenLimit)
+      log('big_orders.trades', { tokenId, total: (trades || []).length })
       for (const tr of trades || []) {
         const ts = typeof tr.timestamp === 'number' ? tr.timestamp : Date.parse(String((tr as any).timestamp))
         if (!Number.isFinite(ts) || ts < cutoff) continue
         const price = parseFloat(String(tr.price || '0'))
         const size = parseFloat(String(tr.size || '0'))
         const notional = price * size
-        if (!Number.isFinite(notional) || notional < minNotionalUsd) continue
+        const skip = !Number.isFinite(notional) || notional < minNotionalUsd
+        log('big_orders.trade', { tokenId, ts, price, size, notional: Math.round(notional), keep: !skip })
+        if (skip) continue
         results.push({ ts, tokenId, marketId: (tr as any).market, side: (tr as any).side || '', price, size, notional })
       }
     } catch {}
   }
   results.sort((a,b)=>b.ts - a.ts)
+  log('big_orders.result', { count: results.length, top: results[0] ? Math.round(results[0].notional) : 0 })
   return results
 }
 
