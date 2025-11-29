@@ -393,12 +393,29 @@ export async function progressiveLiveScan(params?: {
     log('progressive.markets_fetched', { trending: trending.length, active: active.length })
     const tokenIds: string[] = []
     const seen = new Set<string>()
-    const addTokens = (arr:any[]) => { for (const m of arr) for (const t of (m.tokens || [])) if (t?.token_id && !seen.has(t.token_id)) { seen.add(t.token_id); tokenIds.push(t.token_id) } }
+    const addTokens = (arr:any[]) => {
+      for (const m of arr) {
+        // Try tokens array first
+        for (const t of (m.tokens || [])) {
+          const id = t?.token_id || t?.tokenId
+          if (id && !seen.has(id)) { seen.add(id); tokenIds.push(id) }
+        }
+        // Fallback: parse clobTokenIds string if available
+        if (!m.tokens && m.clobTokenIds) {
+          try {
+            const ids = JSON.parse(m.clobTokenIds)
+            for (const id of ids || []) {
+              if (id && !seen.has(id)) { seen.add(id); tokenIds.push(id) }
+            }
+          } catch {}
+        }
+      }
+    }
     addTokens(trending); addTokens(active)
     log('progressive.tokens', { count: tokenIds.length, sample: tokenIds.slice(0,25), trendingSample: trending.slice(0,2), activeSample: active.slice(0,2) })
     // Aggressive token enrichment: fetch Gamma details for each condition, then fallback to CLOB markets
     const conds: string[] = []
-    const addCond = (arr:any[]) => { for (const m of arr) if (m?.condition_id) conds.push(m.condition_id) }
+    const addCond = (arr:any[]) => { for (const m of arr) if (m?.condition_id || m?.conditionId) conds.push(m.condition_id || m.conditionId) }
     addCond(trending); addCond(active)
     const maxConds = Math.min(200, conds.length)
     log('progressive.resolve_tokens_start', { conditions: maxConds, condsSample: conds.slice(0, 5) })
