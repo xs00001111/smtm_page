@@ -28,6 +28,7 @@ const envSchema = z.object({
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_ALPHA_ENABLED: z.string().default('false'),
   TELEGRAM_WEBHOOK_URL: z.string().url().optional(),
   // Resolution monitor tuning
   RESOLUTION_SCAN_BASE_MINUTES: z.string().default('10'),
@@ -35,6 +36,8 @@ const envSchema = z.object({
   RESOLUTION_NEAR_WINDOW_HOURS: z.string().default('24'),
   RESOLUTION_SCAN_FINAL_SECONDS: z.string().default('30'),
   RESOLUTION_FINAL_WINDOW_MINUTES: z.string().default('60'),
+  // Alpha fetch window
+  ALPHA_FRESH_WINDOW_SECONDS: z.string().default('600'),
 });
 
 export const env = envSchema.parse({
@@ -58,10 +61,12 @@ export const env = envSchema.parse({
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  SUPABASE_ALPHA_ENABLED: process.env.SUPABASE_ALPHA_ENABLED || 'false',
   TELEGRAM_WEBHOOK_URL: process.env.TELEGRAM_WEBHOOK_URL,
   RESOLUTION_SCAN_BASE_MINUTES: process.env.RESOLUTION_SCAN_BASE_MINUTES || '10',
   RESOLUTION_SCAN_NEAR_MINUTES: process.env.RESOLUTION_SCAN_NEAR_MINUTES || '2',
   RESOLUTION_NEAR_WINDOW_HOURS: process.env.RESOLUTION_NEAR_WINDOW_HOURS || '24',
   RESOLUTION_SCAN_FINAL_SECONDS: process.env.RESOLUTION_SCAN_FINAL_SECONDS || '30',
   RESOLUTION_FINAL_WINDOW_MINUTES: process.env.RESOLUTION_FINAL_WINDOW_MINUTES || '60',
+  ALPHA_FRESH_WINDOW_SECONDS: process.env.ALPHA_FRESH_WINDOW_SECONDS || '600',
 });

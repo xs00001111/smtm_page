@@ -7,7 +7,7 @@ import { RealTimeDataClient } from '@polymarket/real-time-data-client';
 import type { Message } from '@polymarket/real-time-data-client';
 import { Telegraf } from 'telegraf';
 import { logger } from '../utils/logger';
-import { gammaApi, dataApi, WhaleDetector } from '@smtm/data';
+import { gammaApi, dataApi, WhaleDetector, TradeBuffer } from '@smtm/data';
 import { AlphaAggregator } from './alpha-aggregator';
 import { updateMarketToken, updateWhaleToken } from './subscriptions';
 import { botConfig } from '../config/bot';
@@ -570,6 +570,8 @@ export class WebSocketMonitorService {
 
     // Feed detector for global whale ingestion (in-memory)
     try { WhaleDetector.handleTradeMessage(payload) } catch {}
+    // Feed raw trade buffer for alpha fallbacks and skew
+    try { TradeBuffer.handleTrade(payload) } catch {}
     // Feed alpha aggregator (whale alpha for now)
     try { await AlphaAggregator.onTrade(payload) } catch {}
 

@@ -1829,10 +1829,50 @@ export function registerCommands(bot: Telegraf) {
         }
       }
 
+      // Show searching indicator first
+      const searching = await ctx.reply('🔎 Searching for alpha…')
+
       const { AlphaAggregator } = await import('../services/alpha-aggregator')
-      const latest = AlphaAggregator.getLatest(1, tokenIds)
+      let latest = AlphaAggregator.getLatest(1, tokenIds)
       if (latest.length === 0) {
-        await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')
+        // Try Supabase store if enabled
+        const { fetchRecentAlpha } = await import('../services/alpha-store')
+        latest = await fetchRecentAlpha({ tokenIds, limit: 1 })
+      }
+      if (latest.length === 0) {
+        // Fallback: hit CLOB API for recent big orders (real trades)
+        const { findRecentBigOrders } = await import('@smtm/data')
+        const bigs = await findRecentBigOrders({ tokenIds, minNotionalUsd: 10_000, withinMs: 15*60*1000, perTokenLimit: 50 })
+        if (!bigs.length) {
+          // Last-resort: show most recent buffered trade if any
+          const { TradeBuffer, buildWhaleAlphaForTrade } = await import('@smtm/data')
+          const trades = tokenIds?.length ? TradeBuffer.getTrades(1, { tokenIds }) : TradeBuffer.getTrades(1)
+          if (!trades.length) {
+            await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')
+            return
+          }
+          const t = trades[trades.length - 1]
+          const alpha = await buildWhaleAlphaForTrade({ wallet: (t.wallet||'').toLowerCase(), sizeShares: t.size, price: t.price, tokenId: t.tokenId })
+          const short = t.wallet ? t.wallet.slice(0,6)+'...'+t.wallet.slice(-4) : 'unknown'
+          let msg = `✨ <b>Latest Trade</b>\n\n`
+          msg += `🐋 WhaleScore: ${alpha.whaleScore} • Alpha: ${alpha.alpha} (${alpha.recommendation})\n`
+          msg += `Value: $${Math.round(t.notional).toLocaleString()}\n`
+          msg += `Wallet: <code>${short}</code>`
+          await ctx.reply(msg, { parse_mode: 'HTML' })
+          return
+        }
+        const b = bigs[0]
+        const notionalStr = `$${Math.round(b.notional).toLocaleString()}`
+        let msg = `✨ <b>Big Order Detected</b>\n\n`
+        msg += `${b.side || 'TRADE'} ${notionalStr} @ ${(b.price*100).toFixed(1)}¢\n`
+        // Try to attach market link if possible
+        try {
+          const m = await gammaApi.getMarket(b.marketId || (query || ''))
+          const url = getPolymarketMarketUrl(m)
+          if (m?.question) msg = `✨ <b>${esc(m.question)}</b>\n\n` + msg
+          if (url) msg += `\n🔗 <a href="${esc(url)}">Market</a>`
+        } catch {}
+        await ctx.reply(msg, { parse_mode: 'HTML' })
         return
       }
 
@@ -1868,7 +1908,12 @@ export function registerCommands(bot: Telegraf) {
       const when = new Date(a.ts).toISOString().replace('T',' ').slice(0, 19) + 'Z'
       msg += `\n🕒 ${when}`
       const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:1${tokenIds && tokenIds.length?':'+tokenIds.join(','):''}` }]] }
-      await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
+      // Edit the searching message if possible, otherwise send a new one
+      try {
+        await ctx.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, msg, { parse_mode: 'HTML', reply_markup: kb as any })
+      } catch {
+        await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
+      }
     } catch (e) {
       logger.error('alpha command failed', e)
       await ctx.reply('❌ Failed to fetch alpha. Try again later.')

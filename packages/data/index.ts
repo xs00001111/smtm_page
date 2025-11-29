@@ -10,3 +10,4 @@ export * from './clients/clob-api';
 export * from './utils';
 export * from './whales';
 export * from './alpha';
+export * from './trades';

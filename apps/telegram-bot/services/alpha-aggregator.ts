@@ -1,6 +1,7 @@
 import { buildWhaleAlphaForTrade, classifyWhale, computeSmartSkewAlpha, computeInsiderAlpha } from '@smtm/data'
 import { logger } from '../utils/logger'
 import { botConfig } from '../config/bot'
+import { persistAlphaEvent } from './alpha-store'
 
 export type AlphaKind = 'whale' | 'smart_skew' | 'insider'
 
@@ -43,6 +44,8 @@ class AlphaAggregatorImpl {
   push(event: AlphaEvent) {
     this.buffer.push(event)
     if (this.buffer.length > this.maxEvents) this.buffer.splice(0, this.buffer.length - this.maxEvents)
+    // Best-effort persistence (optional)
+    void persistAlphaEvent(event)
   }
 
   async onTrade(payload: any, context?: { marketName?: string }) {

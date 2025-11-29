@@ -1,5 +1,8 @@
 import { dataApi } from './clients/data-api'
+import { clobApi } from './clients/clob-api'
+import { gammaApi } from './clients/gamma-api'
 import { WhaleDetector, WhaleEvent } from './whales'
+import { TradeBuffer } from './trades'
 
 export type Recommendation = 'copy' | 'counter' | 'neutral'
 
@@ -48,13 +51,11 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 export async function getWalletWhaleStats(wallet: string, opts?: WhaleStatsOptions): Promise<WhaleStats> {
   const windowMs = opts?.windowMs ?? 6 * 60 * 60 * 1000 // 6h
   const maxEvents = opts?.maxEvents ?? 500
-  const now = Date.now()
-  const events: WhaleEvent[] = WhaleDetector.getEvents(maxEvents, undefined, wallet.toLowerCase())
-  const recent = events.filter((e) => now - e.ts <= windowMs)
-  const sampleCount = recent.length
+  const recentTrades = TradeBuffer.getTrades(maxEvents, { sinceMs: windowMs, wallet })
+  const sampleCount = recentTrades.length
   const windowHours = windowMs / 3600000
 
-  const totalNotional = recent.reduce((acc, e) => acc + (e.notionalUsd || 0), 0)
+  const totalNotional = recentTrades.reduce((acc, t) => acc + (t.notional || 0), 0)
   const avgBetUsd = sampleCount > 0 ? totalNotional / sampleCount : 0
   const tradesPerHour = sampleCount / Math.max(0.25, windowHours)
 
@@ -159,15 +160,12 @@ export async function computeSmartSkewAlpha(params: { yesTokenId: string; noToke
   const minSmartPoolUsd = cfg?.minSmartPoolUsd ?? 3000
   const maxWallets = cfg?.maxWallets ?? 50
 
-  const now = Date.now()
-  // Gather recent events for both tokens
-  const maxScan = 1000
-  const yesEvents = WhaleDetector.getEvents(maxScan, params.yesTokenId)
-  const noEvents = WhaleDetector.getEvents(maxScan, params.noTokenId)
-  const all = [...yesEvents, ...noEvents].filter((e) => now - e.ts <= windowMs)
+  // Gather recent raw trades for both tokens
+  const maxScan = 2000
+  const all = TradeBuffer.getTrades(maxScan, { sinceMs: windowMs, tokenIds: [params.yesTokenId, params.noTokenId] })
 
   // Identify unique wallets in window (cap to reduce API calls)
-  const wallets = Array.from(new Set(all.map((e) => e.wallet))).slice(0, maxWallets)
+  const wallets = Array.from(new Set(all.map((e) => (e.wallet || '').toLowerCase()).filter(Boolean))).slice(0, maxWallets)
 
   // Score wallets
   const walletScores = new Map<string, number>()
@@ -183,8 +181,9 @@ export async function computeSmartSkewAlpha(params: { yesTokenId: string; noToke
   // Aggregate volumes by whale vs retail
   let yesWhale = 0, noWhale = 0, yesRetail = 0, noRetail = 0
   for (const e of all) {
-    const isWhale = (walletScores.get(e.wallet) || 0) >= whaleScoreThreshold
-    const v = e.notionalUsd || (e.price * e.sizeShares)
+    const score = e.wallet ? (walletScores.get(e.wallet.toLowerCase()) || 0) : 0
+    const isWhale = score >= whaleScoreThreshold
+    const v = e.notional
     if (e.tokenId === params.yesTokenId) {
       if (isWhale) yesWhale += v; else yesRetail += v
     } else if (e.tokenId === params.noTokenId) {
@@ -222,6 +221,45 @@ export async function computeSmartSkewAlpha(params: { yesTokenId: string; noToke
       walletsEvaluated: wallets.length,
     },
   }
+}
+
+// Fallback: query recent trades from CLOB API to find big orders (no wallet)
+export async function findRecentBigOrders(params?: {
+  tokenIds?: string[]
+  minNotionalUsd?: number
+  withinMs?: number
+  perTokenLimit?: number
+}): Promise<Array<{ ts: number; tokenId: string; marketId?: string; side: 'BUY'|'SELL'|string; price: number; size: number; notional: number }>> {
+  const minNotionalUsd = params?.minNotionalUsd ?? 10_000
+  const withinMs = params?.withinMs ?? 10 * 60 * 1000 // 10 minutes
+  const perTokenLimit = params?.perTokenLimit ?? 50
+  let tokenIds = params?.tokenIds
+  if (!tokenIds || tokenIds.length === 0) {
+    try {
+      const trending = await gammaApi.getTrendingMarkets(8)
+      tokenIds = []
+      for (const m of trending) for (const t of (m.tokens || [])) if (t?.token_id) tokenIds.push(t.token_id)
+    } catch {}
+  }
+  tokenIds = tokenIds || []
+  const cutoff = Date.now() - withinMs
+  const results: Array<{ ts: number; tokenId: string; marketId?: string; side: 'BUY'|'SELL'|string; price: number; size: number; notional: number }> = []
+  for (const tokenId of tokenIds) {
+    try {
+      const trades = await clobApi.getTrades(tokenId, perTokenLimit)
+      for (const tr of trades || []) {
+        const ts = typeof tr.timestamp === 'number' ? tr.timestamp : Date.parse(String((tr as any).timestamp))
+        if (!Number.isFinite(ts) || ts < cutoff) continue
+        const price = parseFloat(String(tr.price || '0'))
+        const size = parseFloat(String(tr.size || '0'))
+        const notional = price * size
+        if (!Number.isFinite(notional) || notional < minNotionalUsd) continue
+        results.push({ ts, tokenId, marketId: (tr as any).market, side: (tr as any).side || '', price, size, notional })
+      }
+    } catch {}
+  }
+  results.sort((a,b)=>b.ts - a.ts)
+  return results
 }
 
 // Insider Alpha (v0.5)
@@ -329,4 +367,3 @@ export async function computeInsiderAlpha(params: {
     },
   }
 }
-
