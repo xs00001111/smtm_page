@@ -1841,12 +1841,12 @@ export function registerCommands(bot: Telegraf) {
           minNotionalUsd: 2000,
           withinMs: 24*60*60*1000,
           perTokenLimit: 50,
-          onLog: (m, ctx) => logger.info(`alpha:big ${m}`, ctx || {})
+          onLog: (m, ctx) => logger.info({ ...ctx }, `alpha:big ${m}`)
         })
         logger.info('alpha:fallback big orders', { count: bigs.length, threshold: 2000 })
         if (!bigs.length) {
           // Try largest trade even if below threshold
-          const any = await findRecentBigOrders({ tokenIds, minNotionalUsd: 0, withinMs: 24*60*60*1000, perTokenLimit: 50, onLog: (m, ctx) => logger.info(`alpha:any ${m}`, ctx || {}) })
+          const any = await findRecentBigOrders({ tokenIds, minNotionalUsd: 0, withinMs: 24*60*60*1000, perTokenLimit: 50, onLog: (m, ctx) => logger.info({ ...ctx }, `alpha:any ${m}`) })
           logger.info('alpha:fallback any orders', { count: any.length })
           if (any.length) {
             any.sort((a,b)=>b.notional - a.notional)
@@ -1869,7 +1869,7 @@ export function registerCommands(bot: Telegraf) {
               delayMs: 250,
               maxDurationMs: 5*60*1000,
               onLog: async (m, ctx) => {
-                logger.info(`alpha:prog ${m}`, ctx || {})
+                logger.info({ ...ctx }, `alpha:prog ${m}`)
                 try {
                   if (m === 'progressive.trades') {
                     const idx = (ctx && ctx.idx) || 0

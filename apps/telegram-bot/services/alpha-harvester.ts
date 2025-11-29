@@ -28,7 +28,7 @@ export function startAlphaHarvester() {
         maxMarkets: 200,
         delayMs: 250,
         maxDurationMs: 4*60*1000,
-        onLog: (m, ctx) => logger.info(`alpha:harvest ${m}`, ctx || {})
+        onLog: (m, ctx) => logger.info({ ...ctx }, `alpha:harvest ${m}`)
       })
       if (best) {
         logger.info('alpha.harvester run.result', { tokenId: best.tokenId, notional: Math.round(best.notional) })

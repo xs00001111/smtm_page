@@ -128,7 +128,7 @@ class AlphaAggregatorImpl {
     // 1) Smart-skew per market pair
     for (const [condId, pair] of this.pairs.entries()) {
       try {
-        const skew = await computeSmartSkewAlpha({ yesTokenId: pair.yes, noTokenId: pair.no }, { onLog: (m, ctx)=> logger.info(`alpha:skew ${m}`, ctx || {}) })
+        const skew = await computeSmartSkewAlpha({ yesTokenId: pair.yes, noTokenId: pair.no }, { onLog: (m, ctx)=> logger.info({ ...ctx }, `alpha:skew ${m}`) })
         const last = this.lastSkewEmit.get(condId) || 0
         const cooldownMs = Math.max(30_000, botConfig.alphaCooldowns.skew * 1000)
         if (skew.trigger && now - last >= cooldownMs) {
@@ -176,7 +176,7 @@ class AlphaAggregatorImpl {
         if (!pair) continue
         // Compute skew once
         let skewRes: any = null
-        try { skewRes = await computeSmartSkewAlpha({ yesTokenId: pair.yes, noTokenId: pair.no }, { onLog: (m, ctx)=> logger.info(`alpha:skew ${m}`, ctx || {}) }) } catch {}
+        try { skewRes = await computeSmartSkewAlpha({ yesTokenId: pair.yes, noTokenId: pair.no }, { onLog: (m, ctx)=> logger.info({ ...ctx }, `alpha:skew ${m}`) }) } catch {}
         const cluster = {
           count: e.clusterCount || 1,
           durationMs: e.clusterDurationMs || 0,
