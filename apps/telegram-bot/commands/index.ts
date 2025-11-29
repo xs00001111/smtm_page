@@ -1861,6 +1861,7 @@ export function registerCommands(bot: Telegraf) {
           if (!trades.length) {
             // Progressive live scan across trending + active universe (sequential up to ~5m)
             const { progressiveLiveScan } = await import('@smtm/data')
+            let tooManyErrors = false
             const best = await progressiveLiveScan({
               minNotionalUsd: 2000,
               withinMs: 24*60*60*1000,
@@ -1868,6 +1869,7 @@ export function registerCommands(bot: Telegraf) {
               maxMarkets: 100,
               delayMs: 250,
               maxDurationMs: 5*60*1000,
+              maxErrors: 10,
               onLog: async (m, ctx) => {
                 logger.info({ ...ctx }, `alpha:prog ${m}`)
                 try {
@@ -1877,13 +1879,20 @@ export function registerCommands(bot: Telegraf) {
                     await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `🔎 Searching… (${idx}/${total})`, {})
                   } else if (m === 'progressive.best_update') {
                     await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `🔎 Found candidate: $${(ctx && ctx.notional) || 0}`, {})
+                  } else if (m === 'progressive.too_many_errors') {
+                    tooManyErrors = true
+                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `❌ Scan stopped due to errors. Please try again later.`, {})
                   }
                 } catch {}
               }
             })
             logger.info('alpha:fallback live scan', { found: !!best, notional: best ? Math.round(best.notional) : 0 })
             if (!best) {
-              await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')
+              if (tooManyErrors) {
+                await ctx.reply('❌ Scan stopped due to repeated errors. Please try again later.')
+              } else {
+                await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')
+              }
               return
             }
             const notionalStr = `$${Math.round(best.notional).toLocaleString()}`
