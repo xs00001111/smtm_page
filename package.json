@@ -23,11 +23,13 @@
     "test:data": "npm run test:setup"
   },
   "dependencies": {
+    "@polymarket/clob-client": "^4.22.8",
     "@polymarket/real-time-data-client": "^1.4.0",
     "axios": "^1.12.2",
     "cheerio": "^1.1.2",
     "class-variance-authority": "0.7.0",
     "dotenv": "^17.2.3",
+    "ethers": "^5.8.0",
     "fuse.js": "^7.1.0",
     "graphql": "^16.11.0",
     "graphql-request": "^7.3.1",

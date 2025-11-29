@@ -6,16 +6,49 @@ import type {
   Trade,
 } from '../types';
 
+let ClobClient: any = null;
+let ApiKeyCreds: any = null;
+
+try {
+  const polyClient = require('@polymarket/clob-client');
+  ClobClient = polyClient.ClobClient;
+  ApiKeyCreds = polyClient.ApiKeyCreds;
+} catch {
+  // Official client not available, will fall back to axios
+}
+
 /**
  * Polymarket CLOB API Client
- * Public API for prices, orderbook, and trades
+ * Uses official @polymarket/clob-client when credentials available for authenticated endpoints
+ * Falls back to direct axios for public endpoints
  * Docs: https://docs.polymarket.com/#clob-api
  */
 export class ClobApiClient {
   private client: AxiosInstance;
+  private officialClient: any = null;
   private baseURL = 'https://clob.polymarket.com';
+  private apiKey?: string;
+  private apiSecret?: string;
+  private apiPassphrase?: string;
 
-  constructor(timeout = 10000) {
+  constructor(timeout = 10000, credentials?: { apiKey?: string; apiSecret?: string; apiPassphrase?: string }) {
+    this.apiKey = credentials?.apiKey || process.env.POLYMARKET_API_KEY;
+    this.apiSecret = credentials?.apiSecret || process.env.POLYMARKET_API_SECRET;
+    this.apiPassphrase = credentials?.apiPassphrase || process.env.POLYMARKET_API_PASSPHRASE;
+
+    // Initialize official client if credentials and package are available
+    if (ClobClient && ApiKeyCreds && this.apiKey && this.apiSecret && this.apiPassphrase) {
+      try {
+        const creds = new ApiKeyCreds(this.apiKey, this.apiSecret, this.apiPassphrase);
+        // Chain ID 137 = Polygon mainnet (Polymarket's chain)
+        this.officialClient = new ClobClient(this.baseURL, 137, undefined, creds);
+        console.log('[CLOB] Using official authenticated client');
+      } catch (e) {
+        console.warn('[CLOB] Failed to initialize official client:', (e as any)?.message);
+      }
+    }
+
+    // Always create axios fallback
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout,
@@ -60,6 +93,17 @@ export class ClobApiClient {
    * @returns Array of recent trades
    */
   async getTrades(assetId: string, limit = 100): Promise<Trade[]> {
+    // Try official authenticated client first
+    if (this.officialClient) {
+      try {
+        const trades = await this.officialClient.getTrades({ asset_id: assetId, limit });
+        return trades;
+      } catch (e) {
+        console.warn('[CLOB] Official client getTrades failed, falling back to axios:', (e as any)?.message);
+      }
+    }
+
+    // Fallback to public axios endpoint
     const { data } = await this.client.get<Trade[]>('/trades', {
       params: {
         asset_id: assetId,
