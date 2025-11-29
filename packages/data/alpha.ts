@@ -262,6 +262,55 @@ export async function findRecentBigOrders(params?: {
   return results
 }
 
+// Live alpha scan across an expanded token universe (trending + top active)
+export async function searchLiveAlpha(params?: {
+  minNotionalUsd?: number
+  withinMs?: number
+  perTokenLimit?: number
+  maxMarkets?: number
+}): Promise<{ ts: number; tokenId: string; marketId?: string; side: string; price: number; size: number; notional: number } | null> {
+  const minNotionalUsd = params?.minNotionalUsd ?? 2000
+  const withinMs = params?.withinMs ?? 10 * 60 * 1000
+  const perTokenLimit = params?.perTokenLimit ?? 25
+  const maxMarkets = params?.maxMarkets ?? 60
+  const cutoff = Date.now() - withinMs
+  try {
+    const [trending, active] = await Promise.all([
+      gammaApi.getTrendingMarkets(20).catch(() => []),
+      gammaApi.getActiveMarkets(maxMarkets, 'volume').catch(() => []),
+    ])
+    const tokenIds: string[] = []
+    const seen = new Set<string>()
+    const addTokens = (mks: any[]) => {
+      for (const m of mks || []) {
+        for (const t of (m.tokens || [])) {
+          if (t?.token_id && !seen.has(t.token_id)) { seen.add(t.token_id); tokenIds.push(t.token_id) }
+        }
+      }
+    }
+    addTokens(trending)
+    addTokens(active)
+    let best: any = null
+    for (const tokenId of tokenIds) {
+      try {
+        const trades = await clobApi.getTrades(tokenId, perTokenLimit)
+        for (const tr of trades || []) {
+          const ts = typeof tr.timestamp === 'number' ? tr.timestamp : Date.parse(String((tr as any).timestamp))
+          if (!Number.isFinite(ts) || ts < cutoff) continue
+          const price = parseFloat(String(tr.price || '0'))
+          const size = parseFloat(String(tr.size || '0'))
+          const notional = price * size
+          if (!Number.isFinite(notional) || notional < minNotionalUsd) continue
+          if (!best || notional > best.notional) best = { ts, tokenId, marketId: (tr as any).market, side: (tr as any).side || '', price, size, notional }
+        }
+      } catch {}
+    }
+    return best
+  } catch {
+    return null
+  }
+}
+
 // Insider Alpha (v0.5)
 export interface ClusterMetrics {
   count: number // number of fills in cluster

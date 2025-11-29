@@ -1860,7 +1860,40 @@ export function registerCommands(bot: Telegraf) {
           const trades = tokenIds?.length ? TradeBuffer.getTrades(1, { tokenIds }) : TradeBuffer.getTrades(1)
           logger.info('alpha:fallback buffer trade count', { count: trades.length })
           if (!trades.length) {
-            await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')
+            // Live scan across trending + active universe
+            const { searchLiveAlpha } = await import('@smtm/data')
+            const best = await searchLiveAlpha({ minNotionalUsd: 2000, withinMs: 10*60*1000, perTokenLimit: 20, maxMarkets: 60 })
+            logger.info('alpha:fallback live scan', { found: !!best, notional: best ? Math.round(best.notional) : 0 })
+            if (!best) {
+              await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')
+              return
+            }
+            const notionalStr = `$${Math.round(best.notional).toLocaleString()}`
+            let msg = `✨ <b>Live Scan: Big Trade</b>\n\n`
+            msg += `${best.side || 'TRADE'} ${notionalStr} @ ${(best.price*100).toFixed(1)}¢\n`
+            try {
+              const m = await gammaApi.getMarket(best.marketId || (query || ''))
+              const url = getPolymarketMarketUrl(m)
+              if (m?.question) msg = `✨ <b>${esc(m.question)}</b>\n\n` + msg
+              if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
+            } catch {}
+            await ctx.reply(msg, { parse_mode: 'HTML' })
+            // Persist
+            try {
+              const { persistAlphaEvent } = await import('../services/alpha-store')
+              const alphaScore = best.notional >= 50000 ? 90 : best.notional >= 20000 ? 80 : best.notional >= 10000 ? 70 : 60
+              await persistAlphaEvent({
+                id: `${Date.now()}-${best.tokenId}-${Math.round(best.notional)}`,
+                ts: Date.now(),
+                kind: 'whale',
+                tokenId: best.tokenId,
+                conditionId: best.marketId || undefined,
+                alpha: alphaScore,
+                title: 'Live Scan: Big Trade',
+                summary: `${best.side || 'TRADE'} $${Math.round(best.notional).toLocaleString()} @ ${(best.price*100).toFixed(1)}¢`,
+                data: { weightedNotionalUsd: best.notional, whaleScore: null, recommendation: null },
+              } as any)
+            } catch {}
             return
           }
           const t = trades[trades.length - 1]
