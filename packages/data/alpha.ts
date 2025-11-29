@@ -375,6 +375,7 @@ export async function progressiveLiveScan(params?: {
   maxMarkets?: number
   delayMs?: number
   maxDurationMs?: number
+  maxErrors?: number
   onLog?: (msg: string, ctx?: any) => void
 }): Promise<{ ts: number; tokenId: string; marketId?: string; side: string; price: number; size: number; notional: number } | null> {
   const minNotionalUsd = params?.minNotionalUsd ?? 2000
@@ -383,10 +384,11 @@ export async function progressiveLiveScan(params?: {
   const maxMarkets = params?.maxMarkets ?? 200
   const delayMs = params?.delayMs ?? 250
   const maxDurationMs = params?.maxDurationMs ?? 5 * 60 * 1000
+  const maxErrors = params?.maxErrors ?? 10
   const cutoff = Date.now() - withinMs
   const log = params?.onLog || (() => {})
   const t0 = Date.now()
-  log('progressive.start', { minNotionalUsd, withinMs, perTokenLimit, maxMarkets, delayMs, maxDurationMs })
+  log('progressive.start', { minNotionalUsd, withinMs, perTokenLimit, maxMarkets, delayMs, maxDurationMs, maxErrors })
   try {
     const trending = await gammaApi.getTrendingMarkets(Math.min(40, maxMarkets)).catch(()=>[] as any[])
     const active = await gammaApi.getActiveMarkets(maxMarkets, 'volume').catch(()=>[] as any[])
@@ -490,6 +492,7 @@ export async function progressiveLiveScan(params?: {
     }
     log('progressive.final_token_count', { count: tokenIds.length, sample: tokenIds.slice(0, 10) })
     let best: any = null
+    let errorCount = 0
     for (let i=0;i<tokenIds.length;i++) {
       const tokenId = tokenIds[i]
       if (Date.now() - t0 > maxDurationMs) { log('progressive.timeout', { scanned: i, elapsedMs: Date.now()-t0 }); break }
@@ -511,7 +514,12 @@ export async function progressiveLiveScan(params?: {
           }
         }
       } catch (e) {
-        log('progressive.error', { tokenId, err: String((e as any)?.message || e) })
+        errorCount += 1
+        log('progressive.error', { tokenId, err: String((e as any)?.message || e), errorCount })
+        if (errorCount >= maxErrors) {
+          log('progressive.too_many_errors', { errorCount, limit: maxErrors })
+          break
+        }
       }
       if (best) break
       if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
