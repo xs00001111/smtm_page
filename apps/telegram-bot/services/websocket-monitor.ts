@@ -51,6 +51,8 @@ export class WebSocketMonitorService {
   private isRateLimited = false;
   private rateLimitCooldown = 180000; // 3 minutes cooldown after rate limit
   private nextReconnectAt: number | null = null;
+  // Lightweight orderbook/imbalance cache (enrichment only)
+  private orderbookState: Map<string, { ts: number; bid: number | null; ask: number | null; depthBid: number; depthAsk: number; imbalance: number | null }> = new Map();
 
   constructor(bot: Telegraf) {
     this.bot = bot;
@@ -925,8 +927,6 @@ export class WebSocketMonitorService {
 
     // Cap maximum delay at 5 minutes and add small jitter to avoid thundering herd
     delay = Math.min(delay, 300000);
-  // Lightweight orderbook/imbalance cache (enrichment only)
-  private orderbookState: Map<string, { ts: number; bid: number | null; ask: number | null; depthBid: number; depthAsk: number; imbalance: number | null }> = new Map()
     const jitter = 0.2; // 20% jitter
     const factor = 1 + (Math.random() * 2 - 1) * jitter;
     delay = Math.floor(delay * factor);
