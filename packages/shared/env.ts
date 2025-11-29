@@ -38,6 +38,9 @@ const envSchema = z.object({
   RESOLUTION_FINAL_WINDOW_MINUTES: z.string().default('60'),
   // Alpha fetch window
   ALPHA_FRESH_WINDOW_SECONDS: z.string().default('600'),
+  // Alpha harvester
+  ALPHA_HARVEST_ENABLED: z.string().default('true'),
+  ALPHA_HARVEST_INTERVAL_MS: z.string().default('180000'),
 });
 
 export const env = envSchema.parse({

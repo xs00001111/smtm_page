@@ -377,10 +377,10 @@ export async function progressiveLiveScan(params?: {
   maxDurationMs?: number
   onLog?: (msg: string, ctx?: any) => void
 }): Promise<{ ts: number; tokenId: string; marketId?: string; side: string; price: number; size: number; notional: number } | null> {
-  const minNotionalUsd = params?.minNotionalUsd ?? 1000
+  const minNotionalUsd = params?.minNotionalUsd ?? 2000
   const withinMs = params?.withinMs ?? 24 * 60 * 60 * 1000
-  const perTokenLimit = params?.perTokenLimit ?? 100
-  const maxMarkets = params?.maxMarkets ?? 100
+  const perTokenLimit = params?.perTokenLimit ?? 200
+  const maxMarkets = params?.maxMarkets ?? 200
   const delayMs = params?.delayMs ?? 250
   const maxDurationMs = params?.maxDurationMs ?? 5 * 60 * 1000
   const cutoff = Date.now() - withinMs
