@@ -52,7 +52,7 @@ class WhaleDetectorImpl {
       largeBetThresholdUsd: options?.largeBetThresholdUsd ?? 10_000,
       clusterWindowMs: options?.clusterWindowMs ?? 1200,
       maxEvents: options?.maxEvents ?? 1000,
-      leaderboardSize: options?.leaderboardSize ?? 200,
+      leaderboardSize: options?.leaderboardSize ?? 1000,
       leaderboardRefreshMs: options?.leaderboardRefreshMs ?? 10 * 60 * 1000,
     }
     this.pending = new Map()
@@ -63,16 +63,25 @@ class WhaleDetectorImpl {
     // Background refresh of top-PnL wallets (best-effort, public endpoints)
     const refresh = async () => {
       try {
-        // eslint-disable-next-line no-console
         console.log('[whale.watchlist] refreshing leaderboard...')
-        const list = await dataApi.getLeaderboard({ limit: this.opts.leaderboardSize })
+        // Page through leaderboard to collect up to leaderboardSize addresses
+        const pageSize = 100
+        const target = Math.max(100, this.opts.leaderboardSize)
         const next = new Set<string>()
-        for (const e of list || []) {
-          const addr = (e.user_id || '').toLowerCase()
-          if (addr) next.add(addr)
+        for (let offset = 0; offset < target; offset += pageSize) {
+          try {
+            const page = await dataApi.getLeaderboard({ limit: Math.min(pageSize, target - offset), offset })
+            if (!page || page.length === 0) break
+            for (const e of page) {
+              const addr = (e.user_id || '').toLowerCase()
+              if (addr) next.add(addr)
+            }
+          } catch (e) {
+            console.log('[whale.watchlist] page error', offset, (e as any)?.message || e)
+            break
+          }
         }
         if (next.size > 0) this.watchlist = next
-        // eslint-disable-next-line no-console
         console.log('[whale.watchlist] size=', next.size, ' sample=', Array.from(next).slice(0, 10))
       } catch (e) {
         // eslint-disable-next-line no-console
