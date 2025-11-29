@@ -568,6 +568,8 @@ export class WebSocketMonitorService {
       return;
     }
 
+    logger.info('ws:trade', { tokenId, price, size, notional: Math.round(tradeValue), maker: (payload.maker_address || payload.maker || '').toLowerCase() })
+
     // Feed detector for global whale ingestion (in-memory)
     try { WhaleDetector.handleTradeMessage(payload) } catch {}
     // Feed raw trade buffer for alpha fallbacks and skew
@@ -583,6 +585,7 @@ export class WebSocketMonitorService {
           // If following a specific wallet, filter by maker address
           const maker = (payload.maker_address || payload.maker || '').toLowerCase();
           if (sub.addressFilter && maker !== sub.addressFilter) continue;
+          logger.info('notify:whale_trade', { tokenId, userId: sub.userId, market: sub.marketName, minTradeSize: sub.minTradeSize, notional: Math.round(tradeValue), maker })
           await this.notifyWhaleTrade(sub, payload, tradeValue);
         }
       }

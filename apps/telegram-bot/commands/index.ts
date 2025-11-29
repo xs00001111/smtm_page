@@ -1840,13 +1840,16 @@ export function registerCommands(bot: Telegraf) {
         latest = await fetchRecentAlpha({ tokenIds, limit: 1 })
       }
       if (latest.length === 0) {
+        logger.info('alpha:buffer empty, trying Supabase/store + fallbacks', { tokenIds: tokenIds?.length || 0, query: query || null })
         // Fallback: hit CLOB API for recent big orders (real trades)
         const { findRecentBigOrders } = await import('@smtm/data')
         const bigs = await findRecentBigOrders({ tokenIds, minNotionalUsd: 10_000, withinMs: 15*60*1000, perTokenLimit: 50 })
+        logger.info('alpha:fallback big orders', { count: bigs.length })
         if (!bigs.length) {
           // Last-resort: show most recent buffered trade if any
           const { TradeBuffer, buildWhaleAlphaForTrade } = await import('@smtm/data')
           const trades = tokenIds?.length ? TradeBuffer.getTrades(1, { tokenIds }) : TradeBuffer.getTrades(1)
+          logger.info('alpha:fallback buffer trade count', { count: trades.length })
           if (!trades.length) {
             await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')
             return
