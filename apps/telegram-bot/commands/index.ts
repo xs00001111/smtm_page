@@ -1862,7 +1862,13 @@ export function registerCommands(bot: Telegraf) {
           if (!trades.length) {
             // Live scan across trending + active universe
             const { searchLiveAlpha } = await import('@smtm/data')
-            const best = await searchLiveAlpha({ minNotionalUsd: 2000, withinMs: 10*60*1000, perTokenLimit: 20, maxMarkets: 60 })
+            const best = await searchLiveAlpha({
+              minNotionalUsd: 2000,
+              withinMs: 10*60*1000,
+              perTokenLimit: 20,
+              maxMarkets: 60,
+              onLog: (m, ctx) => logger.info(`alpha:live ${m}`, ctx || {})
+            })
             logger.info('alpha:fallback live scan', { found: !!best, notional: best ? Math.round(best.notional) : 0 })
             if (!best) {
               await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')

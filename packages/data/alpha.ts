@@ -268,17 +268,19 @@ export async function searchLiveAlpha(params?: {
   withinMs?: number
   perTokenLimit?: number
   maxMarkets?: number
+  onLog?: (msg: string, ctx?: any) => void
 }): Promise<{ ts: number; tokenId: string; marketId?: string; side: string; price: number; size: number; notional: number } | null> {
   const minNotionalUsd = params?.minNotionalUsd ?? 2000
   const withinMs = params?.withinMs ?? 10 * 60 * 1000
   const perTokenLimit = params?.perTokenLimit ?? 25
   const maxMarkets = params?.maxMarkets ?? 60
   const cutoff = Date.now() - withinMs
+  const log = params?.onLog || (() => {})
   try {
-    const [trending, active] = await Promise.all([
-      gammaApi.getTrendingMarkets(20).catch(() => []),
-      gammaApi.getActiveMarkets(maxMarkets, 'volume').catch(() => []),
-    ])
+    log('start', { minNotionalUsd, withinMs, cutoff, perTokenLimit, maxMarkets })
+    const trending = await gammaApi.getTrendingMarkets(20).catch((e)=>{ log('trending_error', { err: String(e?.message || e) }); return [] as any[] })
+    const active = await gammaApi.getActiveMarkets(maxMarkets, 'volume').catch((e)=>{ log('active_error', { err: String(e?.message || e) }); return [] as any[] })
+    log('markets', { trending: trending.length, active: active.length })
     const tokenIds: string[] = []
     const seen = new Set<string>()
     const addTokens = (mks: any[]) => {
@@ -290,10 +292,14 @@ export async function searchLiveAlpha(params?: {
     }
     addTokens(trending)
     addTokens(active)
+    log('tokens', { count: tokenIds.length, sample: tokenIds.slice(0, 25) })
     let best: any = null
     for (const tokenId of tokenIds) {
       try {
         const trades = await clobApi.getTrades(tokenId, perTokenLimit)
+        log('trades', { tokenId, total: (trades || []).length })
+        let filtered = 0
+        let topN = 0
         for (const tr of trades || []) {
           const ts = typeof tr.timestamp === 'number' ? tr.timestamp : Date.parse(String((tr as any).timestamp))
           if (!Number.isFinite(ts) || ts < cutoff) continue
@@ -301,12 +307,18 @@ export async function searchLiveAlpha(params?: {
           const size = parseFloat(String(tr.size || '0'))
           const notional = price * size
           if (!Number.isFinite(notional) || notional < minNotionalUsd) continue
+          filtered++
+          if (notional > topN) topN = notional
           if (!best || notional > best.notional) best = { ts, tokenId, marketId: (tr as any).market, side: (tr as any).side || '', price, size, notional }
         }
+        log('trades_filtered', { tokenId, filtered, topNotional: Math.round(topN) })
       } catch {}
     }
+    if (best) log('result', { tokenId: best.tokenId, notional: Math.round(best.notional), price: best.price, ts: best.ts })
+    else log('empty')
     return best
   } catch {
+    log('error')
     return null
   }
 }
