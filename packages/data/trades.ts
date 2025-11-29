@@ -10,6 +10,7 @@ export interface RawTrade {
 class TradeBufferImpl {
   private buf: RawTrade[] = []
   private max = 2000
+  private bestByToken: Map<string, { ts: number; tokenId: string; price: number; size: number; notional: number; side?: string; marketId?: string }> = new Map()
 
   handleTrade(payload: any): void {
     const tokenId = payload.asset_id || payload.token_id
@@ -21,6 +22,9 @@ class TradeBufferImpl {
     const notional = price * size
     this.buf.push({ ts, tokenId, wallet, price, size, notional })
     if (this.buf.length > this.max) this.buf.splice(0, this.buf.length - this.max)
+    // Update best cache
+    const prev = this.bestByToken.get(tokenId)
+    if (!prev || notional > prev.notional) this.bestByToken.set(tokenId, { ts, tokenId, price, size, notional })
   }
 
   getTrades(limit = 200, opts?: { sinceMs?: number; tokenIds?: string[]; wallet?: string }): RawTrade[] {
@@ -31,7 +35,19 @@ class TradeBufferImpl {
     const filtered = this.buf.filter(t => t.ts >= cutoff && (!tokens || tokens.has(t.tokenId)) && (!wallet || (t.wallet || '').toLowerCase() === wallet))
     return filtered.slice(-Math.max(1, Math.min(limit, this.max)))
   }
+
+  getBestForTokens(tokenIds?: string[], maxAgeMs = 15 * 60 * 1000): { tokenId: string; ts: number; price: number; size: number; notional: number } | null {
+    const now = Date.now()
+    let best: any = null
+    const keys = tokenIds && tokenIds.length ? tokenIds : Array.from(this.bestByToken.keys())
+    for (const k of keys) {
+      const e = this.bestByToken.get(k)
+      if (!e) continue
+      if (now - e.ts > maxAgeMs) continue
+      if (!best || e.notional > best.notional) best = e
+    }
+    return best
+  }
 }
 
 export const TradeBuffer = new TradeBufferImpl()
-

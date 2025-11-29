@@ -41,6 +41,9 @@ const envSchema = z.object({
   // Alpha harvester
   ALPHA_HARVEST_ENABLED: z.string().default('true'),
   ALPHA_HARVEST_INTERVAL_MS: z.string().default('180000'),
+  // Observer refresh
+  OBSERVER_REFRESH_ENABLED: z.string().default('true'),
+  OBSERVER_REFRESH_INTERVAL_MS: z.string().default('300000'),
 });
 
 export const env = envSchema.parse({
