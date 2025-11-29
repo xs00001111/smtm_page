@@ -99,6 +99,11 @@ export class ClobApiClient {
       timeout,
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        // Some endpoints may 401/403 without a browser-like UA and origin
+        'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+        'Origin': 'https://polymarket.com',
+        'Referer': 'https://polymarket.com/',
       },
     });
   }
@@ -125,10 +130,33 @@ export class ClobApiClient {
    * @returns Orderbook with bids and asks
    */
   async getOrderbook(assetId: string): Promise<Orderbook> {
-    const { data } = await this.client.get<Orderbook>(`/book`, {
-      params: { token_id: assetId },
-    });
-    return data;
+    try {
+      const { data } = await this.client.get<Orderbook>(`/book`, {
+        params: { token_id: assetId },
+        headers: { Authorization: undefined as any },
+      });
+      return data;
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const text = err?.response?.data ? JSON.stringify(err.response.data).slice(0, 120) : String(err?.message || err);
+      console.warn(`[CLOB] axios /book failed (${status}): ${text} — retrying via fetch`);
+      const url = new URL(this.baseURL + '/book');
+      url.searchParams.set('token_id', assetId);
+      const res = await fetch(url.toString(), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+          'Origin': 'https://polymarket.com',
+          'Referer': 'https://polymarket.com/',
+        } as any,
+      } as any);
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`fetch /book ${res.status}: ${body.slice(0, 160)}`);
+      }
+      return (await res.json()) as Orderbook;
+    }
   }
 
   /**
@@ -139,12 +167,45 @@ export class ClobApiClient {
    */
   async getTrades(assetId: string, limit = 100): Promise<Trade[]> {
     // ALWAYS use public, unauthenticated endpoint for read-only trades
-    // This avoids accidental 401s from authenticated client usage.
-    const { data } = await this.client.get<Trade[]>('/trades', {
-      params: { asset_id: assetId, limit },
-    });
-    console.log(`[CLOB] Public trades returned ${data?.length || 0} records`);
-    return Array.isArray(data) ? data.slice(0, limit) : [];
+    // Primary attempt: axios with browser-like headers
+    try {
+      const { data } = await this.client.get<Trade[]>('/trades', {
+        params: { asset_id: assetId, limit },
+        // Ensure no auth headers are attached
+        headers: { Authorization: undefined as any },
+      });
+      console.log(`[CLOB] Public trades returned ${data?.length || 0} records`);
+      return Array.isArray(data) ? data.slice(0, limit) : [];
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const text = err?.response?.data ? JSON.stringify(err.response.data).slice(0, 120) : String(err?.message || err);
+      console.warn(`[CLOB] axios /trades failed (${status}): ${text} — retrying via fetch`);
+      // Fallback: use fetch with explicit headers
+      try {
+        const url = new URL(this.baseURL + '/trades');
+        url.searchParams.set('asset_id', assetId);
+        url.searchParams.set('limit', String(limit));
+        const res = await fetch(url.toString(), {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+            'Origin': 'https://polymarket.com',
+            'Referer': 'https://polymarket.com/',
+          } as any,
+        } as any);
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          throw new Error(`fetch /trades ${res.status}: ${body.slice(0, 160)}`);
+        }
+        const json = (await res.json()) as Trade[];
+        console.log(`[CLOB] fetch /trades returned ${json?.length || 0} records`);
+        return Array.isArray(json) ? json.slice(0, limit) : [];
+      } catch (err2) {
+        console.error('[CLOB] ✗ Public /trades failed', (err2 as any)?.message || err2);
+        throw err2;
+      }
+    }
   }
 
   /**
@@ -291,8 +352,31 @@ export class ClobApiClient {
    * @returns Market data
    */
   async getMarket(conditionId: string): Promise<any> {
-    const { data } = await this.client.get(`/markets/${conditionId}`);
-    return data;
+    try {
+      const { data } = await this.client.get(`/markets/${conditionId}`, {
+        headers: { Authorization: undefined as any },
+      });
+      return data;
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const text = err?.response?.data ? JSON.stringify(err.response.data).slice(0, 120) : String(err?.message || err);
+      console.warn(`[CLOB] axios /markets/${conditionId.slice(0,8)}.. failed (${status}): ${text} — retrying via fetch`);
+      const url = `${this.baseURL}/markets/${conditionId}`;
+      const res = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+          'Origin': 'https://polymarket.com',
+          'Referer': 'https://polymarket.com/',
+        } as any,
+      } as any);
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`fetch /markets/${conditionId.slice(0,8)}.. ${res.status}: ${body.slice(0, 160)}`);
+      }
+      return await res.json();
+    }
   }
 }
 
