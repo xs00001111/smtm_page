@@ -189,6 +189,7 @@ export class WebSocketMonitorService {
       const whaleSubs = this.pendingWhaleSubscriptions.get(conditionId) || []
       let tokenId: string | null = null
       try {
+        // Prefer Gamma for metadata
         const market = await gammaApi.getMarket(conditionId)
         if (market?.tokens && market.tokens.length > 0) {
           tokenId = market.tokens[0].token_id
@@ -202,9 +203,14 @@ export class WebSocketMonitorService {
             }
           } catch {}
         }
+        // Fallback: resolve via CLOB Market endpoint (no Data API)
         if (!tokenId) {
-          const holders = await dataApi.getTopHolders({ market: conditionId, limit: 1, minBalance: 1 })
-          tokenId = holders?.[0]?.token || null
+          try {
+            const mkt: any = await (await import('@smtm/data')).clobApi.getMarket(conditionId)
+            if (mkt?.tokens && mkt.tokens.length > 0) {
+              tokenId = mkt.tokens[0].token_id
+            }
+          } catch {}
         }
       } catch (e) {
         logger.error('resolvePendingMarkets error', e)
