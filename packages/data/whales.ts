@@ -43,7 +43,7 @@ class WhaleDetectorImpl {
   private byToken: Map<string, WhaleEvent[]> = new Map()
   private byWallet: Map<string, WhaleEvent[]> = new Map()
   private watchlist: Set<string> = new Set()
-  private pending: Map<PendingClusterKey, { ts: number; firstTs: number; count: number; notional: number; price: number; size: number; side: string; raw: any }>()
+  private pending: Map<PendingClusterKey, { ts: number; firstTs: number; count: number; notional: number; price: number; size: number; side: string; raw: any }>;
 
   private leaderboardTimer: any = null
 
