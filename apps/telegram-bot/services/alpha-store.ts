@@ -38,8 +38,8 @@ export async function persistAlphaEvent(ev: AlphaEvent): Promise<void> {
   }
   try {
     const body = [mapAlphaEvent(ev)]
-    await sb('alpha_event', { method: 'POST', body: JSON.stringify(body) }, 'analytics')
-    logger.info(`alpha:store persisted kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''} alpha=${ev.alpha}`)
+    await sb('alpha_event', { method: 'POST', body: JSON.stringify(body) }, 'public')
+    logger.info(`alpha:store persisted (public) kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''} alpha=${ev.alpha}`)
   } catch (e) {
     const err = (e as any)?.message || String(e)
     logger.warn(`persistAlphaEvent failed err=${err} kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''}`)
@@ -66,8 +66,8 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
     if (opts?.conditionId) params.push(`condition_id=eq.${encodeURIComponent(opts.conditionId)}`)
     if (opts?.tokenIds && opts.tokenIds.length) params.push(`token_id=in.(${opts.tokenIds.map(encodeURIComponent).join(',')})`)
     const path = `alpha_event?${params.join('&')}`
-    logger.info(`alpha:store fetch path schema=analytics ${path}`)
-    const rows = await sb<any[]>(path, undefined, 'analytics')
+    logger.info(`alpha:store fetch path schema=public ${path}`)
+    const rows = await sb<any[]>(path, undefined, 'public')
     logger.info(`alpha:store fetch ok rows=${rows?.length || 0}`)
     return rows.map(r => ({
       id: `${new Date(r.created_at).getTime()}-${r.token_id || ''}-${r.wallet || ''}-${r.alpha}`,
