@@ -22,7 +22,7 @@ export function startAlphaHarvester() {
     try {
       logger.info('alpha.harvester run.begin')
       const best = await progressiveLiveScan({
-        minNotionalUsd: 2000,
+        minNotionalUsd: 0,
         withinMs: 24*60*60*1000,
         perTokenLimit: 200,
         maxMarkets: 200,
@@ -33,7 +33,7 @@ export function startAlphaHarvester() {
       if (best) {
         logger.info('alpha.harvester run.result', { tokenId: best.tokenId, notional: Math.round(best.notional) })
         // Persist approximate whale alpha
-        const alphaScore = best.notional >= 50000 ? 90 : best.notional >= 20000 ? 80 : best.notional >= 10000 ? 70 : 60
+        const alphaScore = best.notional >= 10000 ? (best.notional >= 50000 ? 90 : best.notional >= 20000 ? 80 : 70) : 55
         await persistAlphaEvent({
           id: `${Date.now()}-${best.tokenId}-${Math.round(best.notional)}`,
           ts: Date.now(),
@@ -41,7 +41,7 @@ export function startAlphaHarvester() {
           tokenId: best.tokenId,
           conditionId: best.marketId || undefined,
           alpha: alphaScore,
-          title: 'Harvester: Big Trade',
+          title: alphaScore === 55 ? 'Harvester: Small Trade' : 'Harvester: Big Trade',
           summary: `${best.side || 'TRADE'} $${Math.round(best.notional).toLocaleString()} @ ${(best.price*100).toFixed(1)}¢`,
           data: { weightedNotionalUsd: best.notional, whaleScore: null, recommendation: null },
         } as any)
@@ -64,4 +64,3 @@ export function stopAlphaHarvester() {
   if (timer) clearInterval(timer)
   timer = null
 }
-

@@ -574,7 +574,7 @@ export class WebSocketMonitorService {
       return;
     }
 
-    logger.info('ws:trade', { tokenId, price, size, notional: Math.round(tradeValue), maker: (payload.maker_address || payload.maker || '').toLowerCase() })
+    logger.info('ws:trade', { assetId: tokenId, price, size, notional: Math.round(tradeValue), maker: (payload.maker_address || payload.maker || '').toLowerCase() })
 
     // Feed detector for global whale ingestion (in-memory)
     try {
@@ -583,7 +583,7 @@ export class WebSocketMonitorService {
       const wl = new Set((WhaleDetector as any).getWatchlist ? (WhaleDetector as any).getWatchlist() : [])
       const mk = (payload.maker_address || payload.maker || '').toLowerCase()
       if (mk && wl.has(mk)) {
-        logger.info('alpha:ws whale_trade', { tokenId, maker: mk, price, size, notional: Math.round(tradeValue) })
+        logger.info('alpha:ws whale_trade', { assetId: tokenId, maker: mk, price, size, notional: Math.round(tradeValue) })
       }
     } catch {}
     // Feed raw trade buffer for alpha fallbacks and skew

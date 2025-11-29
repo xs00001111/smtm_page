@@ -57,14 +57,14 @@ class AlphaAggregatorImpl {
       if (!tokenId || !Number.isFinite(price) || !Number.isFinite(size) || size <= 0) return
 
       const notionalPre = size * price
-      logger.info('alpha:onTrade received', { tokenId, wallet, price, size, notional: Math.round(notionalPre) })
+      logger.info('alpha:onTrade received', { assetId: tokenId, wallet, price, size, notional: Math.round(notionalPre) })
 
       const alpha = await buildWhaleAlphaForTrade({ wallet, sizeShares: size, price, tokenId })
       const notional = size * price
       const isWhaleBase = classifyWhale(notional, alpha.whaleScore)
       const rel = await isTopOfRecentTrades(tokenId, notional, 10)
       const isWhale = isWhaleBase || rel.isTop
-      logger.info('alpha:onTrade computed', { tokenId, wallet, whaleScore: alpha.whaleScore, alpha: alpha.alpha, recommendation: alpha.recommendation, notional: Math.round(notional), isWhale, isWhaleBase, topRecent: rel })
+      logger.info('alpha:onTrade computed', { assetId: tokenId, wallet, whaleScore: alpha.whaleScore, alpha: alpha.alpha, recommendation: alpha.recommendation, notional: Math.round(notional), isWhale, isWhaleBase, topRecent: rel })
       if (!isWhale) return
 
       // Try enrich with market mapping
@@ -103,7 +103,7 @@ class AlphaAggregatorImpl {
       this.push(event)
       this.lastWhaleEmit.set(whaleKey, nowTs)
       this.lastEventByKey.set(dedupeKey, { ts: nowTs, alpha: alpha.alpha })
-      logger.info('alpha:whale emitted', { conditionId: condId, tokenId, wallet, alpha: alpha.alpha, whaleScore: alpha.whaleScore, notional: Math.round(alpha.weightedNotionalUsd || notional) })
+      logger.info('alpha:whale emitted', { conditionId: condId, assetId: tokenId, wallet, alpha: alpha.alpha, whaleScore: alpha.whaleScore, notional: Math.round(alpha.weightedNotionalUsd || notional) })
     } catch (e) {
       logger.warn('alpha-aggregator onTrade failed', { err: (e as any)?.message })
     }
