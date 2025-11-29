@@ -1,4 +1,4 @@
-import { buildWhaleAlphaForTrade, classifyWhale, computeSmartSkewAlpha, computeInsiderAlpha } from '@smtm/data'
+import { buildWhaleAlphaForTrade, classifyWhale, computeSmartSkewAlpha, computeInsiderAlpha, isTopOfRecentTrades } from '@smtm/data'
 import { logger } from '../utils/logger'
 import { botConfig } from '../config/bot'
 import { persistAlphaEvent } from './alpha-store'
@@ -61,8 +61,10 @@ class AlphaAggregatorImpl {
 
       const alpha = await buildWhaleAlphaForTrade({ wallet, sizeShares: size, price, tokenId })
       const notional = size * price
-      const isWhale = classifyWhale(notional, alpha.whaleScore)
-      logger.info('alpha:onTrade computed', { tokenId, wallet, whaleScore: alpha.whaleScore, alpha: alpha.alpha, recommendation: alpha.recommendation, notional: Math.round(notional), isWhale })
+      const isWhaleBase = classifyWhale(notional, alpha.whaleScore)
+      const rel = await isTopOfRecentTrades(tokenId, notional, 10)
+      const isWhale = isWhaleBase || rel.isTop
+      logger.info('alpha:onTrade computed', { tokenId, wallet, whaleScore: alpha.whaleScore, alpha: alpha.alpha, recommendation: alpha.recommendation, notional: Math.round(notional), isWhale, isWhaleBase, topRecent: rel })
       if (!isWhale) return
 
       // Try enrich with market mapping

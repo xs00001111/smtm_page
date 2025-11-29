@@ -126,6 +126,33 @@ export async function buildWhaleAlphaForTrade(trade: { wallet: string; sizeShare
   }
 }
 
+// Relative-top detector: is current trade the largest among recent N trades?
+export async function isTopOfRecentTrades(tokenId: string, notional: number, recentCount = 10): Promise<{ isTop: boolean; rank: number; sample: number; maxNotional: number; median: number }> {
+  const recent = TradeBuffer.getTrades(100, { tokenIds: [tokenId], sinceMs: 60 * 60 * 1000 })
+  let list = recent.filter(t => t.tokenId === tokenId).slice(-recentCount)
+  if (list.length === 0) {
+    try {
+      const trades = await clobApi.getTrades(tokenId, recentCount)
+      list = (trades || []).map((tr:any) => ({
+        ts: typeof tr.timestamp === 'number' ? tr.timestamp : Date.parse(String(tr.timestamp)),
+        tokenId,
+        wallet: (tr as any).maker || (tr as any).maker_address || null,
+        price: parseFloat(String(tr.price || '0')),
+        size: parseFloat(String(tr.size || '0')),
+        notional: parseFloat(String(tr.price || '0')) * parseFloat(String(tr.size || '0')),
+      }))
+    } catch {}
+  }
+  const arr = list.map(t => t.notional).filter(n => Number.isFinite(n))
+  if (arr.length === 0) return { isTop: true, rank: 1, sample: 0, maxNotional: 0, median: 0 }
+  const sorted = [...arr].sort((a,b)=>b-a)
+  const rank = 1 + sorted.findIndex(v => notional >= v)
+  const maxNotional = sorted[0] || 0
+  const mid = Math.floor(sorted.length/2)
+  const median = sorted.length % 2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2
+  return { isTop: rank === 1, rank: rank === 0 ? 1 : rank, sample: arr.length, maxNotional, median }
+}
+
 // Smart Money Skew ("sizing screw")
 export interface SmartSkewConfig {
   whaleScoreThreshold?: number // default 65
