@@ -164,6 +164,7 @@ export function registerCommands(bot: Telegraf) {
     await ctx.reply(
       'Welcome to SMTM 🎯\n\n' +
         'Quick actions:\n' +
+        '• /alpha [market] — freshest whale/skew/insider\n' +
         '• /markets [query] — trending, breaking, new, or search\n' +
         '• /whales [query] — leaderboard or search traders\n' +
         '• /price <market> — detailed price info\n' +
@@ -174,7 +175,8 @@ export function registerCommands(bot: Telegraf) {
       {
         reply_markup: {
           keyboard: [
-            [{ text: '/markets' }, { text: '/whales' }],
+            [{ text: '/alpha' }, { text: '/markets' }],
+            [{ text: '/whales' }, { text: '/price' }],
             [{ text: '/list' }, { text: '/help' }]
           ],
           resize_keyboard: true,
@@ -668,6 +670,7 @@ export function registerCommands(bot: Telegraf) {
     await ctx.reply(
       '📚 SMTM Help\n\n' +
         'Discover\n' +
+        '• /alpha [market] — freshest whale/skew/insider signal\n' +
         '• /markets [segment|query] — browse markets\n' +
         '   Segments: trending, breaking, new, ending\n' +
         '   e.g. /markets trending  •  /markets election\n' +
