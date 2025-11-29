@@ -6,6 +6,14 @@ import type {
   Trade,
 } from '../types';
 
+let Wallet: any = null;
+try {
+  const ethers = require('ethers');
+  Wallet = ethers.Wallet;
+} catch {
+  // ethers not available
+}
+
 let ClobClient: any = null;
 
 try {
@@ -44,7 +52,7 @@ export class ClobApiClient {
     });
 
     // Initialize official client if credentials and package are available
-    if (ClobClient && this.apiKey && this.apiSecret && this.apiPassphrase) {
+    if (ClobClient && Wallet && this.apiKey && this.apiSecret && this.apiPassphrase) {
       try {
         console.log('[CLOB] Attempting to initialize official client...');
         // ApiKeyCreds is just a plain object interface
@@ -53,8 +61,23 @@ export class ClobApiClient {
           secret: this.apiSecret,
           passphrase: this.apiPassphrase,
         };
+
+        // Create or use wallet signer (needed for authenticated endpoints)
+        // For read-only operations, we can use any wallet - no funds needed
+        let signer;
+        const signerKey = process.env.POLYMARKET_SIGNER_PRIVATE_KEY;
+        if (signerKey) {
+          signer = new Wallet(signerKey);
+          console.log('[CLOB] Using provided signer wallet:', signer.address);
+        } else {
+          // Generate a random read-only wallet (deterministic based on API key for consistency)
+          const deterministicSeed = this.apiKey.slice(0, 64).padEnd(64, '0');
+          signer = new Wallet(deterministicSeed);
+          console.log('[CLOB] Generated deterministic read-only signer:', signer.address);
+        }
+
         // Chain ID 137 = Polygon mainnet (Polymarket's chain)
-        this.officialClient = new ClobClient(this.baseURL, 137, undefined, creds);
+        this.officialClient = new ClobClient(this.baseURL, 137, signer, creds);
         console.log('[CLOB] ✓ Official authenticated client initialized successfully');
       } catch (e) {
         console.error('[CLOB] ✗ Failed to initialize official client:', (e as any)?.message, (e as any)?.stack);
@@ -62,6 +85,7 @@ export class ClobApiClient {
     } else {
       const missing = [];
       if (!ClobClient) missing.push('package');
+      if (!Wallet) missing.push('ethers.Wallet');
       if (!this.apiKey) missing.push('POLYMARKET_API_KEY');
       if (!this.apiSecret) missing.push('POLYMARKET_API_SECRET');
       if (!this.apiPassphrase) missing.push('POLYMARKET_API_PASSPHRASE');
