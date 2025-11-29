@@ -38,8 +38,8 @@ const envSchema = z.object({
   RESOLUTION_FINAL_WINDOW_MINUTES: z.string().default('60'),
   // Alpha fetch window
   ALPHA_FRESH_WINDOW_SECONDS: z.string().default('600'),
-  // Alpha harvester
-  ALPHA_HARVEST_ENABLED: z.string().default('true'),
+  // Alpha harvester (disabled by default - requires special CLOB API access)
+  ALPHA_HARVEST_ENABLED: z.string().default('false'),
   ALPHA_HARVEST_INTERVAL_MS: z.string().default('180000'),
   // Observer refresh
   OBSERVER_REFRESH_ENABLED: z.string().default('true'),
@@ -75,4 +75,8 @@ export const env = envSchema.parse({
   RESOLUTION_SCAN_FINAL_SECONDS: process.env.RESOLUTION_SCAN_FINAL_SECONDS || '30',
   RESOLUTION_FINAL_WINDOW_MINUTES: process.env.RESOLUTION_FINAL_WINDOW_MINUTES || '60',
   ALPHA_FRESH_WINDOW_SECONDS: process.env.ALPHA_FRESH_WINDOW_SECONDS || '600',
+  ALPHA_HARVEST_ENABLED: process.env.ALPHA_HARVEST_ENABLED || 'false',
+  ALPHA_HARVEST_INTERVAL_MS: process.env.ALPHA_HARVEST_INTERVAL_MS || '180000',
+  OBSERVER_REFRESH_ENABLED: process.env.OBSERVER_REFRESH_ENABLED || 'true',
+  OBSERVER_REFRESH_INTERVAL_MS: process.env.OBSERVER_REFRESH_INTERVAL_MS || '300000',
 });
