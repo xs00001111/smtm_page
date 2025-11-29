@@ -98,6 +98,15 @@ class WhaleDetectorImpl {
 
   getWatchlist(): string[] { return Array.from(this.watchlist) }
 
+  setWatchlist(addresses: string[]): void {
+    const next = new Set<string>()
+    for (const a of addresses || []) {
+      const addr = (a || '').toLowerCase()
+      if (addr && addr.startsWith('0x') && addr.length === 42) next.add(addr)
+    }
+    if (next.size > 0) this.watchlist = next
+  }
+
   getEvents(limit = 50, tokenId?: string, wallet?: string): WhaleEvent[] {
     const src = tokenId ? (this.byToken.get(tokenId) || []) : wallet ? (this.byWallet.get(wallet.toLowerCase()) || []) : this.events
     return src.slice(-Math.max(1, Math.min(limit, this.opts.maxEvents)))

@@ -13,6 +13,7 @@ import { startResolutionMonitor } from './services/resolution-monitor';
 import { startAlphaHarvester } from './services/alpha-harvester';
 import { startObserverRefresh } from './services/observer-refresh';
 import { startTradersHarvester } from './services/traders-harvester';
+import { seedWatchlistFromSupabase } from './services/watchlist';
 
 const token = env.TELEGRAM_BOT_TOKEN
 if (!token) {
@@ -98,6 +99,10 @@ async function start() {
     startObserverRefresh(wsMonitor);
     // Start daily traders harvester (top 100 wallets + recent trades)
     startTradersHarvester();
+    // Seed whale detector watchlist from Supabase snapshot if available
+    seedWatchlistFromSupabase(1000).then((ok)=>{
+      if (ok) logger.info('watchlist.seed applied from Supabase')
+    }).catch(()=>{})
 
     // Only start WS if enabled and there are active subscriptions; otherwise lazy-start
     const status = wsMonitor.getStatus();
