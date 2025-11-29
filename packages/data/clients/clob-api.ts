@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import { createHash } from 'crypto';
 import type {
   PricesHistoryResponse,
   PricesHistoryParams,
@@ -70,9 +71,9 @@ export class ClobApiClient {
           signer = new Wallet(signerKey);
           console.log('[CLOB] Using provided signer wallet:', signer.address);
         } else {
-          // Generate a random read-only wallet (deterministic based on API key for consistency)
-          const deterministicSeed = this.apiKey.slice(0, 64).padEnd(64, '0');
-          signer = new Wallet(deterministicSeed);
+          // Generate deterministic wallet from API key hash (valid 32-byte private key)
+          const hash = createHash('sha256').update(this.apiKey).digest('hex');
+          signer = new Wallet('0x' + hash);
           console.log('[CLOB] Generated deterministic read-only signer:', signer.address);
         }
 
