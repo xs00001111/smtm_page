@@ -138,32 +138,13 @@ export class ClobApiClient {
    * @returns Array of recent trades
    */
   async getTrades(assetId: string, limit = 100): Promise<Trade[]> {
-    // Try official authenticated client first
-    if (this.officialClient) {
-      try {
-        console.log(`[CLOB] Using official client for getTrades (assetId: ${assetId.slice(0, 10)}...)`);
-        // Note: official client getTrades doesn't have a limit parameter, it returns all trades
-        // Signature: getTrades(params?: TradeParams, only_first_page?: boolean, next_cursor?: string)
-        const trades = await this.officialClient.getTrades({ asset_id: assetId });
-        console.log(`[CLOB] ✓ Official client returned ${trades?.length || 0} trades`);
-        // Limit results on our side if needed
-        return trades.slice(0, limit);
-      } catch (e) {
-        console.error('[CLOB] ✗ Official client getTrades failed:', (e as any)?.message, 'falling back to axios');
-      }
-    } else {
-      console.log(`[CLOB] ⚠ No official client available, using public axios endpoint for assetId: ${assetId.slice(0, 10)}...`);
-    }
-
-    // Fallback to public axios endpoint
+    // ALWAYS use public, unauthenticated endpoint for read-only trades
+    // This avoids accidental 401s from authenticated client usage.
     const { data } = await this.client.get<Trade[]>('/trades', {
-      params: {
-        asset_id: assetId,
-        limit,
-      },
+      params: { asset_id: assetId, limit },
     });
-    console.log(`[CLOB] Axios returned ${data?.length || 0} trades`);
-    return data;
+    console.log(`[CLOB] Public trades returned ${data?.length || 0} records`);
+    return Array.isArray(data) ? data.slice(0, limit) : [];
   }
 
   /**

@@ -42,6 +42,10 @@ type FollowRow = {
 }
 
 export function startResolutionMonitor(ws: WebSocketMonitorService) {
+  if (env.RESOLUTION_MONITOR_ENABLED !== 'true') {
+    logger.info('Resolution monitor disabled by env flag')
+    return
+  }
   if (!supabaseAvailable()) {
     logger.info('Resolution monitor disabled: Supabase not configured')
     return
