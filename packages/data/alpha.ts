@@ -269,7 +269,7 @@ export async function findRecentBigOrders(params?: {
   onLog?: (msg: string, ctx?: any) => void
 }): Promise<Array<{ ts: number; tokenId: string; marketId?: string; side: 'BUY'|'SELL'|string; price: number; size: number; notional: number }>> {
   const minNotionalUsd = params?.minNotionalUsd ?? 10_000
-  const withinMs = params?.withinMs ?? 10 * 60 * 1000 // 10 minutes
+  const withinMs = params?.withinMs ?? 24 * 60 * 60 * 1000 // 24 hours (low traffic default)
   const perTokenLimit = params?.perTokenLimit ?? 50
   const log = params?.onLog || (() => {})
   let tokenIds = params?.tokenIds
@@ -315,7 +315,7 @@ export async function searchLiveAlpha(params?: {
   onLog?: (msg: string, ctx?: any) => void
 }): Promise<{ ts: number; tokenId: string; marketId?: string; side: string; price: number; size: number; notional: number } | null> {
   const minNotionalUsd = params?.minNotionalUsd ?? 2000
-  const withinMs = params?.withinMs ?? 10 * 60 * 1000
+  const withinMs = params?.withinMs ?? 24 * 60 * 60 * 1000 // 24 hours (low traffic default)
   const perTokenLimit = params?.perTokenLimit ?? 25
   const maxMarkets = params?.maxMarkets ?? 60
   const cutoff = Date.now() - withinMs
