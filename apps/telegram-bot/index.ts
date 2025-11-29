@@ -12,6 +12,7 @@ import { initAnalyticsLogging, logAnalyticsError } from './services/analytics';
 import { startResolutionMonitor } from './services/resolution-monitor';
 import { startAlphaHarvester } from './services/alpha-harvester';
 import { startObserverRefresh } from './services/observer-refresh';
+import { startTradersHarvester } from './services/traders-harvester';
 
 const token = env.TELEGRAM_BOT_TOKEN
 if (!token) {
@@ -95,6 +96,8 @@ async function start() {
     startAlphaHarvester();
     // Periodically refresh WS observer tokens to capture more trades
     startObserverRefresh(wsMonitor);
+    // Start daily traders harvester (top 100 wallets + recent trades)
+    startTradersHarvester();
 
     // Only start WS if enabled and there are active subscriptions; otherwise lazy-start
     const status = wsMonitor.getStatus();

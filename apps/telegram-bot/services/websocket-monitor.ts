@@ -571,7 +571,15 @@ export class WebSocketMonitorService {
     logger.info('ws:trade', { tokenId, price, size, notional: Math.round(tradeValue), maker: (payload.maker_address || payload.maker || '').toLowerCase() })
 
     // Feed detector for global whale ingestion (in-memory)
-    try { WhaleDetector.handleTradeMessage(payload) } catch {}
+    try {
+      const ev = WhaleDetector.handleTradeMessage(payload)
+      // If maker is a known watchlist whale, log explicitly
+      const wl = new Set((WhaleDetector as any).getWatchlist ? (WhaleDetector as any).getWatchlist() : [])
+      const mk = (payload.maker_address || payload.maker || '').toLowerCase()
+      if (mk && wl.has(mk)) {
+        logger.info('alpha:ws whale_trade', { tokenId, maker: mk, price, size, notional: Math.round(tradeValue) })
+      }
+    } catch {}
     // Feed raw trade buffer for alpha fallbacks and skew
     try { TradeBuffer.handleTrade(payload) } catch {}
     // Feed alpha aggregator (whale alpha for now)
