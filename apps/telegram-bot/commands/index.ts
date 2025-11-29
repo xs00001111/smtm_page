@@ -1866,14 +1866,16 @@ export function registerCommands(bot: Telegraf) {
           const trades = tokenIds?.length ? TradeBuffer.getTrades(1, { tokenIds }) : TradeBuffer.getTrades(1)
           logger.info('alpha:fallback buffer trade count', { count: trades.length })
           if (!trades.length) {
-            // Live scan across trending + active universe
-            const { searchLiveAlpha } = await import('@smtm/data')
-            const best = await searchLiveAlpha({
+            // Progressive live scan across trending + active universe (sequential up to ~5m)
+            const { progressiveLiveScan } = await import('@smtm/data')
+            const best = await progressiveLiveScan({
               minNotionalUsd: 2000,
               withinMs: 24*60*60*1000,
-              perTokenLimit: 20,
-              maxMarkets: 60,
-              onLog: (m, ctx) => logger.info(`alpha:live ${m}`, ctx || {})
+              perTokenLimit: 100,
+              maxMarkets: 100,
+              delayMs: 250,
+              maxDurationMs: 5*60*1000,
+              onLog: (m, ctx) => logger.info(`alpha:prog ${m}`, ctx || {})
             })
             logger.info('alpha:fallback live scan', { found: !!best, notional: best ? Math.round(best.notional) : 0 })
             if (!best) {

@@ -367,6 +367,70 @@ export async function searchLiveAlpha(params?: {
   }
 }
 
+// Progressive, rate-limit-friendly live scan (sequential with delays and max duration)
+export async function progressiveLiveScan(params?: {
+  minNotionalUsd?: number
+  withinMs?: number
+  perTokenLimit?: number
+  maxMarkets?: number
+  delayMs?: number
+  maxDurationMs?: number
+  onLog?: (msg: string, ctx?: any) => void
+}): Promise<{ ts: number; tokenId: string; marketId?: string; side: string; price: number; size: number; notional: number } | null> {
+  const minNotionalUsd = params?.minNotionalUsd ?? 1000
+  const withinMs = params?.withinMs ?? 24 * 60 * 60 * 1000
+  const perTokenLimit = params?.perTokenLimit ?? 100
+  const maxMarkets = params?.maxMarkets ?? 100
+  const delayMs = params?.delayMs ?? 250
+  const maxDurationMs = params?.maxDurationMs ?? 5 * 60 * 1000
+  const cutoff = Date.now() - withinMs
+  const log = params?.onLog || (() => {})
+  const t0 = Date.now()
+  log('progressive.start', { minNotionalUsd, withinMs, perTokenLimit, maxMarkets, delayMs, maxDurationMs })
+  try {
+    const trending = await gammaApi.getTrendingMarkets(Math.min(40, maxMarkets)).catch(()=>[] as any[])
+    const active = await gammaApi.getActiveMarkets(maxMarkets, 'volume').catch(()=>[] as any[])
+    const tokenIds: string[] = []
+    const seen = new Set<string>()
+    const addTokens = (arr:any[]) => { for (const m of arr) for (const t of (m.tokens || [])) if (t?.token_id && !seen.has(t.token_id)) { seen.add(t.token_id); tokenIds.push(t.token_id) } }
+    addTokens(trending); addTokens(active)
+    log('progressive.tokens', { count: tokenIds.length, sample: tokenIds.slice(0,25) })
+    let best: any = null
+    for (let i=0;i<tokenIds.length;i++) {
+      const tokenId = tokenIds[i]
+      if (Date.now() - t0 > maxDurationMs) { log('progressive.timeout', { scanned: i, elapsedMs: Date.now()-t0 }); break }
+      try {
+        const trades = await clobApi.getTrades(tokenId, perTokenLimit)
+        log('progressive.trades', { idx: i+1, total: tokenIds.length, tokenId, totalTrades: (trades||[]).length })
+        for (const tr of trades || []) {
+          const ts = typeof tr.timestamp === 'number' ? tr.timestamp : Date.parse(String((tr as any).timestamp))
+          if (!Number.isFinite(ts) || ts < cutoff) continue
+          const price = parseFloat(String(tr.price || '0'))
+          const size = parseFloat(String(tr.size || '0'))
+          const notional = price * size
+          const keep = Number.isFinite(notional) && notional >= minNotionalUsd
+          log('progressive.trade', { tokenId, ts, price, size, notional: Math.round(notional), keep })
+          if (!keep) continue
+          if (!best || notional > best.notional) {
+            best = { ts, tokenId, marketId: (tr as any).market, side: (tr as any).side || '', price, size, notional }
+            log('progressive.best_update', { tokenId, notional: Math.round(notional) })
+          }
+        }
+      } catch (e) {
+        log('progressive.error', { tokenId, err: String((e as any)?.message || e) })
+      }
+      if (best) break
+      if (delayMs > 0) await new Promise(r => setTimeout(r, delayMs))
+    }
+    if (best) log('progressive.result', { tokenId: best.tokenId, notional: Math.round(best.notional) })
+    else log('progressive.result_empty', { elapsedMs: Date.now()-t0 })
+    return best
+  } catch (e) {
+    log('progressive.fail', { err: String((e as any)?.message || e) })
+    return null
+  }
+}
+
 // Insider Alpha (v0.5)
 export interface ClusterMetrics {
   count: number // number of fills in cluster
