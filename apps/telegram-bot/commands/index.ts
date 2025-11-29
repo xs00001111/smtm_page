@@ -1886,6 +1886,22 @@ export function registerCommands(bot: Telegraf) {
           if (url) msg += `\n🔗 <a href="${esc(url)}">Market</a>`
         } catch {}
         await ctx.reply(msg, { parse_mode: 'HTML' })
+        // Persist this fallback alpha so subsequent /alpha can read it as fresh
+        try {
+          const { persistAlphaEvent } = await import('../services/alpha-store')
+          const alphaScore = b.notional >= 50000 ? 90 : b.notional >= 20000 ? 80 : b.notional >= 10000 ? 70 : 60
+          await persistAlphaEvent({
+            id: `${Date.now()}-${b.tokenId}-${Math.round(b.notional)}`,
+            ts: Date.now(),
+            kind: 'whale',
+            tokenId: b.tokenId,
+            conditionId: b.marketId || undefined,
+            alpha: alphaScore,
+            title: titleText,
+            summary: `${b.side || 'TRADE'} $${Math.round(b.notional).toLocaleString()} @ ${(b.price*100).toFixed(1)}¢`,
+            data: { weightedNotionalUsd: b.notional, whaleScore: null, recommendation: null },
+          } as any)
+        } catch {}
         return
       }
 

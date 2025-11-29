@@ -29,25 +29,16 @@ export async function persistAlphaEvent(ev: AlphaEvent): Promise<void> {
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   const available = supabaseAvailable()
   if (!enabled || !available) {
-    logger.info('alpha:store persist skipped', {
-      enabled,
-      available,
-      url: !!env.SUPABASE_URL,
-      key: !!(env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY),
-    })
+    logger.info(`alpha:store persist skipped enabled=${enabled} available=${available} url=${!!env.SUPABASE_URL} key=${!!(env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY)}`)
     return
   }
   try {
     const body = [mapAlphaEvent(ev)]
     await sb('analytics.alpha_event', { method: 'POST', body: JSON.stringify(body) })
-    logger.info('alpha:store persisted', { kind: ev.kind, tokenId: ev.tokenId, conditionId: ev.conditionId, alpha: ev.alpha })
+    logger.info(`alpha:store persisted kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''} alpha=${ev.alpha}`)
   } catch (e) {
-    logger.warn('persistAlphaEvent failed', {
-      err: (e as any)?.message || e,
-      kind: ev.kind,
-      tokenId: ev.tokenId,
-      conditionId: ev.conditionId,
-    })
+    const err = (e as any)?.message || String(e)
+    logger.warn(`persistAlphaEvent failed err=${err} kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''}`)
   }
 }
 
@@ -55,12 +46,7 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   const available = supabaseAvailable()
   if (!available || !enabled) {
-    logger.info('alpha:store fetch skipped', {
-      enabled,
-      available,
-      url: !!env.SUPABASE_URL,
-      key: !!(env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY),
-    })
+    logger.info(`alpha:store fetch skipped enabled=${enabled} available=${available} url=${!!env.SUPABASE_URL} key=${!!(env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY)}`)
     return []
   }
   try {
@@ -76,8 +62,9 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
     if (opts?.conditionId) params.push(`condition_id=eq.${encodeURIComponent(opts.conditionId)}`)
     if (opts?.tokenIds && opts.tokenIds.length) params.push(`token_id=in.(${opts.tokenIds.map(encodeURIComponent).join(',')})`)
     const path = `analytics.alpha_event?${params.join('&')}`
-    logger.info('alpha:store fetch path', { path })
+    logger.info(`alpha:store fetch path ${path}`)
     const rows = await sb<any[]>(path)
+    logger.info(`alpha:store fetch ok rows=${rows?.length || 0}`)
     return rows.map(r => ({
       id: `${new Date(r.created_at).getTime()}-${r.token_id || ''}-${r.wallet || ''}-${r.alpha}`,
       ts: new Date(r.created_at).getTime(),
@@ -91,11 +78,8 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
       data: r,
     } as AlphaEvent))
   } catch (e) {
-    logger.warn('fetchRecentAlpha failed', {
-      err: (e as any)?.message || e,
-      enabled,
-      available,
-    })
+    const err = (e as any)?.message || String(e)
+    logger.warn(`fetchRecentAlpha failed err=${err} enabled=${enabled} available=${available}`)
     return []
   }
 }
