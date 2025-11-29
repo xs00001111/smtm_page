@@ -7,12 +7,10 @@ import type {
 } from '../types';
 
 let ClobClient: any = null;
-let ApiKeyCreds: any = null;
 
 try {
   const polyClient = require('@polymarket/clob-client');
   ClobClient = polyClient.ClobClient;
-  ApiKeyCreds = polyClient.ApiKeyCreds;
   console.log('[CLOB] ✓ Official @polymarket/clob-client package loaded');
 } catch (e) {
   console.log('[CLOB] ✗ Official client package not available:', (e as any)?.message);
@@ -43,14 +41,18 @@ export class ClobApiClient {
       hasApiSecret: !!this.apiSecret,
       hasApiPassphrase: !!this.apiPassphrase,
       hasClientClass: !!ClobClient,
-      hasCredsClass: !!ApiKeyCreds,
     });
 
     // Initialize official client if credentials and package are available
-    if (ClobClient && ApiKeyCreds && this.apiKey && this.apiSecret && this.apiPassphrase) {
+    if (ClobClient && this.apiKey && this.apiSecret && this.apiPassphrase) {
       try {
         console.log('[CLOB] Attempting to initialize official client...');
-        const creds = new ApiKeyCreds(this.apiKey, this.apiSecret, this.apiPassphrase);
+        // ApiKeyCreds is just a plain object interface
+        const creds = {
+          key: this.apiKey,
+          secret: this.apiSecret,
+          passphrase: this.apiPassphrase,
+        };
         // Chain ID 137 = Polygon mainnet (Polymarket's chain)
         this.officialClient = new ClobClient(this.baseURL, 137, undefined, creds);
         console.log('[CLOB] ✓ Official authenticated client initialized successfully');
@@ -59,7 +61,7 @@ export class ClobApiClient {
       }
     } else {
       const missing = [];
-      if (!ClobClient || !ApiKeyCreds) missing.push('package');
+      if (!ClobClient) missing.push('package');
       if (!this.apiKey) missing.push('POLYMARKET_API_KEY');
       if (!this.apiSecret) missing.push('POLYMARKET_API_SECRET');
       if (!this.apiPassphrase) missing.push('POLYMARKET_API_PASSPHRASE');
