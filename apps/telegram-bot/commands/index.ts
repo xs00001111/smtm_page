@@ -1947,13 +1947,13 @@ export function registerCommands(bot: Telegraf) {
         }
         // New fallback: Smart Money Skew scan (deprecates legacy progressive scan)
         try {
-          const active = await gammaApi.getActiveMarkets(60, 'volume').catch(()=>[] as any[])
+          const active = await gammaApi.getActiveMarkets(80, 'volume').catch(()=>[] as any[])
           const pairs: Array<{ cond: string; yes: string; no: string; title: string }> = []
           for (const m of active) {
             const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
             const no = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
             if (m.condition_id && yes && no) pairs.push({ cond: m.condition_id, yes, no, title: m.question || m.slug || m.condition_id })
-            if (pairs.length >= 20) break
+            if (pairs.length >= 35) break
           }
           let bestSkew: any = null
           for (const p of pairs) {
