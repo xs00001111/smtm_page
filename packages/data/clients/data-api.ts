@@ -2,17 +2,6 @@ import axios, { AxiosInstance } from 'axios';
 const DATA_DEBUG = process.env.DATA_DEBUG === 'true';
 function dataDbg(msg: string, ctx?: any) {
   if (DATA_DEBUG) {
-    try {
-      // Avoid JSON errors if ctx has cycles
-      console.log('[DATA][debug]', msg, ctx ? JSON.stringify(ctx) : '');
-    } catch {
-      console.log('[DATA][debug]', msg);
-    }
-  }
-}
-const DATA_DEBUG = process.env.DATA_DEBUG === 'true';
-function dataDbg(msg: string, ctx?: any) {
-  if (DATA_DEBUG) {
     try { console.log('[DATA][debug]', msg, ctx ? JSON.stringify(ctx) : ''); } catch { console.log('[DATA][debug]', msg); }
   }
 }
