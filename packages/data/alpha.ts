@@ -276,10 +276,17 @@ export async function findRecentBigOrders(params?: {
   for (const tokenId of tokenIds) {
     try {
       const cond = tokenToCond.get(tokenId)
-      const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit, takerOnly: true }) : []
+      const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit }) : []
       log('big_orders.trades', { tokenId, total: (trades || []).length })
+      if ((trades || []).length === 0) {
+        try {
+          const clobFallback = await clobApi.getTrades(tokenId, Math.min(50, perTokenLimit))
+          log('big_orders.trades_fallback_clob', { tokenId, total: clobFallback.length })
+        } catch {}
+      }
       for (const tr of trades || []) {
-        if ((tr as any).asset_id && String((tr as any).asset_id) !== String(tokenId)) continue
+        const assetAny = (tr as any).asset_id || (tr as any).asset
+        if (assetAny && String(assetAny) !== String(tokenId)) continue
         const tsRaw: any = (tr as any).timestamp || (tr as any).match_time || (tr as any).last_update
         const ts = typeof tsRaw === 'number' ? tsRaw : Date.parse(String(tsRaw))
         if (!Number.isFinite(ts) || ts < cutoff) continue
@@ -334,12 +341,26 @@ export async function searchLiveAlpha(params?: {
     for (const tokenId of tokenIds) {
       try {
         const cond = tokenToCond.get(tokenId)
-        const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit, takerOnly: true }) : []
+        const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit }) : []
         log('trades', { tokenId, total: (trades || []).length })
+        if (process.env.ALPHA_LOG_TRADES === 'true') {
+          for (const t of (trades || []).slice(0, 5)) {
+            try {
+              log('trade.detail', {
+                cond,
+                asset: (t as any).asset_id || (t as any).asset,
+                price: (t as any).price,
+                size: (t as any).size,
+                ts: (t as any).timestamp || (t as any).match_time || (t as any).last_update,
+              })
+            } catch {}
+          }
+        }
         let filtered = 0
         let topN = 0
         for (const tr of trades || []) {
-          if ((tr as any).asset_id && String((tr as any).asset_id) !== String(tokenId)) continue
+          const assetAny2 = (tr as any).asset_id || (tr as any).asset
+          if (assetAny2 && String(assetAny2) !== String(tokenId)) continue
           const tsRaw: any = (tr as any).timestamp || (tr as any).match_time || (tr as any).last_update
           const ts = typeof tsRaw === 'number' ? tsRaw : Date.parse(String(tsRaw))
           if (!Number.isFinite(ts) || ts < cutoff) continue
@@ -499,10 +520,17 @@ export async function progressiveLiveScan(params?: {
       if (Date.now() - t0 > maxDurationMs) { log('progressive.timeout', { scanned: i, elapsedMs: Date.now()-t0 }); break }
       try {
         const cond = tokenToCondProg.get(tokenId)
-        const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit, takerOnly: true }) : []
+        const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit }) : []
         log('progressive.trades', { idx: i+1, total: tokenIds.length, tokenId, totalTrades: (trades||[]).length })
+        if ((trades || []).length === 0) {
+          try {
+            const clobFallback = await clobApi.getTrades(tokenId, Math.min(50, perTokenLimit))
+            log('progressive.trades_fallback_clob', { tokenId, total: clobFallback.length })
+          } catch {}
+        }
         for (const tr of trades || []) {
-          if ((tr as any).asset_id && String((tr as any).asset_id) !== String(tokenId)) continue
+          const assetAny = (tr as any).asset_id || (tr as any).asset
+          if (assetAny && String(assetAny) !== String(tokenId)) continue
           const tsRaw: any = (tr as any).timestamp || (tr as any).match_time || (tr as any).last_update
           const ts = typeof tsRaw === 'number' ? tsRaw : Date.parse(String(tsRaw))
           if (!Number.isFinite(ts) || ts < cutoff) continue

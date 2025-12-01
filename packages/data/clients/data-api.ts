@@ -71,8 +71,13 @@ export class DataApiClient {
       if (params.user) q.user = params.user;
       if (params.side) q.side = params.side;
     }
-    const { data } = await this.client.get<any[]>('/trades', { params: q });
-    return Array.isArray(data) ? data : [];
+    const { data } = await this.client.get<any>('/trades', { params: q });
+    // Normalize common response shapes: [], { trades: [] }, { data: [] }, { results: [] }
+    const list = Array.isArray(data)
+      ? data
+      : (data?.trades || data?.data || data?.results || data?.items || []);
+    this.dbg('trades.api', { count: Array.isArray(list) ? list.length : 0, params: q });
+    return Array.isArray(list) ? list : [];
   }
 
   /**
