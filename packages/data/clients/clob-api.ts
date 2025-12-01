@@ -183,77 +183,34 @@ export class ClobApiClient {
    * @returns Array of recent trades
    */
   async getTrades(assetId: string, limit = 100): Promise<Trade[]> {
-    // ALWAYS use public, unauthenticated client for read-only trades
-    // Lazily init public SDK to avoid module system issues
-    if (!this.publicClient) {
-      const SDK = await loadClobSdk();
-      if (SDK) {
-        try {
-          // Provide base URL (and chain id) so SDK does not read undefined
-          // No signer or creds for public read-only usage
-          this.publicClient = new SDK(this.baseURL, 137);
-          console.log('[CLOB] ✓ Public client (unauthenticated) initialized with baseURL');
-        } catch (e) {
-          console.warn('[CLOB] ✗ Failed to init public client', (e as any)?.message || e);
-        }
+    // Use public, unauthenticated HTTP endpoint for read-only trades
+    try {
+      const { data } = await this.client.get<Trade[]>('/trades', {
+        params: { asset_id: assetId, limit },
+      });
+      console.log(`[CLOB] Public HTTP trades returned ${Array.isArray(data) ? data.length : 0} records`);
+      return Array.isArray(data) ? data.slice(0, limit) : [];
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const text = err?.response?.data ? JSON.stringify(err.response.data).slice(0, 160) : String(err?.message || err);
+      console.warn(`[CLOB] axios /trades failed (${status}): ${text} — retrying via fetch`);
+      const url = new URL(this.baseURL + '/trades');
+      url.searchParams.set('asset_id', assetId);
+      url.searchParams.set('limit', String(limit));
+      const res = await fetch(url.toString(), {
+        headers: {
+          'Accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+        } as any,
+      } as any);
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`fetch /trades ${res.status}: ${body.slice(0, 200)}`);
       }
+      const json = (await res.json()) as Trade[];
+      console.log(`[CLOB] fetch /trades returned ${Array.isArray(json) ? json.length : 0} records`);
+      return Array.isArray(json) ? json.slice(0, limit) : [];
     }
-    if (this.publicClient && typeof this.publicClient.getTrades === 'function') {
-      try {
-        const result = await this.publicClient.getTrades({ assetId });
-        const list: Trade[] = Array.isArray(result) ? result : (result?.trades || result || []);
-        console.log(`[CLOB] Public SDK trades returned ${list?.length || 0} records`);
-        return list.slice(0, limit);
-      } catch (e1) {
-        try {
-          const result2 = await this.publicClient.getTrades({ asset_id: assetId });
-          const list2: Trade[] = Array.isArray(result2) ? result2 : (result2?.trades || result2 || []);
-          console.log(`[CLOB] Public SDK trades (asset_id) returned ${list2?.length || 0} records`);
-          return list2.slice(0, limit);
-        } catch (e2) {
-          console.warn('[CLOB] Public SDK getTrades failed, falling back to HTTP', (e2 as any)?.message || e2);
-        }
-      }
-    }
-
-    // HTTP fallback (opt-in via CLOB_HTTP_FALLBACK=true)
-    if (process.env.CLOB_HTTP_FALLBACK === 'true') {
-      try {
-        const { data } = await this.client.get<Trade[]>('/trades', {
-          // trades endpoint expects asset_id
-          params: { asset_id: assetId, limit },
-          headers: { Authorization: undefined as any },
-        });
-        console.log(`[CLOB] Public HTTP trades returned ${data?.length || 0} records`);
-        return Array.isArray(data) ? data.slice(0, limit) : [];
-      } catch (err: any) {
-        const status = err?.response?.status;
-        const text = err?.response?.data ? JSON.stringify(err.response.data).slice(0, 120) : String(err?.message || err);
-        console.warn(`[CLOB] axios /trades failed (${status}): ${text} — retrying via fetch`);
-        const url = new URL(this.baseURL + '/trades');
-        // try both param names in order
-        url.searchParams.set('token_id', assetId);
-        url.searchParams.set('limit', String(limit));
-        const res = await fetch(url.toString(), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
-            'Origin': 'https://polymarket.com',
-            'Referer': 'https://polymarket.com/',
-          } as any,
-        } as any);
-        if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          throw new Error(`fetch /trades ${res.status}: ${body.slice(0, 160)}`);
-        }
-        const json = (await res.json()) as Trade[];
-        console.log(`[CLOB] fetch /trades returned ${json?.length || 0} records`);
-        return Array.isArray(json) ? json.slice(0, limit) : [];
-      }
-    }
-    // If SDK is unavailable and HTTP fallback is disabled/failed, return empty
-    return [];
   }
 
   /**

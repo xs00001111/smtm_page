@@ -1795,6 +1795,24 @@ export function registerCommands(bot: Telegraf) {
   // Alpha: return the freshest alpha found (optionally filter by market)
   bot.command('alpha', async (ctx) => {
     try {
+      // Per-user guard to prevent overlapping /alpha runs and rapid repeats
+      const userId = ctx.from?.id
+      const nowTs = Date.now()
+      if (userId) {
+        // Initialize locks map if not present
+        if (!(global as any)._alphaLocks) (global as any)._alphaLocks = new Map<number, { running: boolean; lastTs: number }>()
+        const alphaLocks: Map<number, { running: boolean; lastTs: number }> = (global as any)._alphaLocks
+        const prev = alphaLocks.get(userId)
+        if (prev?.running) {
+          await ctx.reply('⏳ A scan is already running for you. Please wait…')
+          return
+        }
+        if (prev && nowTs - prev.lastTs < 60_000) {
+          await ctx.reply('⌛ Please wait ~1 minute before running /alpha again.')
+          return
+        }
+        alphaLocks.set(userId, { running: true, lastTs: nowTs })
+      }
       const parts = ctx.message.text.split(/\s+/).filter(Boolean)
       const query = parts.slice(1).join(' ').trim()
       let tokenIds: string[] | undefined
@@ -2045,6 +2063,12 @@ export function registerCommands(bot: Telegraf) {
     } catch (e) {
       logger.error('alpha command failed', e)
       await ctx.reply('❌ Failed to fetch alpha. Try again later.')
+    } finally {
+      const userId = ctx.from?.id
+      if (userId && (global as any)._alphaLocks) {
+        const alphaLocks: Map<number, { running: boolean; lastTs: number }> = (global as any)._alphaLocks
+        alphaLocks.set(userId, { running: false, lastTs: Date.now() })
+      }
     }
   })
 
