@@ -341,6 +341,10 @@ export async function searchLiveAlpha(params?: {
     addTokens(trending)
     addTokens(active)
     log('tokens', { count: tokenIds.length, sample: tokenIds.slice(0, 25) })
+    try {
+      const mapSample = tokenIds.slice(0, 5).map((id) => ({ tokenId: id, cond: tokenToCond.get(id) }))
+      log('tokens_map', { sample: mapSample })
+    } catch {}
     let best: any = null
     for (const tokenId of tokenIds) {
       try {
@@ -361,13 +365,15 @@ export async function searchLiveAlpha(params?: {
           }
         }
         let filtered = 0
+        let filteredByAsset = 0
+        let filteredByTime = 0
         let topN = 0
         for (const tr of trades || []) {
           const assetAny2 = (tr as any).asset_id || (tr as any).asset
-          if (assetAny2 && String(assetAny2) !== String(tokenId)) continue
+          if (assetAny2 && String(assetAny2) !== String(tokenId)) { filtered++; filteredByAsset++; continue }
           const tsRaw: any = (tr as any).timestamp || (tr as any).match_time || (tr as any).last_update
           const ts = typeof tsRaw === 'number' ? tsRaw : Date.parse(String(tsRaw))
-          if (!Number.isFinite(ts) || ts < cutoff) continue
+          if (!Number.isFinite(ts) || ts < cutoff) { filtered++; filteredByTime++; continue }
           const price = parseFloat(String(tr.price || '0'))
           const size = parseFloat(String(tr.size || '0'))
           const notional = price * size
@@ -376,7 +382,7 @@ export async function searchLiveAlpha(params?: {
           if (notional > topN) topN = notional
           if (!best || notional > best.notional) best = { ts, tokenId, marketId: (tr as any).market, side: (tr as any).side || '', price, size, notional }
         }
-        log('trades_filtered', { tokenId, filtered, topNotional: Math.round(topN) })
+        log('trades_filter_breakdown', { tokenId, total: (trades||[]).length, filtered, filteredByAsset, filteredByTime, keptTop: Math.round(topN) })
       } catch {}
     }
     if (best) log('result', { tokenId: best.tokenId, notional: Math.round(best.notional), price: best.price, ts: best.ts })

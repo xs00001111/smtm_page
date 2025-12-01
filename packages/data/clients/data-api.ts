@@ -72,13 +72,31 @@ export class DataApiClient {
       if (params.user) q.user = params.user;
       if (params.side) q.side = params.side;
     }
-    const { data } = await this.client.get<any>('/trades', { params: q });
-    // Normalize common response shapes: [], { trades: [] }, { data: [] }, { results: [] }
-    const list = Array.isArray(data)
-      ? data
-      : (data?.trades || data?.data || data?.results || data?.items || []);
-    this.dbg('trades.api', { count: Array.isArray(list) ? list.length : 0, params: q });
-    return Array.isArray(list) ? list : [];
+    try {
+      const { data } = await this.client.get<any>('/trades', { params: q });
+      // Normalize common response shapes: [], { trades: [] }, { data: [] }, { results: [] }
+      const list = Array.isArray(data)
+        ? data
+        : (data?.trades || data?.data || data?.results || data?.items || []);
+      const count = Array.isArray(list) ? list.length : 0;
+      this.dbg('trades.api', { count, params: q });
+      if (count > 0) {
+        const t = list[0] || {};
+        this.dbg('trades.sample', {
+          asset: t.asset || t.asset_id,
+          conditionId: t.conditionId || t.market,
+          price: t.price,
+          size: t.size,
+          timestamp: t.timestamp || t.match_time || t.last_update,
+        });
+      }
+      return Array.isArray(list) ? list : [];
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const text = e?.response?.data ? JSON.stringify(e.response.data).slice(0, 200) : String(e?.message || e);
+      this.dbg('trades.error', { status, text, params: q });
+      return [];
+    }
   }
 
   /**
