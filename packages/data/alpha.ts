@@ -276,8 +276,7 @@ export async function findRecentBigOrders(params?: {
   for (const tokenId of tokenIds) {
     try {
       const cond = tokenToCond.get(tokenId)
-      const afterSec = Math.floor(cutoff/1000)
-      const trades = cond ? await clobApi.getUserTrades({ market: cond, after: String(afterSec) }) : []
+      const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit, takerOnly: true }) : []
       log('big_orders.trades', { tokenId, total: (trades || []).length })
       for (const tr of trades || []) {
         if ((tr as any).asset_id && String((tr as any).asset_id) !== String(tokenId)) continue
@@ -335,8 +334,7 @@ export async function searchLiveAlpha(params?: {
     for (const tokenId of tokenIds) {
       try {
         const cond = tokenToCond.get(tokenId)
-        const afterSec = Math.floor(cutoff/1000)
-        const trades = cond ? await clobApi.getUserTrades({ market: cond, after: String(afterSec) }) : []
+        const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit, takerOnly: true }) : []
         log('trades', { tokenId, total: (trades || []).length })
         let filtered = 0
         let topN = 0
@@ -501,8 +499,7 @@ export async function progressiveLiveScan(params?: {
       if (Date.now() - t0 > maxDurationMs) { log('progressive.timeout', { scanned: i, elapsedMs: Date.now()-t0 }); break }
       try {
         const cond = tokenToCondProg.get(tokenId)
-        const afterSec = Math.floor(cutoff/1000)
-        const trades = cond ? await clobApi.getUserTrades({ market: cond, after: String(afterSec) }) : []
+        const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit, takerOnly: true }) : []
         log('progressive.trades', { idx: i+1, total: tokenIds.length, tokenId, totalTrades: (trades||[]).length })
         for (const tr of trades || []) {
           if ((tr as any).asset_id && String((tr as any).asset_id) !== String(tokenId)) continue
