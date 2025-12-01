@@ -79,7 +79,11 @@ export class DataApiClient {
         ? data
         : (data?.trades || data?.data || data?.results || data?.items || []);
       const count = Array.isArray(list) ? list.length : 0;
-      this.dbg('trades.api', { count, params: q });
+      const reqMarket = typeof q.market === 'string' ? q.market : undefined;
+      const firstCond = (Array.isArray(list) && list[0]) ? (list[0].conditionId || list[0].market) : undefined;
+      const marketUrl = reqMarket ? `https://polymarket.com/market/${reqMarket.split(',')[0]}` : undefined;
+      const clobMarketApiUrl = reqMarket ? `https://clob.polymarket.com/markets/${reqMarket.split(',')[0]}` : undefined;
+      this.dbg('trades.api', { count, params: q, requestedMarket: reqMarket, marketUrl, clobMarketApiUrl, firstCond });
       if (count > 0) {
         const t = list[0] || {};
         this.dbg('trades.sample', {

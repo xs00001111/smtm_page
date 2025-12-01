@@ -350,12 +350,15 @@ export async function searchLiveAlpha(params?: {
       try {
         const cond = tokenToCond.get(tokenId)
         const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit }) : []
-        log('trades', { tokenId, total: (trades || []).length })
+        const marketUrl = cond ? `https://polymarket.com/market/${cond}` : undefined
+        const clobMarketApiUrl = cond ? `https://clob.polymarket.com/markets/${cond}` : undefined
+        log('trades', { tokenId, conditionId: cond, marketUrl, clobMarketApiUrl, total: (trades || []).length })
         if (ALPHA_LOG_TRADES) {
           for (const t of (trades || []).slice(0, 5)) {
             try {
               log('trade.detail', {
-                cond,
+                conditionId: cond,
+                marketUrl,
                 asset: (t as any).asset_id || (t as any).asset,
                 price: (t as any).price,
                 size: (t as any).size,
@@ -382,7 +385,7 @@ export async function searchLiveAlpha(params?: {
           if (notional > topN) topN = notional
           if (!best || notional > best.notional) best = { ts, tokenId, marketId: (tr as any).market, side: (tr as any).side || '', price, size, notional }
         }
-        log('trades_filter_breakdown', { tokenId, total: (trades||[]).length, filtered, filteredByAsset, filteredByTime, keptTop: Math.round(topN) })
+        log('trades_filter_breakdown', { tokenId, conditionId: cond, marketUrl, total: (trades||[]).length, filtered, filteredByAsset, filteredByTime, keptTop: Math.round(topN) })
       } catch {}
     }
     if (best) log('result', { tokenId: best.tokenId, notional: Math.round(best.notional), price: best.price, ts: best.ts })
