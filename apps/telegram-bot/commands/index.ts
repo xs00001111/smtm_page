@@ -1862,6 +1862,23 @@ export function registerCommands(bot: Telegraf) {
             // Progressive live scan across trending + active universe (sequential up to ~5m)
             const { progressiveLiveScan } = await import('@smtm/data')
             let tooManyErrors = false
+            let totalTokens = 0
+            let lastIdx = 0
+            let startedAt = Date.now()
+            let lastEditAt = 0
+            const throttleMs = 1200
+
+            function makeProgressLine(idx: number, total: number, extra?: string) {
+              const t = Math.max(1, total || 1)
+              const i = Math.min(Math.max(0, idx), t)
+              const pct = Math.round((i / t) * 100)
+              const bars = 10
+              const filled = Math.round((pct / 100) * bars)
+              const bar = '▰'.repeat(filled) + '▱'.repeat(bars - filled)
+              const tail = extra ? ` • ${extra}` : ''
+              return `⏳ ${pct}% ${bar} (${i}/${t})${tail}`
+            }
+
             const best = await progressiveLiveScan({
               minNotionalUsd: 2000,
               withinMs: 24*60*60*1000,
@@ -1873,26 +1890,48 @@ export function registerCommands(bot: Telegraf) {
               onLog: async (m, ctx) => {
                 logger.info({ ...ctx }, `alpha:prog ${m}`)
                 try {
-                  if (m === 'progressive.trades') {
+                  const now = Date.now()
+                  if (m === 'progressive.start') {
+                    startedAt = now
+                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `🔎 Scanning markets for fresh alpha…`, {})
+                  } else if (m === 'progressive.markets_fetched') {
+                    const tr = ctx?.trending ?? 0, ac = ctx?.active ?? 0
+                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `🔎 Preparing scan set… Trending: ${tr}, Active: ${ac}`, {})
+                  } else if (m === 'progressive.final_token_count') {
+                    totalTokens = ctx?.count || 0
+                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `🔎 Scan set ready • ${totalTokens} tokens`, {})
+                  } else if (m === 'progressive.trades') {
                     const idx = (ctx && ctx.idx) || 0
-                    const total = (ctx && ctx.total) || 0
-                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `🔎 Searching… (${idx}/${total})`, {})
+                    const total = (ctx && ctx.total) || totalTokens || 0
+                    // Throttle UI updates
+                    if (now - lastEditAt > throttleMs && (idx !== lastIdx)) {
+                      lastIdx = idx
+                      lastEditAt = now
+                      const line = makeProgressLine(idx, total)
+                      await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `🔎 Searching…\n${line}`, { })
+                    }
                   } else if (m === 'progressive.best_update') {
-                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `🔎 Found candidate: $${(ctx && ctx.notional) || 0}`, {})
+                    const notionalStr = ctx?.notional ? `$${Math.round(ctx.notional).toLocaleString()}` : '$0'
+                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `✨ Candidate found: ${notionalStr}`, {})
                   } else if (m === 'progressive.too_many_errors') {
                     tooManyErrors = true
-                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `❌ Scan stopped due to errors. Please try again later.`, {})
+                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `❌ Scan stopped due to repeated errors.`, {})
+                  } else if (m === 'progressive.timeout') {
+                    await ctxRef.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, `⏱️ Scan timed out. Partial results only.`, {})
                   }
                 } catch {}
               }
             })
             logger.info('alpha:fallback live scan', { found: !!best, notional: best ? Math.round(best.notional) : 0 })
             if (!best) {
-              if (tooManyErrors) {
-                await ctx.reply('❌ Scan stopped due to repeated errors. Please try again later.')
-              } else {
-                await ctx.reply('⚠️ No fresh alpha found in the recent window. Try again shortly or follow active markets.')
-              }
+              const elapsed = Math.round((Date.now() - startedAt)/1000)
+              const scanned = lastIdx || 0
+              const total = totalTokens || scanned
+              const summary = tooManyErrors
+                ? '❌ Scan stopped due to repeated errors. Please try again later.'
+                : '⚠️ No fresh alpha found in the recent window.'
+              const line = makeProgressLine(scanned, total, `${elapsed}s`)
+              await ctx.reply(`${summary}\n\n${line}`, { disable_web_page_preview: true })
               return
             }
             const notionalStr = `$${Math.round(best.notional).toLocaleString()}`
