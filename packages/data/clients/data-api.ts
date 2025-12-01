@@ -1,5 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
-const DATA_DEBUG = process.env.DATA_DEBUG === 'true';
+// Hardcoded debug: enable verbose Data API logging during investigation
+const DATA_DEBUG = true;
 function dataDbg(msg: string, ctx?: any) {
   if (DATA_DEBUG) {
     try { console.log('[DATA][debug]', msg, ctx ? JSON.stringify(ctx) : ''); } catch { console.log('[DATA][debug]', msg); }

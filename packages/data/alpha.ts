@@ -1,4 +1,6 @@
 import { dataApi } from './clients/data-api'
+// Hardcoded debug: print trade details during investigation
+const ALPHA_LOG_TRADES = true
 import { clobApi } from './clients/clob-api'
 import { gammaApi } from './clients/gamma-api'
 import { WhaleDetector, WhaleEvent } from './whales'
@@ -343,7 +345,7 @@ export async function searchLiveAlpha(params?: {
         const cond = tokenToCond.get(tokenId)
         const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit }) : []
         log('trades', { tokenId, total: (trades || []).length })
-        if (process.env.ALPHA_LOG_TRADES === 'true') {
+        if (ALPHA_LOG_TRADES) {
           for (const t of (trades || []).slice(0, 5)) {
             try {
               log('trade.detail', {
