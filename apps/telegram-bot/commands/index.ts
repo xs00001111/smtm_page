@@ -1873,12 +1873,13 @@ export function registerCommands(bot: Telegraf) {
               const disp = (best as any).displayName || ''
               const profileUrl = getPolymarketProfileUrl(disp || null, addr)
               const short = `${addr.slice(0,6)}…${addr.slice(-4)}`
-              const [pnlAgg, winr, val, openPos, closedPos] = await Promise.all([
+              const [pnlAgg, winr, val, openPos, closedPos, prof] = await Promise.all([
                 dataApi.getUserAccuratePnL(addr).catch(()=>({ totalPnL: 0, realizedPnL:0, unrealizedPnL:0, currentValue:0 })),
                 dataApi.getUserWinRate(addr).catch(()=>({ wins:0, total:0, winRate:0 })),
                 dataApi.getUserValue(addr).catch(()=>({ user: addr, value:'0', positions_count: 0 })),
                 dataApi.getUserPositions({ user: addr, limit: 100 }).catch(()=>[]),
                 dataApi.getClosedPositions(addr, 200).catch(()=>[]),
+                dataApi.getUserProfileMetrics(addr).catch(()=>({})) as any,
               ])
               // If computed totalPnL is zero, try scraping profile hero PnL as a parity check
               if (!pnlAgg.totalPnL) {
@@ -1891,6 +1892,17 @@ export function registerCommands(bot: Telegraf) {
               const valNum = parseFloat(String((val as any).value || '0'))
               const valStr = `$${Math.round(valNum).toLocaleString()}`
               const whaleStr = (best as any).whaleScore != null ? ` • 🐋 ${Math.round((best as any).whaleScore)}` : ''
+              // Trades in last 12h (best-effort)
+              let trades12h = 0
+              try {
+                const raw = await dataApi.getTrades({ user: addr, limit: 1000 })
+                const cutoff = Date.now() - 12*60*60*1000
+                trades12h = (raw || []).filter((t:any)=>{
+                  const r = t.timestamp || t.match_time || t.last_update
+                  const ts = typeof r === 'number' ? (r > 1e12 ? r : r*1000) : Date.parse(String(r))
+                  return Number.isFinite(ts) && ts >= cutoff
+                }).length
+              } catch {}
               // New wallet badge heuristics: few positions and young account
               let totalPositions = (val as any).positions_count || 0
               if (!totalPositions) totalPositions = (openPos?.length || 0) + (closedPos?.length || 0)
@@ -1915,6 +1927,9 @@ export function registerCommands(bot: Telegraf) {
               msg += `\n👤 Trader: <a href=\"${esc(profileUrl)}\">${esc(name)}</a>${whaleStr}${newBadge}`
               msg += `\n📈 PnL: ${pnlStr} • 🏆 Win: ${winStr}`
               msg += `\n💼 Portfolio: ${valStr}`
+              if (trades12h) msg += `\n🧾 Trades (12h): ${trades12h}`
+              const preds = (prof as any)?.predictions
+              if (preds != null) msg += `\n📟 Predictions: ${preds}`
               if ((best as any).tags && (best as any).tags.length) {
                 const tags = Array.from(new Set((best as any).tags)).slice(0,4).join(', ')
                 msg += `\n🏷️ Tags: ${esc(tags)}`

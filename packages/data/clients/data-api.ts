@@ -486,6 +486,58 @@ export class DataApiClient {
       return null;
     }
   }
+
+  /**
+   * Best-effort: scrape profile metrics like predictions count and positions value.
+   */
+  async getUserProfileMetrics(userOrHandle: string): Promise<{
+    predictions?: number;
+    positionsValueUsd?: number;
+    biggestWinUsd?: number;
+  }> {
+    const out: any = {};
+    try {
+      const isAddr = /^0x[a-fA-F0-9]{40}$/.test(userOrHandle);
+      const url = isAddr
+        ? `https://polymarket.com/profile/${userOrHandle}`
+        : `https://polymarket.com/profile/%40${encodeURIComponent(userOrHandle)}`;
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Referer': 'https://polymarket.com/',
+        } as any,
+      } as any);
+      if (!res.ok) return out;
+      const html = await res.text();
+      const match = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/);
+      if (!match || !match[1]) return out;
+      const data = JSON.parse(match[1]);
+      const queries = data?.props?.pageProps?.dehydratedState?.queries || [];
+      for (const q of queries) {
+        const st = q?.state?.data;
+        if (!st || typeof st !== 'object') continue;
+        // Heuristics: look for metrics on common keys
+        if (st.predictions != null && out.predictions == null) {
+          const v = Number(st.predictions);
+          if (Number.isFinite(v)) out.predictions = v;
+        }
+        if (st.positionsValueUsd != null && out.positionsValueUsd == null) {
+          const v = Number(st.positionsValueUsd);
+          if (Number.isFinite(v)) out.positionsValueUsd = v;
+        }
+        if (st.positions_value != null && out.positionsValueUsd == null) {
+          const v = Number(st.positions_value);
+          if (Number.isFinite(v)) out.positionsValueUsd = v;
+        }
+        if (st.biggestWinUsd != null && out.biggestWinUsd == null) {
+          const v = Number(st.biggestWinUsd);
+          if (Number.isFinite(v)) out.biggestWinUsd = v;
+        }
+      }
+    } catch {}
+    return out;
+  }
 }
 
 // Export singleton instance
