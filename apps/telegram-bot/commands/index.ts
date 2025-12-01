@@ -1918,7 +1918,8 @@ export function registerCommands(bot: Telegraf) {
                 msg += `\n🔎 ${catParts.join(' • ')}`
               }
             } catch {}
-            await ctx.reply(msg, { parse_mode: 'HTML' })
+            const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:trade` }]] }
+            await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
             return
           }
         } catch (e) {
@@ -2152,6 +2153,75 @@ export function registerCommands(bot: Telegraf) {
       if (!data.startsWith('alpha:more:')) return await next()
       await ctx.answerCbQuery('Loading more alpha...')
       const parts = data.split(':')
+      // Trade-first refresh path
+      if (parts[2] === 'trade') {
+        try {
+          const { scanAlphaFromTrades } = await import('@smtm/data')
+          const best = await scanAlphaFromTrades({ windowMs: 12*60*60*1000, minNotionalUsd: 1000, limit: 1000, maxBatches: 3, onLog: (m, c) => logger.info({ ...c }, `alpha:trades_first ${m}`) })
+          if (!best) { await ctx.reply('No fresh trades right now. Try again soon.'); return }
+          const notionalStr = `$${Math.round(best.notional).toLocaleString()}`
+          let msg = `✨ <b>Fresh Trade</b>\n\n`
+          msg += `${best.side || 'TRADE'} ${notionalStr} @ ${(best.price*100).toFixed(1)}¢\n`
+          try {
+            const m = await gammaApi.getMarket(best.marketId)
+            const url = getPolymarketMarketUrl(m)
+            if (m?.question) msg = `✨ <b>${esc(m.question)}</b>\n\n` + msg
+            if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
+          } catch {}
+          try {
+            const addr = best.wallet
+            const disp = (best as any).displayName || ''
+            const profileUrl = getPolymarketProfileUrl(disp || null, addr)
+            const short = `${addr.slice(0,6)}…${addr.slice(-4)}`
+            const [pnlAgg, winr, val, openPos, closedPos] = await Promise.all([
+              dataApi.getUserAccuratePnL(addr).catch(()=>({ totalPnL: 0, realizedPnL:0, unrealizedPnL:0, currentValue:0 })),
+              dataApi.getUserWinRate(addr).catch(()=>({ wins:0, total:0, winRate:0 })),
+              dataApi.getUserValue(addr).catch(()=>({ user: addr, value:'0', positions_count: 0 })),
+              dataApi.getUserPositions({ user: addr, limit: 100 }).catch(()=>[]),
+              dataApi.getClosedPositions(addr, 200).catch(()=>[]),
+            ])
+            const name = disp || short
+            const pnlStr = `${pnlAgg.totalPnL >= 0 ? '+' : '-'}$${Math.abs(Math.round(pnlAgg.totalPnL)).toLocaleString()}`
+            const winStr = `${Math.round(winr.winRate)}% (${winr.wins}/${winr.total})`
+            const valNum = parseFloat(String((val as any).value || '0'))
+            const valStr = `$${Math.round(valNum).toLocaleString()}`
+            const whaleStr = (best as any).whaleScore != null ? ` • 🐋 ${Math.round((best as any).whaleScore)}` : ''
+            let totalPositions = (val as any).positions_count || 0
+            if (!totalPositions) totalPositions = (openPos?.length || 0) + (closedPos?.length || 0)
+            let firstTs = Infinity
+            for (const p of [...(openPos||[]), ...(closedPos||[])]) {
+              const cAt = (p as any)?.created_at
+              const t = cAt ? Date.parse(String(cAt)) : NaN
+              if (Number.isFinite(t)) firstTs = Math.min(firstTs, t)
+            }
+            const ageDays = Number.isFinite(firstTs) ? Math.max(0, Math.floor((Date.now() - firstTs) / (24*60*60*1000))) : null
+            const isNewWallet = (totalPositions <= 5) && (ageDays == null || ageDays <= 14)
+            const newBadge = isNewWallet ? ' • 🆕' : ''
+            const notional = Math.round((best as any).notional || 0)
+            const whaleScore = (best as any).whaleScore || 0
+            const highReturn = (pnlAgg.totalPnL >= 20000 && winr.winRate >= 55)
+            const insiderish = (notional >= 20000) && (isNewWallet || whaleScore >= 80)
+            const catParts: string[] = []
+            if (highReturn) catParts.push('📈 High Return')
+            if (insiderish) catParts.push('🕵️ Potential Insider')
+            msg += `\n👤 Trader: <a href=\"${esc(profileUrl)}\">${esc(name)}</a>${whaleStr}${newBadge}`
+            msg += `\n📈 PnL: ${pnlStr} • 🏆 Win: ${winStr}`
+            msg += `\n💼 Portfolio: ${valStr}`
+            if ((best as any).tags && (best as any).tags.length) {
+              const tags = Array.from(new Set((best as any).tags)).slice(0,4).join(', ')
+              msg += `\n🏷️ Tags: ${esc(tags)}`
+            }
+            if (catParts.length) { msg += `\n🔎 ${catParts.join(' • ')}` }
+          } catch {}
+          const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:trade` }]] }
+          await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
+          return
+        } catch (e) {
+          logger.error('alpha:more trade-first failed', e)
+          await ctx.reply('Error fetching fresh trade. Please try again.')
+          return
+        }
+      }
       const offset = parseInt(parts[2] || '1', 10)
       const tokenIdsArg = parts[3] ? parts[3].split(',') : undefined
       const { AlphaAggregator } = await import('../services/alpha-aggregator')
