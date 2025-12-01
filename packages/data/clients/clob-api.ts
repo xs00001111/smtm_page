@@ -118,7 +118,10 @@ export class ClobApiClient {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         // Keep a neutral UA; avoid Origin/Referer which can trigger stricter checks
-        'User-Agent': 'smtm-bot/1.0 (+https://smtm.ai)'
+        'User-Agent': 'smtm-bot/1.0 (+https://smtm.ai)',
+        // Add browser-like headers to reduce 401s on public endpoints
+        'Origin': 'https://polymarket.com',
+        'Referer': 'https://polymarket.com/'
       },
     });
     this.dbg('client.init', { baseURL: this.baseURL });
@@ -192,39 +195,28 @@ export class ClobApiClient {
    * @returns Array of recent trades
    */
   async getTrades(assetId: string, limit = 100): Promise<Trade[]> {
-    // Use public, unauthenticated HTTP endpoint for read-only trades
-    try {
-      this.dbg('getTrades.axios', { asset_id: assetId, limit, baseURL: (this.client as any).defaults?.baseURL });
-      const { data } = await this.client.get<Trade[]>('/trades', {
-        // Use asset_id per public docs
-        params: { asset_id: assetId, limit },
-      });
-      console.log(`[CLOB] Public HTTP trades returned ${Array.isArray(data) ? data.length : 0} records`);
-      this.dbg('getTrades.ok', { count: Array.isArray(data) ? data.length : 0 });
-      return Array.isArray(data) ? data.slice(0, limit) : [];
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const text = err?.response?.data ? JSON.stringify(err.response.data).slice(0, 160) : String(err?.message || err);
-      console.warn(`[CLOB] axios /trades failed (${status}): ${text} — retrying via fetch`);
-      const url = new URL(this.baseURL + '/trades');
-      url.searchParams.set('asset_id', assetId);
-      url.searchParams.set('limit', String(limit));
-      this.dbg('getTrades.fetch', { url: url.toString(), baseURL: this.baseURL });
-      const res = await fetch(url.toString(), {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'smtm-bot/1.0 (+https://smtm.ai)'
-        } as any,
-      } as any);
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        throw new Error(`fetch /trades ${res.status}: ${body.slice(0, 200)}`);
-      }
-      const json = (await res.json()) as Trade[];
-      console.log(`[CLOB] fetch /trades returned ${Array.isArray(json) ? json.length : 0} records`);
-      this.dbg('getTrades.fetch.ok', { count: Array.isArray(json) ? json.length : 0 });
-      return Array.isArray(json) ? json.slice(0, limit) : [];
+    // Use public, unauthenticated HTTP endpoint for read-only trades via fetch only
+    const url = new URL(this.baseURL + '/trades');
+    url.searchParams.set('asset_id', assetId);
+    url.searchParams.set('limit', String(limit));
+    this.dbg('getTrades.fetch', { url: url.toString(), baseURL: this.baseURL });
+    const res = await fetch(url.toString(), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+        'Origin': 'https://polymarket.com',
+        'Referer': 'https://polymarket.com/',
+      } as any,
+    } as any);
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`fetch /trades ${res.status}: ${body.slice(0, 200)}`);
     }
+    const json = (await res.json()) as Trade[];
+    console.log(`[CLOB] fetch /trades returned ${Array.isArray(json) ? json.length : 0} records`);
+    this.dbg('getTrades.fetch.ok', { count: Array.isArray(json) ? json.length : 0 });
+    return Array.isArray(json) ? json.slice(0, limit) : [];
   }
 
   /**
