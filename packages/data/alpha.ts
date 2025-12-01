@@ -636,6 +636,7 @@ export async function scanAlphaFromTrades(params?: {
   wallet: string
   whaleScore?: number
   tags?: string[]
+  displayName?: string | null
 } | null> {
   const windowMs = params?.windowMs ?? 12 * 60 * 60 * 1000
   const minNotionalUsd = params?.minNotionalUsd ?? 1000
@@ -664,8 +665,9 @@ export async function scanAlphaFromTrades(params?: {
       const tokenId = String((t.asset_id || t.asset || '')).trim()
       const marketId = String((t.conditionId || t.market || '')).trim()
       const wallet = String(t.proxyWallet || t.user || '').toLowerCase()
+      const displayName = (t.name || t.pseudonym) ? String(t.name || t.pseudonym) : null
       if (!tokenId || !marketId) continue
-      candidates.push({ ts, tokenId, marketId, side: t.side || '', price, size, notional, wallet })
+      candidates.push({ ts, tokenId, marketId, side: t.side || '', price, size, notional, wallet, displayName })
     }
     // If oldest trade in this page is older than cutoff, stop paging
     const oldest = items.reduce((mn:number, t:any)=>{
