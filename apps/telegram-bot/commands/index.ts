@@ -1958,8 +1958,8 @@ export function registerCommands(bot: Telegraf) {
           let bestSkew: any = null
           for (const p of pairs) {
             try {
-              const { computeSmartSkewAlpha } = await import('@smtm/data')
-              const res = await computeSmartSkewAlpha({ yesTokenId: p.yes, noTokenId: p.no }, { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew ${m}`) })
+              const { computeSmartSkewFromHolders } = await import('@smtm/data')
+              const res = await computeSmartSkewFromHolders({ conditionId: p.cond, yesTokenId: p.yes, noTokenId: p.no }, { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew ${m}`) })
               if (res.trigger) {
                 const score = res.alpha + res.smartPoolUsd/100
                 if (!bestSkew || score > bestSkew._score) bestSkew = { ...res, _score: score, pair: p }
@@ -1973,6 +1973,15 @@ export function registerCommands(bot: Telegraf) {
             let msg = `✨ <b>${esc(m.question || bestSkew.pair.title)}</b>\n\n`
             msg += `⚖️ Smart-Skew Alpha: <b>${bestSkew.alpha}</b>\n`
             msg += `${directionEmoji} ${bestSkew.direction} • Skew ${Math.round(bestSkew.skew*100)}% • Pool $${Math.round(bestSkew.smartPoolUsd).toLocaleString()}\n`
+            // Per-direction wallet examples (top 3 on skewed side)
+            if (Array.isArray((bestSkew as any).examples) && (bestSkew as any).examples.length) {
+              msg += `\nTop Wallets (${bestSkew.direction}):\n`
+              for (const ex of (bestSkew as any).examples) {
+                const short = ex.wallet.slice(0,6)+"…"+ex.wallet.slice(-4)
+                const pnlStr = `${ex.pnl >= 0 ? '+' : '-'}$${Math.abs(Math.round(ex.pnl)).toLocaleString()}`
+                msg += `• <code>${short}</code> — $${Math.round(ex.valueUsd).toLocaleString()} • 🐋 ${Math.round(ex.whaleScore)} • PnL ${pnlStr}\n`
+              }
+            }
             if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
             const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
             await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })

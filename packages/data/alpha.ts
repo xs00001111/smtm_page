@@ -288,6 +288,122 @@ export async function computeSmartSkewAlpha(
   }
 }
 
+// Smart Money Skew using Top Holders (no time window)
+export async function computeSmartSkewFromHolders(
+  params: { conditionId: string; yesTokenId?: string; noTokenId?: string },
+  cfg?: (SmartSkewConfig & WhaleScoreConfig & WhaleStatsOptions) & { onLog?: (msg: string, ctx?: any) => void }
+): Promise<SmartSkewResult & { examples?: Array<{ wallet: string; valueUsd: number; whaleScore: number; pnl: number }> }> {
+  const log = cfg?.onLog || (() => {})
+  const whaleScoreThreshold = cfg?.whaleScoreThreshold ?? 65
+  const minSmartPoolUsd = cfg?.minSmartPoolUsd ?? 3000
+  const maxWallets = cfg?.maxWallets ?? 50
+  log('skew.holders.start', { cond: params.conditionId, maxWallets, minSmartPoolUsd })
+
+  // Resolve token IDs if not provided
+  let yesTokenId = params.yesTokenId
+  let noTokenId = params.noTokenId
+  try {
+    if (!yesTokenId || !noTokenId) {
+      const m = await gammaApi.getMarket(params.conditionId)
+      const yesT = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')
+      const noT = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')
+      yesTokenId = yesTokenId || yesT?.token_id
+      noTokenId = noTokenId || noT?.token_id
+    }
+  } catch {}
+  if (!yesTokenId || !noTokenId) {
+    log('skew.holders.no_pair', { cond: params.conditionId })
+    return { direction: 'YES', skewYes: 0.5, skew: 0.5, alpha: 0, trigger: false, smartPoolUsd: 0, volumes: { yesWhale:0, noWhale:0, yesRetail:0, noRetail:0 }, meta: { whaleScoreThreshold, windowMs: 0, walletsEvaluated: 0 } }
+  }
+
+  // Fetch holders for the market
+  let holders: any[] = []
+  try {
+    holders = await dataApi.getTopHolders({ market: params.conditionId, limit: 200, minBalance: 1 })
+  } catch {}
+  const byToken = new Map<string, Array<{ address: string; balance: number; value?: number }>>()
+  for (const row of holders || []) {
+    const list = Array.isArray(row?.holders) ? row.holders : []
+    byToken.set(String(row?.token), list.map((h:any)=>({ address: String(h.address).toLowerCase(), balance: parseFloat(String(h.balance||'0')), value: h.value != null ? parseFloat(String(h.value)) : undefined })))
+  }
+  // Fetch prices to estimate USD if needed
+  let yesPrice: number | null = null
+  let noPrice: number | null = null
+  try { yesPrice = await clobApi.getCurrentPrice(yesTokenId) } catch {}
+  try { noPrice = await clobApi.getCurrentPrice(noTokenId) } catch {}
+
+  const toUsd = (bal: number, v?: number, price?: number|null) => {
+    if (Number.isFinite(v as any)) return (v as any) as number
+    if (Number.isFinite(price||NaN)) return bal * (price as number)
+    return 0
+  }
+
+  const yesH = (byToken.get(yesTokenId) || []).map(h=>({ wallet: h.address, usd: toUsd(h.balance, h.value, yesPrice) }))
+  const noH  = (byToken.get(noTokenId)  || []).map(h=>({ wallet: h.address, usd: toUsd(h.balance, h.value, noPrice) }))
+  // Sort by USD and cap wallets to evaluate
+  yesH.sort((a,b)=>b.usd - a.usd)
+  noH.sort((a,b)=>b.usd - a.usd)
+  const yesEval = yesH.slice(0, Math.min(maxWallets, yesH.length))
+  const noEval  = noH.slice(0, Math.min(maxWallets, noH.length))
+
+  // Score wallets and compute PnL for examples
+  const scoreCache = new Map<string, number>()
+  const pnlCache = new Map<string, number>()
+  const evalWallets = Array.from(new Set([...yesEval, ...noEval].map(w=>w.wallet)))
+  for (const w of evalWallets) {
+    try {
+      const stats = await getWalletWhaleStats(w, cfg)
+      scoreCache.set(w, computeWhaleScore(stats, cfg))
+    } catch { scoreCache.set(w, 0) }
+    try {
+      const pnl = await dataApi.getUserAccuratePnL(w)
+      pnlCache.set(w, pnl.totalPnL || 0)
+    } catch { pnlCache.set(w, 0) }
+  }
+
+  // Aggregate whale vs retail by threshold
+  let yesWhale = 0, noWhale = 0, yesRetail = 0, noRetail = 0
+  for (const h of yesEval) {
+    const sc = scoreCache.get(h.wallet) || 0
+    if (sc >= whaleScoreThreshold) yesWhale += h.usd; else yesRetail += h.usd
+  }
+  for (const h of noEval) {
+    const sc = scoreCache.get(h.wallet) || 0
+    if (sc >= whaleScoreThreshold) noWhale += h.usd; else noRetail += h.usd
+  }
+  const smartPoolUsd = yesWhale + noWhale
+  const denom = yesWhale + noWhale
+  const skewYes = denom > 0 ? yesWhale / denom : 0.5
+  const skew = Math.max(skewYes, 1 - skewYes)
+  const direction: 'YES' | 'NO' = skewYes >= 0.5 ? 'YES' : 'NO'
+  const rawAlpha = 60 + (skew - 0.75) * 180
+  const alpha = clamp(Math.round(rawAlpha), 0, 100)
+  const trigger = skew >= 0.75 && smartPoolUsd >= minSmartPoolUsd
+  log('skew.holders.result', { direction, skew, skewYes, smartPoolUsd, trigger, alpha })
+
+  // Build top 3 examples for the skewed side by USD
+  const sideH = direction === 'YES' ? yesEval : noEval
+  sideH.sort((a,b)=>b.usd - a.usd)
+  const examples = sideH.slice(0, 3).map(w => ({ wallet: w.wallet, valueUsd: Math.round(w.usd), whaleScore: scoreCache.get(w.wallet) || 0, pnl: Math.round(pnlCache.get(w.wallet) || 0) }))
+
+  return {
+    direction,
+    skewYes: parseFloat(skewYes.toFixed(4)),
+    skew: parseFloat(skew.toFixed(4)),
+    alpha,
+    trigger,
+    smartPoolUsd: parseFloat(smartPoolUsd.toFixed(2)),
+    volumes: {
+      yesWhale: parseFloat(yesWhale.toFixed(2)),
+      noWhale: parseFloat(noWhale.toFixed(2)),
+      yesRetail: parseFloat(yesRetail.toFixed(2)),
+      noRetail: parseFloat(noRetail.toFixed(2)),
+    },
+    meta: { whaleScoreThreshold, windowMs: 0, walletsEvaluated: evalWallets.length },
+    examples,
+  }
+}
+
 // Fallback: query recent trades from CLOB API to find big orders (no wallet)
 export async function findRecentBigOrders(params?: {
   tokenIds?: string[]
