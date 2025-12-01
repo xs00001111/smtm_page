@@ -189,8 +189,10 @@ export class ClobApiClient {
       const SDK = await loadClobSdk();
       if (SDK) {
         try {
-          this.publicClient = new SDK();
-          console.log('[CLOB] ✓ Public client (unauthenticated) initialized');
+          // Provide base URL (and chain id) so SDK does not read undefined
+          // No signer or creds for public read-only usage
+          this.publicClient = new SDK(this.baseURL, 137);
+          console.log('[CLOB] ✓ Public client (unauthenticated) initialized with baseURL');
         } catch (e) {
           console.warn('[CLOB] ✗ Failed to init public client', (e as any)?.message || e);
         }
