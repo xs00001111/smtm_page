@@ -1945,6 +1945,45 @@ export function registerCommands(bot: Telegraf) {
         } catch (e) {
           logger.warn({ err: String((e as any)?.message || e) }, 'alpha:trades_first_error')
         }
+        // New fallback: Smart Money Skew scan (deprecates legacy progressive scan)
+        try {
+          const active = await gammaApi.getActiveMarkets(60, 'volume').catch(()=>[] as any[])
+          const pairs: Array<{ cond: string; yes: string; no: string; title: string }> = []
+          for (const m of active) {
+            const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+            const no = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+            if (m.condition_id && yes && no) pairs.push({ cond: m.condition_id, yes, no, title: m.question || m.slug || m.condition_id })
+            if (pairs.length >= 20) break
+          }
+          let bestSkew: any = null
+          for (const p of pairs) {
+            try {
+              const { computeSmartSkewAlpha } = await import('@smtm/data')
+              const res = await computeSmartSkewAlpha({ yesTokenId: p.yes, noTokenId: p.no }, { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew ${m}`) })
+              if (res.trigger) {
+                const score = res.alpha + res.smartPoolUsd/100
+                if (!bestSkew || score > bestSkew._score) bestSkew = { ...res, _score: score, pair: p }
+              }
+            } catch {}
+          }
+          if (bestSkew) {
+            const m = await gammaApi.getMarket(bestSkew.pair.cond)
+            const url = getPolymarketMarketUrl(m)
+            const directionEmoji = bestSkew.direction === 'YES' ? '✅' : '❌'
+            let msg = `✨ <b>${esc(m.question || bestSkew.pair.title)}</b>\n\n`
+            msg += `⚖️ Smart-Skew Alpha: <b>${bestSkew.alpha}</b>\n`
+            msg += `${directionEmoji} ${bestSkew.direction} • Skew ${Math.round(bestSkew.skew*100)}% • Pool $${Math.round(bestSkew.smartPoolUsd).toLocaleString()}\n`
+            if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
+            const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
+            await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
+            return
+          }
+        } catch (e) {
+          logger.warn({ err: String((e as any)?.message || e) }, 'alpha:skew_fallback_error')
+        }
+        // Nothing found
+        await ctx.reply('⚠️ No fresh alpha found in the recent window.', { disable_web_page_preview: true })
+        return
         // Fallback: hit CLOB API for recent big orders (real trades)
         const { findRecentBigOrders } = await import('@smtm/data')
         let bigs = await findRecentBigOrders({
