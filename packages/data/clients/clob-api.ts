@@ -117,10 +117,8 @@ export class ClobApiClient {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        // Some endpoints may 401/403 without a browser-like UA and origin
-        'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
-        'Origin': 'https://polymarket.com',
-        'Referer': 'https://polymarket.com/',
+        // Keep a neutral UA; avoid Origin/Referer which can trigger stricter checks
+        'User-Agent': 'smtm-bot/1.0 (+https://smtm.ai)'
       },
     });
   }
@@ -186,7 +184,8 @@ export class ClobApiClient {
     // Use public, unauthenticated HTTP endpoint for read-only trades
     try {
       const { data } = await this.client.get<Trade[]>('/trades', {
-        params: { asset_id: assetId, limit },
+        // Use token_id which is broadly accepted
+        params: { token_id: assetId, limit },
       });
       console.log(`[CLOB] Public HTTP trades returned ${Array.isArray(data) ? data.length : 0} records`);
       return Array.isArray(data) ? data.slice(0, limit) : [];
@@ -195,12 +194,12 @@ export class ClobApiClient {
       const text = err?.response?.data ? JSON.stringify(err.response.data).slice(0, 160) : String(err?.message || err);
       console.warn(`[CLOB] axios /trades failed (${status}): ${text} — retrying via fetch`);
       const url = new URL(this.baseURL + '/trades');
-      url.searchParams.set('asset_id', assetId);
+      url.searchParams.set('token_id', assetId);
       url.searchParams.set('limit', String(limit));
       const res = await fetch(url.toString(), {
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+          'User-Agent': 'smtm-bot/1.0 (+https://smtm.ai)'
         } as any,
       } as any);
       if (!res.ok) {
