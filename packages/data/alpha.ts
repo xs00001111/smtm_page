@@ -273,11 +273,12 @@ export async function findRecentBigOrders(params?: {
   const perTokenLimit = params?.perTokenLimit ?? 50
   const log = params?.onLog || (() => {})
   let tokenIds = params?.tokenIds
+  const tokenToCond = new Map<string, string>()
   if (!tokenIds || tokenIds.length === 0) {
     try {
       const trending = await gammaApi.getTrendingMarkets(8)
       tokenIds = []
-      for (const m of trending) for (const t of (m.tokens || [])) if (t?.token_id) tokenIds.push(t.token_id)
+      for (const m of trending) for (const t of (m.tokens || [])) if (t?.token_id) { tokenIds.push(t.token_id); if (m?.condition_id) tokenToCond.set(t.token_id, m.condition_id) }
     } catch {}
   }
   tokenIds = tokenIds || []
@@ -286,10 +287,14 @@ export async function findRecentBigOrders(params?: {
   const results: Array<{ ts: number; tokenId: string; marketId?: string; side: 'BUY'|'SELL'|string; price: number; size: number; notional: number }> = []
   for (const tokenId of tokenIds) {
     try {
-      const trades = await clobApi.getTrades(tokenId, perTokenLimit)
+      const cond = tokenToCond.get(tokenId)
+      const afterSec = Math.floor(cutoff/1000)
+      const trades = cond ? await clobApi.getUserTrades({ market: cond, after: String(afterSec) }) : []
       log('big_orders.trades', { tokenId, total: (trades || []).length })
       for (const tr of trades || []) {
-        const ts = typeof tr.timestamp === 'number' ? tr.timestamp : Date.parse(String((tr as any).timestamp))
+        if ((tr as any).asset_id && String((tr as any).asset_id) !== String(tokenId)) continue
+        const tsRaw: any = (tr as any).timestamp || (tr as any).match_time || (tr as any).last_update
+        const ts = typeof tsRaw === 'number' ? tsRaw : Date.parse(String(tsRaw))
         if (!Number.isFinite(ts) || ts < cutoff) continue
         const price = parseFloat(String(tr.price || '0'))
         const size = parseFloat(String(tr.size || '0'))
@@ -327,10 +332,11 @@ export async function searchLiveAlpha(params?: {
     log('markets', { trending: trending.length, active: active.length })
     const tokenIds: string[] = []
     const seen = new Set<string>()
+    const tokenToCond = new Map<string, string>()
     const addTokens = (mks: any[]) => {
       for (const m of mks || []) {
         for (const t of (m.tokens || [])) {
-          if (t?.token_id && !seen.has(t.token_id)) { seen.add(t.token_id); tokenIds.push(t.token_id) }
+          if (t?.token_id && !seen.has(t.token_id)) { seen.add(t.token_id); tokenIds.push(t.token_id); if (m?.condition_id) tokenToCond.set(t.token_id, m.condition_id) }
         }
       }
     }
@@ -340,12 +346,16 @@ export async function searchLiveAlpha(params?: {
     let best: any = null
     for (const tokenId of tokenIds) {
       try {
-        const trades = await clobApi.getTrades(tokenId, perTokenLimit)
+        const cond = tokenToCond.get(tokenId)
+        const afterSec = Math.floor(cutoff/1000)
+        const trades = cond ? await clobApi.getUserTrades({ market: cond, after: String(afterSec) }) : []
         log('trades', { tokenId, total: (trades || []).length })
         let filtered = 0
         let topN = 0
         for (const tr of trades || []) {
-          const ts = typeof tr.timestamp === 'number' ? tr.timestamp : Date.parse(String((tr as any).timestamp))
+          if ((tr as any).asset_id && String((tr as any).asset_id) !== String(tokenId)) continue
+          const tsRaw: any = (tr as any).timestamp || (tr as any).match_time || (tr as any).last_update
+          const ts = typeof tsRaw === 'number' ? tsRaw : Date.parse(String(tsRaw))
           if (!Number.isFinite(ts) || ts < cutoff) continue
           const price = parseFloat(String(tr.price || '0'))
           const size = parseFloat(String(tr.size || '0'))
@@ -493,14 +503,23 @@ export async function progressiveLiveScan(params?: {
     log('progressive.final_token_count', { count: tokenIds.length, sample: tokenIds.slice(0, 10) })
     let best: any = null
     let errorCount = 0
+    const tokenToCondProg = new Map<string, string>()
+    // Build condition mapping from markets we fetched
+    for (const m of [...trending, ...active] as any[]) {
+      for (const t of (m?.tokens || [])) if (t?.token_id && m?.condition_id) tokenToCondProg.set(t.token_id, m.condition_id)
+    }
     for (let i=0;i<tokenIds.length;i++) {
       const tokenId = tokenIds[i]
       if (Date.now() - t0 > maxDurationMs) { log('progressive.timeout', { scanned: i, elapsedMs: Date.now()-t0 }); break }
       try {
-        const trades = await clobApi.getTrades(tokenId, perTokenLimit)
+        const cond = tokenToCondProg.get(tokenId)
+        const afterSec = Math.floor(cutoff/1000)
+        const trades = cond ? await clobApi.getUserTrades({ market: cond, after: String(afterSec) }) : []
         log('progressive.trades', { idx: i+1, total: tokenIds.length, tokenId, totalTrades: (trades||[]).length })
         for (const tr of trades || []) {
-          const ts = typeof tr.timestamp === 'number' ? tr.timestamp : Date.parse(String((tr as any).timestamp))
+          if ((tr as any).asset_id && String((tr as any).asset_id) !== String(tokenId)) continue
+          const tsRaw: any = (tr as any).timestamp || (tr as any).match_time || (tr as any).last_update
+          const ts = typeof tsRaw === 'number' ? tsRaw : Date.parse(String(tsRaw))
           if (!Number.isFinite(ts) || ts < cutoff) continue
           const price = parseFloat(String(tr.price || '0'))
           const size = parseFloat(String(tr.size || '0'))

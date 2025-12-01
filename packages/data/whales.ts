@@ -60,6 +60,10 @@ class WhaleDetectorImpl {
   }
 
   private startLeaderboardRefresh() {
+    // Disable leaderboard refresh for now: no official public leaderboard API
+    console.log('[whale.watchlist] leaderboard refresh disabled')
+    return
+    /*
     // Background refresh of top-PnL wallets (best-effort, public endpoints)
     const refresh = async () => {
       try {
@@ -116,6 +120,7 @@ class WhaleDetectorImpl {
     }
     refresh().catch(() => {})
     this.leaderboardTimer = setInterval(() => refresh().catch(() => {}), this.opts.leaderboardRefreshMs)
+    */
   }
 
   stop() {

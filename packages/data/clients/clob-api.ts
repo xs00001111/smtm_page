@@ -122,6 +122,11 @@ export class ClobApiClient {
       },
     });
     this.dbg('client.init', { baseURL: this.baseURL });
+    // Also log axios resolved baseURL for sanity when debugging
+    this.dbg('client.axios.defaults', { baseURL: (this.client && (this.client as any).defaults?.baseURL) || null });
+    if (this.client && (this.client as any).defaults?.baseURL && (this.client as any).defaults.baseURL !== this.baseURL) {
+      console.warn('[CLOB] axios baseURL mismatch!', { expected: this.baseURL, actual: (this.client as any).defaults.baseURL });
+    }
   }
 
   /**
@@ -189,10 +194,10 @@ export class ClobApiClient {
   async getTrades(assetId: string, limit = 100): Promise<Trade[]> {
     // Use public, unauthenticated HTTP endpoint for read-only trades
     try {
-      this.dbg('getTrades.axios', { token_id: assetId, limit });
+      this.dbg('getTrades.axios', { asset_id: assetId, limit, baseURL: (this.client as any).defaults?.baseURL });
       const { data } = await this.client.get<Trade[]>('/trades', {
-        // Use token_id which is broadly accepted
-        params: { token_id: assetId, limit },
+        // Use asset_id per public docs
+        params: { asset_id: assetId, limit },
       });
       console.log(`[CLOB] Public HTTP trades returned ${Array.isArray(data) ? data.length : 0} records`);
       this.dbg('getTrades.ok', { count: Array.isArray(data) ? data.length : 0 });
@@ -202,9 +207,9 @@ export class ClobApiClient {
       const text = err?.response?.data ? JSON.stringify(err.response.data).slice(0, 160) : String(err?.message || err);
       console.warn(`[CLOB] axios /trades failed (${status}): ${text} — retrying via fetch`);
       const url = new URL(this.baseURL + '/trades');
-      url.searchParams.set('token_id', assetId);
+      url.searchParams.set('asset_id', assetId);
       url.searchParams.set('limit', String(limit));
-      this.dbg('getTrades.fetch', { url: url.toString() });
+      this.dbg('getTrades.fetch', { url: url.toString(), baseURL: this.baseURL });
       const res = await fetch(url.toString(), {
         headers: {
           'Accept': 'application/json',
@@ -401,3 +406,60 @@ export const clobApi = new ClobApiClient();
 export function createClobApiClient(timeout?: number): ClobApiClient {
   return new ClobApiClient(timeout);
 }
+  // Build L2 headers for private endpoints (e.g. /data/trades)
+  private buildL2Headers(method: string, path: string, params?: Record<string, any>, body?: any) {
+    if (!this.apiKey || !this.apiSecret || !this.apiPassphrase) {
+      throw new Error('Missing API credentials for L2 header');
+    }
+    const ts = Math.floor(Date.now() / 1000).toString();
+    // Construct canonical request path including querystring
+    const usp = new URLSearchParams();
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        if (v === undefined || v === null) continue;
+        usp.append(k, String(v));
+      }
+    }
+    const query = usp.toString();
+    const reqPath = query ? `${path}?${query}` : path;
+    const bodyStr = body ? (typeof body === 'string' ? body : JSON.stringify(body)) : '';
+    // Common pattern: HMAC-SHA256 over ts + method + reqPath + body using apiSecret
+    const payload = ts + method.toUpperCase() + reqPath + bodyStr;
+    const hmac = createHash('sha256');
+    // Use crypto.createHmac for HMAC rather than hash
+    const crypto = require('crypto');
+    const sig = crypto.createHmac('sha256', this.apiSecret).update(payload).digest('base64');
+    this.dbg('l2.sign', { ts, method, reqPath });
+    return {
+      'PM-ACCESS-KEY': this.apiKey,
+      'PM-ACCESS-PASSPHRASE': this.apiPassphrase,
+      'PM-ACCESS-TIMESTAMP': ts,
+      'PM-ACCESS-SIGNATURE': sig,
+    } as Record<string, string>;
+  }
+
+  /**
+   * Authenticated: fetch user-scoped trades via /data/trades (L2 headers required)
+   * Filters: id, taker, maker, market, before, after
+   */
+  async getUserTrades(filters?: Partial<{ id: string; taker: string; maker: string; market: string; before: string | number; after: string | number }>): Promise<Trade[]> {
+    const path = '/data/trades';
+    const params: any = {};
+    if (filters) {
+      for (const [k, v] of Object.entries(filters)) {
+        if (v != null && v !== '') params[k] = v;
+      }
+    }
+    const headers = this.buildL2Headers('GET', path, params);
+    try {
+      this.dbg('getUserTrades.request', { path, params });
+      const { data } = await this.client.get<Trade[]>(path, { params, headers });
+      this.dbg('getUserTrades.ok', { count: Array.isArray(data) ? data.length : 0 });
+      return Array.isArray(data) ? data : [];
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const text = e?.response?.data ? JSON.stringify(e.response.data).slice(0, 200) : String(e?.message || e);
+      console.error(`[CLOB] getUserTrades failed (${status}): ${text}`);
+      throw e;
+    }
+  }
