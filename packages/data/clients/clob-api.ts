@@ -66,8 +66,8 @@ export class ClobApiClient {
     this.apiSecret = credentials?.apiSecret || process.env.POLYMARKET_API_SECRET;
     this.apiPassphrase = credentials?.apiPassphrase || process.env.POLYMARKET_API_PASSPHRASE;
 
-    // Log credential availability (without exposing values)
-    console.log('[CLOB] Credential check:', {
+    // Only log creds/client availability when debugging
+    this.dbg('creds.check', {
       hasApiKey: !!this.apiKey,
       hasApiSecret: !!this.apiSecret,
       hasApiPassphrase: !!this.apiPassphrase,
@@ -77,9 +77,10 @@ export class ClobApiClient {
     // Initialize official client if credentials and package are available
     // Defer public client creation to first use to support dynamic import in ESM runtimes
 
-    if (ClobClient && Wallet && this.apiKey && this.apiSecret && this.apiPassphrase) {
+    // Initialize authenticated client only if explicitly enabled
+    if (process.env.POLY_ENABLE_TRADING === 'true' && ClobClient && Wallet && this.apiKey && this.apiSecret && this.apiPassphrase) {
       try {
-        console.log('[CLOB] Attempting to initialize official client...');
+        this.dbg('auth.init.start');
         // ApiKeyCreds is just a plain object interface
         const creds = {
           key: this.apiKey,
@@ -93,28 +94,20 @@ export class ClobApiClient {
         const signerKey = process.env.POLYMARKET_SIGNER_PRIVATE_KEY;
         if (signerKey) {
           signer = new Wallet(signerKey);
-          console.log('[CLOB] Using provided signer wallet:', signer.address);
+        this.dbg('auth.signer.provided', { address: signer.address });
         } else {
           // Generate deterministic wallet from API key hash (valid 32-byte private key)
           const hash = createHash('sha256').update(this.apiKey).digest('hex');
           signer = new Wallet('0x' + hash);
-          console.log('[CLOB] Generated deterministic read-only signer:', signer.address);
+          this.dbg('auth.signer.generated', { address: signer.address });
         }
 
         // Chain ID 137 = Polygon mainnet (Polymarket's chain)
         this.officialClient = new ClobClient(this.baseURL, 137, signer, creds);
-        console.log('[CLOB] ✓ Official authenticated client initialized successfully');
+        this.dbg('auth.init.ok');
       } catch (e) {
         console.error('[CLOB] ✗ Failed to initialize official client:', (e as any)?.message, (e as any)?.stack);
       }
-    } else {
-      const missing = [];
-      if (!ClobClient) missing.push('package');
-      if (!Wallet) missing.push('ethers.Wallet');
-      if (!this.apiKey) missing.push('POLYMARKET_API_KEY');
-      if (!this.apiSecret) missing.push('POLYMARKET_API_SECRET');
-      if (!this.apiPassphrase) missing.push('POLYMARKET_API_PASSPHRASE');
-      console.log('[CLOB] ⚠ Skipping authenticated client - missing:', missing.join(', '));
     }
 
     // Always create axios fallback

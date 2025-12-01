@@ -1,4 +1,21 @@
 import axios, { AxiosInstance } from 'axios';
+const DATA_DEBUG = process.env.DATA_DEBUG === 'true';
+function dataDbg(msg: string, ctx?: any) {
+  if (DATA_DEBUG) {
+    try {
+      // Avoid JSON errors if ctx has cycles
+      console.log('[DATA][debug]', msg, ctx ? JSON.stringify(ctx) : '');
+    } catch {
+      console.log('[DATA][debug]', msg);
+    }
+  }
+}
+const DATA_DEBUG = process.env.DATA_DEBUG === 'true';
+function dataDbg(msg: string, ctx?: any) {
+  if (DATA_DEBUG) {
+    try { console.log('[DATA][debug]', msg, ctx ? JSON.stringify(ctx) : ''); } catch { console.log('[DATA][debug]', msg); }
+  }
+}
 import type {
   Position,
   PositionsParams,
@@ -18,6 +35,7 @@ import type {
 export class DataApiClient {
   private client: AxiosInstance;
   private baseURL = 'https://data-api.polymarket.com';
+  private dbg(msg: string, ctx?: any) { dataDbg(msg, ctx) }
 
   constructor(timeout = 10000) {
     this.client = axios.create({
@@ -33,6 +51,7 @@ export class DataApiClient {
         'Referer': 'https://polymarket.com/',
       },
     });
+    this.dbg('client.init', { baseURL: this.baseURL });
   }
 
   /**
@@ -117,15 +136,15 @@ export class DataApiClient {
     const offset = params?.offset || 0;
     // Attempt 1: axios
     try {
-      this.dbg('leaderboard.api.axios', { limit, offset });
+      dataDbg('leaderboard.api.axios', { limit, offset });
       const { data } = await this.client.get<LeaderboardEntry[]>('/leaderboard', { params: { limit, offset } });
-      this.dbg('leaderboard.api.axios.ok', { count: Array.isArray(data) ? data.length : 0 });
+      dataDbg('leaderboard.api.axios.ok', { count: Array.isArray(data) ? data.length : 0 });
       return data;
     } catch (err1: any) {
       // Attempt 2: fetch with explicit headers
       try {
         const url = `${this.baseURL}/leaderboard?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`;
-        this.dbg('leaderboard.api.fetch', { url });
+        dataDbg('leaderboard.api.fetch', { url });
         const res = await fetch(url, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
@@ -139,7 +158,7 @@ export class DataApiClient {
           const text = await res.text();
           try {
             const json = JSON.parse(text);
-            this.dbg('leaderboard.api.fetch.ok', { count: Array.isArray(json) ? json.length : 0 });
+            dataDbg('leaderboard.api.fetch.ok', { count: Array.isArray(json) ? json.length : 0 });
             return Array.isArray(json) ? (json as LeaderboardEntry[]) : [];
           } catch (e) {
             console.error('getLeaderboard: JSON parse failed', { snippet: text.slice(0, 200) });
@@ -153,7 +172,7 @@ export class DataApiClient {
       // Attempt 3: scrape public leaderboard HTML and parse __NEXT_DATA__ as last resort
       try {
         const url2 = 'https://polymarket.com/leaderboard';
-        this.dbg('leaderboard.html.fetch', { url: url2 });
+        dataDbg('leaderboard.html.fetch', { url: url2 });
         const res2 = await fetch(url2, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
@@ -184,7 +203,7 @@ export class DataApiClient {
                     pnl: entry.pnl || entry.pnlUsd || 0,
                     profile_image: entry.profileImage || entry.profile_image || '',
                   }));
-                  this.dbg('leaderboard.html.ok', { count: items.length });
+                  dataDbg('leaderboard.html.ok', { count: items.length });
                   if (items.length) return items;
                 }
               }
@@ -202,9 +221,9 @@ export class DataApiClient {
             pnl: 0,
             profile_image: '',
           } as any));
-          if (items.length) { this.dbg('leaderboard.html.addrs', { count: items.length }); return items; }
+          if (items.length) { dataDbg('leaderboard.html.addrs', { count: items.length }); return items; }
         } else {
-          this.dbg('leaderboard.html.status', { status: res2.status, statusText: res2.statusText });
+          dataDbg('leaderboard.html.status', { status: res2.status, statusText: res2.statusText });
         }
       } catch (e3) {
         console.error('getLeaderboard scrape fallback failed', (e3 as any)?.message || e3);
