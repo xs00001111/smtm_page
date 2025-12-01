@@ -1918,7 +1918,7 @@ export function registerCommands(bot: Telegraf) {
                 msg += `\n🔎 ${catParts.join(' • ')}`
               }
             } catch {}
-            const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:trade` }]] }
+            const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
             await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
             return
           }
@@ -2126,7 +2126,7 @@ export function registerCommands(bot: Telegraf) {
 
       const when = new Date(a.ts).toISOString().replace('T',' ').slice(0, 19) + 'Z'
       msg += `\n🕒 ${when}`
-      const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:1${tokenIds && tokenIds.length?':'+tokenIds.join(','):''}` }]] }
+      const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:1${tokenIds && tokenIds.length?':'+tokenIds.join(','):''}` }]] }
       // Edit the searching message if possible, otherwise send a new one
       try {
         await ctx.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, msg, { parse_mode: 'HTML', reply_markup: kb as any })
@@ -2213,7 +2213,7 @@ export function registerCommands(bot: Telegraf) {
             }
             if (catParts.length) { msg += `\n🔎 ${catParts.join(' • ')}` }
           } catch {}
-          const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:trade` }]] }
+          const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
           return
         } catch (e) {
@@ -2254,7 +2254,7 @@ export function registerCommands(bot: Telegraf) {
       const when = new Date(a.ts).toISOString().replace('T',' ').slice(0, 19) + 'Z'
       msg += `\n🕒 ${when}`
       const nextOffset = offset + 1
-      const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:${nextOffset}${tokenIdsArg && tokenIdsArg.length?':'+tokenIdsArg.join(','):''}` }]] }
+      const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:${nextOffset}${tokenIdsArg && tokenIdsArg.length?':'+tokenIdsArg.join(','):''}` }]] }
       await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
     } catch (e) {
       logger.error('alpha:more failed', e)
