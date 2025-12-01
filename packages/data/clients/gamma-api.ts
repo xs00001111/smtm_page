@@ -125,6 +125,8 @@ export class GammaApiClient {
     // Use total volume as a robust proxy for trending when 24h ordering isn't supported
     return this.getMarkets({
       active: true,
+      closed: false,
+      archived: false,
       limit,
       order: 'volume',
       ascending: false,

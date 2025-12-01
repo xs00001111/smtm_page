@@ -1,6 +1,8 @@
 import { dataApi } from './clients/data-api'
 // Hardcoded debug: print trade details during investigation
 const ALPHA_LOG_TRADES = true
+// Disable CLOB fallback while investigating Data API zeros
+const ENABLE_CLOB_FALLBACK = false
 import { clobApi } from './clients/clob-api'
 import { gammaApi } from './clients/gamma-api'
 import { WhaleDetector, WhaleEvent } from './whales'
@@ -280,7 +282,7 @@ export async function findRecentBigOrders(params?: {
       const cond = tokenToCond.get(tokenId)
       const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit }) : []
       log('big_orders.trades', { tokenId, total: (trades || []).length })
-      if ((trades || []).length === 0) {
+      if (ENABLE_CLOB_FALLBACK && (trades || []).length === 0) {
         try {
           const clobFallback = await clobApi.getTrades(tokenId, Math.min(50, perTokenLimit))
           log('big_orders.trades_fallback_clob', { tokenId, total: clobFallback.length })
@@ -524,7 +526,7 @@ export async function progressiveLiveScan(params?: {
         const cond = tokenToCondProg.get(tokenId)
         const trades = cond ? await dataApi.getTrades({ market: [cond], limit: perTokenLimit }) : []
         log('progressive.trades', { idx: i+1, total: tokenIds.length, tokenId, totalTrades: (trades||[]).length })
-        if ((trades || []).length === 0) {
+        if (ENABLE_CLOB_FALLBACK && (trades || []).length === 0) {
           try {
             const clobFallback = await clobApi.getTrades(tokenId, Math.min(50, perTokenLimit))
             log('progressive.trades_fallback_clob', { tokenId, total: clobFallback.length })
