@@ -3,6 +3,42 @@ import { dataApi } from './clients/data-api'
 const ALPHA_LOG_TRADES = true
 // Disable CLOB fallback while investigating Data API zeros
 const ENABLE_CLOB_FALLBACK = false
+// Helper: determine if a market is live and tradeable enough for alpha scans
+function isMarketLive(m: any): boolean {
+  if (!m) return false
+  // Exclude closed/archived; prefer active+accepting orders when provided
+  if (m.archived === true) return false
+  if (m.closed === true) return false
+  if (m.active === false) return false
+  if (m.accepting_orders === false) return false
+  // Exclude resolved winners
+  if (Array.isArray(m.tokens) && m.tokens.some((t: any) => t?.winner === true)) return false
+  // Exclude price-extreme markets (already effectively decided)
+  const extreme = (p: any) => {
+    const v = typeof p === 'number' ? p : parseFloat(String(p ?? 'NaN'))
+    return Number.isFinite(v) && (v >= 0.99 || v <= 0.01)
+  }
+  if (Array.isArray(m.tokens) && m.tokens.length > 0) {
+    const allExtreme = m.tokens.every((t: any) => extreme(t?.price))
+    if (allExtreme) return false
+  }
+  // Time-based filters
+  const now = Date.now()
+  // 1) Explicit end date (common on many markets)
+  if (m.end_date_iso) {
+    const endTs = Date.parse(String(m.end_date_iso))
+    if (Number.isFinite(endTs)) {
+      const delayMs = Math.max(0, (m.seconds_delay || 0) * 1000)
+      if (now > endTs + delayMs + 2 * 60 * 1000) return false
+    }
+  }
+  // 2) Sports markets often have game_start_time; treat >6h past start as not live
+  if (m.game_start_time) {
+    const startTs = Date.parse(String(m.game_start_time))
+    if (Number.isFinite(startTs) && now > startTs + 6 * 60 * 60 * 1000) return false
+  }
+  return true
+}
 import { clobApi } from './clients/clob-api'
 import { gammaApi } from './clients/gamma-api'
 import { WhaleDetector, WhaleEvent } from './whales'
@@ -333,6 +369,7 @@ export async function searchLiveAlpha(params?: {
     const tokenToCond = new Map<string, string>()
     const addTokens = (mks: any[]) => {
       for (const m of mks || []) {
+        if (!isMarketLive(m)) continue
         for (const t of (m.tokens || [])) {
           if (t?.token_id && !seen.has(t.token_id)) { seen.add(t.token_id); tokenIds.push(t.token_id); if (m?.condition_id) tokenToCond.set(t.token_id, m.condition_id) }
         }
@@ -427,6 +464,7 @@ export async function progressiveLiveScan(params?: {
     const seen = new Set<string>()
     const addTokens = (arr:any[]) => {
       for (const m of arr) {
+        if (!isMarketLive(m)) continue
         // Try tokens array first
         for (const t of (m.tokens || [])) {
           const id = t?.token_id || t?.tokenId
@@ -460,6 +498,7 @@ export async function progressiveLiveScan(params?: {
         const cid = conds[i]
         try {
           const mkt = await gammaApi.getMarket(cid)
+          if (!isMarketLive(mkt)) { log('progressive.resolve_condition_skipped', { conditionId: cid, reason: 'not_live' }); continue }
           let added = 0
           for (const t of (mkt?.tokens || [])) {
             const id = (t as any)?.token_id
@@ -478,6 +517,7 @@ export async function progressiveLiveScan(params?: {
         const cid = conds[i]
         try {
           const mkt: any = await (await import('./clients/clob-api')).clobApi.getMarket(cid)
+          if (!isMarketLive(mkt)) { log('progressive.resolve_clob_market_skipped', { conditionId: cid, reason: 'not_live' }); continue }
           let added = 0
           for (const t of (mkt?.tokens || [])) {
             const id = t?.token_id
@@ -576,6 +616,114 @@ export async function progressiveLiveScan(params?: {
     log('progressive.fail', { err: String((e as any)?.message || e) })
     return null
   }
+}
+
+// Trade-first alpha scan across all markets via Data API
+export async function scanAlphaFromTrades(params?: {
+  windowMs?: number
+  minNotionalUsd?: number
+  limit?: number
+  maxBatches?: number
+  onLog?: (msg: string, ctx?: any) => void
+}): Promise<{
+  ts: number
+  tokenId: string
+  marketId: string
+  side: string
+  price: number
+  size: number
+  notional: number
+  wallet: string
+  whaleScore?: number
+  tags?: string[]
+} | null> {
+  const windowMs = params?.windowMs ?? 12 * 60 * 60 * 1000
+  const minNotionalUsd = params?.minNotionalUsd ?? 1000
+  const pageSize = Math.min(Math.max(100, params?.limit ?? 1000), 1000)
+  const maxBatches = Math.min(Math.max(1, params?.maxBatches ?? 5), 20)
+  const log = params?.onLog || (() => {})
+  const cutoff = Date.now() - windowMs
+
+  let offset = 0
+  const candidates: any[] = []
+  for (let batch = 0; batch < maxBatches; batch++) {
+    log('trades_first.fetch', { offset, pageSize })
+    const items = await dataApi.getTrades({ limit: pageSize, offset })
+    const len = Array.isArray(items) ? items.length : 0
+    log('trades_first.page', { offset, len })
+    if (!len) break
+    // Filter window and notional
+    for (const t of items as any[]) {
+      const tsRaw = t.timestamp || t.match_time || t.last_update
+      const ts = typeof tsRaw === 'number' ? (tsRaw > 1e12 ? tsRaw : tsRaw * 1000) : Date.parse(String(tsRaw))
+      if (!Number.isFinite(ts) || ts < cutoff) continue
+      const price = parseFloat(String(t.price ?? '0'))
+      const size = parseFloat(String(t.size ?? '0'))
+      const notional = price * size
+      if (!Number.isFinite(notional) || notional < minNotionalUsd) continue
+      const tokenId = String((t.asset_id || t.asset || '')).trim()
+      const marketId = String((t.conditionId || t.market || '')).trim()
+      const wallet = String(t.proxyWallet || t.user || '').toLowerCase()
+      if (!tokenId || !marketId) continue
+      candidates.push({ ts, tokenId, marketId, side: t.side || '', price, size, notional, wallet })
+    }
+    // If oldest trade in this page is older than cutoff, stop paging
+    const oldest = items.reduce((mn:number, t:any)=>{
+      const r = t.timestamp || t.match_time || t.last_update
+      const v = typeof r === 'number' ? (r > 1e12 ? r : r*1000) : Date.parse(String(r))
+      return Number.isFinite(v) ? Math.min(mn, v) : mn
+    }, Number.POSITIVE_INFINITY)
+    if (oldest < cutoff) break
+    offset += pageSize
+  }
+
+  if (!candidates.length) { log('trades_first.empty', { minNotionalUsd, windowMs }); return null }
+
+  // Enrich top K by notional to limit load
+  candidates.sort((a,b)=> b.notional - a.notional)
+  const top = candidates.slice(0, Math.min(100, candidates.length))
+
+  // Fetch markets once per condition
+  const byMarket = new Map<string, any>()
+  for (const c of top) {
+    if (byMarket.has(c.marketId)) continue
+    try {
+      const m = await gammaApi.getMarket(c.marketId)
+      if (!isMarketLive(m)) { byMarket.set(c.marketId, null); continue }
+      byMarket.set(c.marketId, m)
+    } catch { byMarket.set(c.marketId, null) }
+  }
+
+  // Compute whale scores for wallets appearing in top trades (cap distinct wallets)
+  const wallets = Array.from(new Set(top.map(t=>t.wallet).filter(Boolean))).slice(0, 50)
+  const whaleScores = new Map<string, number>()
+  for (const w of wallets) {
+    try {
+      const stats = await getWalletWhaleStats(w, { windowMs: 6*60*60*1000, maxEvents: 500 })
+      whaleScores.set(w, computeWhaleScore(stats, {}))
+    } catch { whaleScores.set(w, 0) }
+  }
+
+  // Pick best candidate by combined score (notional + whale)
+  let best: any = null
+  for (const t of top) {
+    const m = byMarket.get(t.marketId)
+    if (!m) continue
+    // tags/category enrichment
+    const tags: string[] = []
+    if (Array.isArray(m.tags)) tags.push(...m.tags)
+    if (m.eventSlug) tags.push(String(m.eventSlug))
+    if (m.slug) tags.push(String(m.slug))
+    const whale = whaleScores.get(t.wallet) || 0
+    const score = t.notional + whale * 200 // light whale boost
+    if (!best || score > best._score) {
+      best = { ...t, whaleScore: whale, tags, _score: score }
+    }
+  }
+  if (!best) { log('trades_first.no_live_after_filter', { candidates: candidates.length }); return null }
+  log('trades_first.best', { notional: Math.round(best.notional), whale: best.whaleScore, marketId: best.marketId, tokenId: best.tokenId })
+  delete best._score
+  return best
 }
 
 // Insider Alpha (v0.5)

@@ -1852,6 +1852,27 @@ export function registerCommands(bot: Telegraf) {
       }
       if (latest.length === 0) {
         logger.info('alpha:buffer empty, trying Supabase/store + fallbacks', { tokenIds: tokenIds?.length || 0, query: query || null })
+
+        // New: Trade-first alpha scan (Data API global trades)
+        try {
+          const { scanAlphaFromTrades } = await import('@smtm/data')
+          const best = await scanAlphaFromTrades({ windowMs: 12*60*60*1000, minNotionalUsd: 1000, limit: 1000, maxBatches: 3, onLog: (m, ctx) => logger.info({ ...ctx }, `alpha:trades_first ${m}`) })
+          if (best) {
+            const notionalStr = `$${Math.round(best.notional).toLocaleString()}`
+            let msg = `✨ <b>Fresh Trade</b>\n\n`
+            msg += `${best.side || 'TRADE'} ${notionalStr} @ ${(best.price*100).toFixed(1)}¢\n`
+            try {
+              const m = await gammaApi.getMarket(best.marketId)
+              const url = getPolymarketMarketUrl(m)
+              if (m?.question) msg = `✨ <b>${esc(m.question)}</b>\n\n` + msg
+              if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
+            } catch {}
+            await ctx.reply(msg, { parse_mode: 'HTML' })
+            return
+          }
+        } catch (e) {
+          logger.warn({ err: String((e as any)?.message || e) }, 'alpha:trades_first_error')
+        }
         // Fallback: hit CLOB API for recent big orders (real trades)
         const { findRecentBigOrders } = await import('@smtm/data')
         let bigs = await findRecentBigOrders({
