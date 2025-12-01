@@ -53,6 +53,13 @@ export class ClobApiClient {
   private apiKey?: string;
   private apiSecret?: string;
   private apiPassphrase?: string;
+  private debug = process.env.CLOB_DEBUG === 'true';
+
+  private dbg(msg: string, ctx?: any) {
+    if (this.debug) {
+      try { console.log('[CLOB][debug]', msg, ctx ? JSON.stringify(ctx) : ''); } catch { console.log('[CLOB][debug]', msg); }
+    }
+  }
 
   constructor(timeout = 10000, credentials?: { apiKey?: string; apiSecret?: string; apiPassphrase?: string }) {
     this.apiKey = credentials?.apiKey || process.env.POLYMARKET_API_KEY;
@@ -121,6 +128,7 @@ export class ClobApiClient {
         'User-Agent': 'smtm-bot/1.0 (+https://smtm.ai)'
       },
     });
+    this.dbg('client.init', { baseURL: this.baseURL });
   }
 
   /**
@@ -146,10 +154,12 @@ export class ClobApiClient {
    */
   async getOrderbook(assetId: string): Promise<Orderbook> {
     try {
+      this.dbg('getOrderbook.axios', { token_id: assetId });
       const { data } = await this.client.get<Orderbook>(`/book`, {
         params: { token_id: assetId },
         headers: { Authorization: undefined as any },
       });
+      this.dbg('getOrderbook.ok', { bids: data?.bids?.length || 0, asks: data?.asks?.length || 0 });
       return data;
     } catch (err: any) {
       const status = err?.response?.status;
@@ -157,6 +167,7 @@ export class ClobApiClient {
       console.warn(`[CLOB] axios /book failed (${status}): ${text} — retrying via fetch`);
       const url = new URL(this.baseURL + '/book');
       url.searchParams.set('token_id', assetId);
+      this.dbg('getOrderbook.fetch', { url: url.toString() });
       const res = await fetch(url.toString(), {
         headers: {
           'Content-Type': 'application/json',
@@ -170,7 +181,9 @@ export class ClobApiClient {
         const body = await res.text().catch(() => '');
         throw new Error(`fetch /book ${res.status}: ${body.slice(0, 160)}`);
       }
-      return (await res.json()) as Orderbook;
+      const json = (await res.json()) as Orderbook;
+      this.dbg('getOrderbook.fetch.ok', { bids: json?.bids?.length || 0, asks: json?.asks?.length || 0 });
+      return json;
     }
   }
 
@@ -183,11 +196,13 @@ export class ClobApiClient {
   async getTrades(assetId: string, limit = 100): Promise<Trade[]> {
     // Use public, unauthenticated HTTP endpoint for read-only trades
     try {
+      this.dbg('getTrades.axios', { token_id: assetId, limit });
       const { data } = await this.client.get<Trade[]>('/trades', {
         // Use token_id which is broadly accepted
         params: { token_id: assetId, limit },
       });
       console.log(`[CLOB] Public HTTP trades returned ${Array.isArray(data) ? data.length : 0} records`);
+      this.dbg('getTrades.ok', { count: Array.isArray(data) ? data.length : 0 });
       return Array.isArray(data) ? data.slice(0, limit) : [];
     } catch (err: any) {
       const status = err?.response?.status;
@@ -196,6 +211,7 @@ export class ClobApiClient {
       const url = new URL(this.baseURL + '/trades');
       url.searchParams.set('token_id', assetId);
       url.searchParams.set('limit', String(limit));
+      this.dbg('getTrades.fetch', { url: url.toString() });
       const res = await fetch(url.toString(), {
         headers: {
           'Accept': 'application/json',
@@ -208,6 +224,7 @@ export class ClobApiClient {
       }
       const json = (await res.json()) as Trade[];
       console.log(`[CLOB] fetch /trades returned ${Array.isArray(json) ? json.length : 0} records`);
+      this.dbg('getTrades.fetch.ok', { count: Array.isArray(json) ? json.length : 0 });
       return Array.isArray(json) ? json.slice(0, limit) : [];
     }
   }
