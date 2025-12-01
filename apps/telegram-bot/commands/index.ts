@@ -1867,16 +1867,18 @@ export function registerCommands(bot: Telegraf) {
               if (m?.question) msg = `✨ <b>${esc(m.question)}</b>\n\n` + msg
               if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
             } catch {}
-            // Enrich trader details: PnL, win rate, portfolio
+            // Enrich trader details: PnL, win rate, portfolio, new wallet badge, categories
             try {
               const addr = best.wallet
               const disp = (best as any).displayName || ''
               const profileUrl = getPolymarketProfileUrl(disp || null, addr)
               const short = `${addr.slice(0,6)}…${addr.slice(-4)}`
-              const [pnlAgg, winr, val] = await Promise.all([
+              const [pnlAgg, winr, val, openPos, closedPos] = await Promise.all([
                 dataApi.getUserAccuratePnL(addr).catch(()=>({ totalPnL: 0, realizedPnL:0, unrealizedPnL:0, currentValue:0 })),
                 dataApi.getUserWinRate(addr).catch(()=>({ wins:0, total:0, winRate:0 })),
                 dataApi.getUserValue(addr).catch(()=>({ user: addr, value:'0', positions_count: 0 })),
+                dataApi.getUserPositions({ user: addr, limit: 100 }).catch(()=>[]),
+                dataApi.getClosedPositions(addr, 200).catch(()=>[]),
               ])
               const name = disp || short
               const pnlStr = `${pnlAgg.totalPnL >= 0 ? '+' : '-'}$${Math.abs(Math.round(pnlAgg.totalPnL)).toLocaleString()}`
@@ -1884,12 +1886,36 @@ export function registerCommands(bot: Telegraf) {
               const valNum = parseFloat(String((val as any).value || '0'))
               const valStr = `$${Math.round(valNum).toLocaleString()}`
               const whaleStr = (best as any).whaleScore != null ? ` • 🐋 ${Math.round((best as any).whaleScore)}` : ''
-              msg += `\n👤 Trader: <a href=\"${esc(profileUrl)}\">${esc(name)}</a>${whaleStr}`
+              // New wallet badge heuristics: few positions and young account
+              let totalPositions = (val as any).positions_count || 0
+              if (!totalPositions) totalPositions = (openPos?.length || 0) + (closedPos?.length || 0)
+              let firstTs = Infinity
+              for (const p of [...(openPos||[]), ...(closedPos||[])]) {
+                const cAt = (p as any)?.created_at
+                const t = cAt ? Date.parse(String(cAt)) : NaN
+                if (Number.isFinite(t)) firstTs = Math.min(firstTs, t)
+              }
+              const ageDays = Number.isFinite(firstTs) ? Math.max(0, Math.floor((Date.now() - firstTs) / (24*60*60*1000))) : null
+              const isNewWallet = (totalPositions <= 5) && (ageDays == null || ageDays <= 14)
+              const newBadge = isNewWallet ? ' • 🆕' : ''
+              // Categorization flags
+              const notional = Math.round((best as any).notional || 0)
+              const whaleScore = (best as any).whaleScore || 0
+              const highReturn = (pnlAgg.totalPnL >= 20000 && winr.winRate >= 55)
+              const insiderish = (notional >= 20000) && (isNewWallet || whaleScore >= 80)
+              const catParts: string[] = []
+              if (highReturn) catParts.push('📈 High Return')
+              if (insiderish) catParts.push('🕵️ Potential Insider')
+              // Compose message
+              msg += `\n👤 Trader: <a href=\"${esc(profileUrl)}\">${esc(name)}</a>${whaleStr}${newBadge}`
               msg += `\n📈 PnL: ${pnlStr} • 🏆 Win: ${winStr}`
               msg += `\n💼 Portfolio: ${valStr}`
               if ((best as any).tags && (best as any).tags.length) {
                 const tags = Array.from(new Set((best as any).tags)).slice(0,4).join(', ')
                 msg += `\n🏷️ Tags: ${esc(tags)}`
+              }
+              if (catParts.length) {
+                msg += `\n🔎 ${catParts.join(' • ')}`
               }
             } catch {}
             await ctx.reply(msg, { parse_mode: 'HTML' })
