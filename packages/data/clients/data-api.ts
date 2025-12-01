@@ -444,6 +444,48 @@ export class DataApiClient {
       };
     }
   }
+
+  /**
+   * Best-effort: scrape Polymarket profile to extract hero PnL (ALL) for parity with UI.
+   * This helps when open-position PnL isn't exposed via Data API fields.
+   */
+  async getUserPnLFromProfile(userOrHandle: string): Promise<number | null> {
+    try {
+      const isAddr = /^0x[a-fA-F0-9]{40}$/.test(userOrHandle);
+      const url = isAddr
+        ? `https://polymarket.com/profile/${userOrHandle}`
+        : `https://polymarket.com/profile/%40${encodeURIComponent(userOrHandle)}`;
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Referer': 'https://polymarket.com/',
+        } as any,
+      } as any);
+      if (!res.ok) return null;
+      const html = await res.text();
+      const match = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/);
+      if (!match || !match[1]) return null;
+      const data = JSON.parse(match[1]);
+      // Try common locations for PnL metrics inside dehydrated queries
+      const queries = data?.props?.pageProps?.dehydratedState?.queries || [];
+      let pnl: number | null = null;
+      for (const q of queries) {
+        const st = q?.state?.data;
+        if (!st) continue;
+        // Heuristics: look for keys that look like pnl totals
+        if (typeof st === 'object') {
+          if (typeof st.pnlAll === 'number') pnl = st.pnlAll;
+          if (typeof st.totalPnL === 'number') pnl = st.totalPnL;
+          if (typeof st.pnl === 'number' && !Array.isArray(st)) pnl = st.pnl;
+          if (pnl != null) break;
+        }
+      }
+      return (pnl != null && Number.isFinite(pnl)) ? pnl : null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 // Export singleton instance

@@ -1880,6 +1880,11 @@ export function registerCommands(bot: Telegraf) {
                 dataApi.getUserPositions({ user: addr, limit: 100 }).catch(()=>[]),
                 dataApi.getClosedPositions(addr, 200).catch(()=>[]),
               ])
+              // If computed totalPnL is zero, try scraping profile hero PnL as a parity check
+              if (!pnlAgg.totalPnL) {
+                const uiPnl = await dataApi.getUserPnLFromProfile(addr).catch(()=>null)
+                if (uiPnl != null) (pnlAgg as any).totalPnL = uiPnl
+              }
               const name = disp || short
               const pnlStr = `${pnlAgg.totalPnL >= 0 ? '+' : '-'}$${Math.abs(Math.round(pnlAgg.totalPnL)).toLocaleString()}`
               const winStr = `${Math.round(winr.winRate)}% (${winr.wins}/${winr.total})`
@@ -2180,6 +2185,10 @@ export function registerCommands(bot: Telegraf) {
               dataApi.getUserPositions({ user: addr, limit: 100 }).catch(()=>[]),
               dataApi.getClosedPositions(addr, 200).catch(()=>[]),
             ])
+            if (!(pnlAgg as any).totalPnL) {
+              const uiPnl = await dataApi.getUserPnLFromProfile(addr).catch(()=>null)
+              if (uiPnl != null) (pnlAgg as any).totalPnL = uiPnl
+            }
             const name = disp || short
             const pnlStr = `${pnlAgg.totalPnL >= 0 ? '+' : '-'}$${Math.abs(Math.round(pnlAgg.totalPnL)).toLocaleString()}`
             const winStr = `${Math.round(winr.winRate)}% (${winr.wins}/${winr.total})`
