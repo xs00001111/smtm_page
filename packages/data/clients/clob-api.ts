@@ -397,15 +397,6 @@ export class ClobApiClient {
       return await res.json();
     }
   }
-}
-
-// Export singleton instance
-export const clobApi = new ClobApiClient();
-
-// Export factory function for custom configurations
-export function createClobApiClient(timeout?: number): ClobApiClient {
-  return new ClobApiClient(timeout);
-}
   // Build L2 headers for private endpoints (e.g. /data/trades)
   private buildL2Headers(method: string, path: string, params?: Record<string, any>, body?: any) {
     if (!this.apiKey || !this.apiSecret || !this.apiPassphrase) {
@@ -425,7 +416,6 @@ export function createClobApiClient(timeout?: number): ClobApiClient {
     const bodyStr = body ? (typeof body === 'string' ? body : JSON.stringify(body)) : '';
     // Common pattern: HMAC-SHA256 over ts + method + reqPath + body using apiSecret
     const payload = ts + method.toUpperCase() + reqPath + bodyStr;
-    const hmac = createHash('sha256');
     // Use crypto.createHmac for HMAC rather than hash
     const crypto = require('crypto');
     const sig = crypto.createHmac('sha256', this.apiSecret).update(payload).digest('base64');
@@ -463,3 +453,12 @@ export function createClobApiClient(timeout?: number): ClobApiClient {
       throw e;
     }
   }
+}
+
+// Export singleton instance
+export const clobApi = new ClobApiClient();
+
+// Export factory function for custom configurations
+export function createClobApiClient(timeout?: number): ClobApiClient {
+  return new ClobApiClient(timeout);
+}

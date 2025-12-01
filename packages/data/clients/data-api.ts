@@ -44,6 +44,38 @@ export class DataApiClient {
   }
 
   /**
+   * Get trades (public, no auth) from Data API
+   * Mirrors https://data-api.polymarket.com/trades
+   * Common filters: limit, offset, takerOnly, market, eventId, user, side
+   */
+  async getTrades(params?: {
+    limit?: number;
+    offset?: number;
+    takerOnly?: boolean;
+    filterType?: 'CASH' | 'TOKENS';
+    filterAmount?: number;
+    market?: string[];       // condition IDs
+    eventId?: number[];      // event IDs
+    user?: string;           // 0x address
+    side?: 'BUY' | 'SELL';
+  }): Promise<any[]> {
+    const q: Record<string, any> = {};
+    if (params) {
+      if (params.limit != null) q.limit = params.limit;
+      if (params.offset != null) q.offset = params.offset;
+      if (params.takerOnly != null) q.takerOnly = params.takerOnly;
+      if (params.filterType) q.filterType = params.filterType;
+      if (params.filterAmount != null) q.filterAmount = params.filterAmount;
+      if (params.market?.length) q.market = params.market.join(',');
+      if (params.eventId?.length) q.eventId = params.eventId.join(',');
+      if (params.user) q.user = params.user;
+      if (params.side) q.side = params.side;
+    }
+    const { data } = await this.client.get<any[]>('/trades', { params: q });
+    return Array.isArray(data) ? data : [];
+  }
+
+  /**
    * Get open positions for a user
    * @param params - User address and optional pagination
    * @returns Array of positions
