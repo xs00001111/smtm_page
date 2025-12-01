@@ -414,7 +414,15 @@ export class DataApiClient {
       let unrealizedPnL = 0;
       if (openPositions && openPositions.length > 0) {
         for (const position of openPositions) {
-          unrealizedPnL += parseFloat(position.pnl || '0');
+          // Prefer value - initial_value when available; fallback to provided pnl if present
+          const v = parseFloat(String(position.value ?? '0'));
+          const iv = parseFloat(String(position.initial_value ?? '0'));
+          const computed = (Number.isFinite(v) && Number.isFinite(iv)) ? (v - iv) : NaN;
+          const fromField = parseFloat(String(position.pnl ?? 'NaN'));
+          const delta = Number.isFinite(computed)
+            ? computed
+            : (Number.isFinite(fromField) ? fromField : 0);
+          unrealizedPnL += delta;
         }
       }
 
