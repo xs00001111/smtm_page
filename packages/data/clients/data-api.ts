@@ -352,17 +352,23 @@ export class DataApiClient {
         return { wins: 0, total: 0, winRate: 0 };
       }
 
-      // Group positions by market and calculate net PnL per market
+      // Group positions by market/condition id and calculate net PnL per market
       const marketPnL = new Map<string, number>();
 
-      for (const position of closedPositions) {
-        const market = position.market;
-        const pnl = parseFloat(position.pnl || '0');
-
-        if (!marketPnL.has(market)) {
-          marketPnL.set(market, 0);
-        }
-        marketPnL.set(market, (marketPnL.get(market) || 0) + pnl);
+      for (let i=0; i<closedPositions.length; i++) {
+        const position: any = closedPositions[i] as any;
+        const key = String(
+          position.market ||
+          position.condition_id ||
+          position.conditionId ||
+          position.market_id ||
+          position.marketId ||
+          ''
+        ).trim();
+        const marketKey = key || String(position.id || i);
+        const pnl = parseFloat(String(position.pnl ?? '0'));
+        const prev = marketPnL.get(marketKey) || 0;
+        marketPnL.set(marketKey, prev + (Number.isFinite(pnl) ? pnl : 0));
       }
 
       // Count markets with positive net PnL
