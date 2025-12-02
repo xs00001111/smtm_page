@@ -29,7 +29,7 @@ async function sb<T>(path: string, init?: RequestInit, schema: string = 'public'
   return (ct.includes('application/json') ? await res.json() : (undefined as any))
 }
 
-export async function persistAlphaEvent(ev: AlphaEvent): Promise<void> {
+export async function persistAlphaEvent(ev: AlphaEvent): Promise<string | null> {
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   const available = supabaseAvailable()
   if (!enabled || !available) {
@@ -38,15 +38,18 @@ export async function persistAlphaEvent(ev: AlphaEvent): Promise<void> {
   }
   try {
     const body = [mapAlphaEvent(ev)]
-    await sb('alpha_event', { method: 'POST', body: JSON.stringify(body) }, 'public')
-    logger.info(`alpha:store persisted (public) kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''} alpha=${ev.alpha}`)
+    const rows: any[] = await sb('alpha_event', { method: 'POST', body: JSON.stringify(body) }, 'public')
+    const id = rows && rows[0] && rows[0].id ? String(rows[0].id) : null
+    logger.info(`alpha:store persisted (public) kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''} alpha=${ev.alpha} id=${id}`)
+    return id
   } catch (e) {
     const err = (e as any)?.message || String(e)
     logger.warn(`persistAlphaEvent failed err=${err} kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''}`)
+    return null
   }
 }
 
-export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId?: string; limit?: number; maxAgeSec?: number }): Promise<AlphaEvent[]> {
+export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId?: string; limit?: number; maxAgeSec?: number; excludeIds?: string[] }): Promise<AlphaEvent[]> {
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   const available = supabaseAvailable()
   if (!available || !enabled) {
@@ -58,7 +61,7 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
     const maxAgeSec = Math.max(60, opts?.maxAgeSec || parseInt(env.ALPHA_FRESH_WINDOW_SECONDS || '600', 10))
     const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()
     const params: string[] = [
-      `select=kind,condition_id,token_id,wallet,alpha,whale_score,recommendation,notional_usd,cluster_count,cluster_duration_ms,skew,smart_pool_usd,direction,insider_score,created_at` ,
+      `select=id,kind,condition_id,token_id,wallet,alpha,whale_score,recommendation,notional_usd,cluster_count,cluster_duration_ms,skew,smart_pool_usd,direction,insider_score,created_at` ,
       `created_at=gt.${encodeURIComponent(sinceIso)}`,
       `order=created_at.desc` ,
       `limit=${limit}`
@@ -69,8 +72,8 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
     logger.info(`alpha:store fetch path schema=public ${path}`)
     const rows = await sb<any[]>(path, undefined, 'public')
     logger.info(`alpha:store fetch ok rows=${rows?.length || 0}`)
-    return rows.map(r => ({
-      id: `${new Date(r.created_at).getTime()}-${r.token_id || ''}-${r.wallet || ''}-${r.alpha}`,
+    let events = rows.map(r => ({
+      id: r.id ? String(r.id) : `${new Date(r.created_at).getTime()}-${r.token_id || ''}-${r.wallet || ''}-${r.alpha}`,
       ts: new Date(r.created_at).getTime(),
       kind: r.kind,
       tokenId: r.token_id,
@@ -81,10 +84,63 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
       summary: '',
       data: r,
     } as AlphaEvent))
+    if (opts?.excludeIds && opts.excludeIds.length) {
+      const ex = new Set(opts.excludeIds.map(String))
+      events = events.filter(e => !ex.has(e.id))
+    }
+    return events
   } catch (e) {
     const err = (e as any)?.message || String(e)
     logger.warn(`fetchRecentAlpha failed err=${err} enabled=${enabled} available=${available}`)
     return []
+  }
+}
+
+// View tracking: record that a telegram user has seen an alpha event
+export async function markAlphaSeen(params: { alphaId: string; telegramUserId: number; chatId?: number }): Promise<void> {
+  const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
+  if (!enabled || !supabaseAvailable()) return
+  try {
+    // Write to analytics.alpha_click for per-user view/click tracking
+    const body = [{
+      user_id: params.telegramUserId,
+      chat_id: params.chatId ?? null,
+      alpha_event_id: Number.isFinite(Number(params.alphaId)) ? Number(params.alphaId) : null,
+      kind: 'view',
+      context: {}
+    }]
+    await sb('alpha_click', { method: 'POST', body: JSON.stringify(body) }, 'analytics')
+  } catch (e) {
+    logger.warn('alpha:store markAlphaSeen failed', { err: (e as any)?.message || String(e) })
+  }
+}
+
+// Fetch recently seen alpha ids for a user (to exclude from suggestions)
+export async function fetchSeenAlphaIds(params: { telegramUserId: number; maxAgeSec?: number }): Promise<string[]> {
+  const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
+  if (!enabled || !supabaseAvailable()) return []
+  try {
+    const maxAgeSec = Math.max(60, params.maxAgeSec || parseInt(env.ALPHA_FRESH_WINDOW_SECONDS || '600', 10))
+    const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()
+    const rows = await sb<any[]>(`alpha_click?user_id=eq.${params.telegramUserId}&created_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
+    return (rows || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
+  } catch (e) {
+    logger.warn('alpha:store fetchSeenAlphaIds failed', { err: (e as any)?.message || String(e) })
+    return []
+  }
+}
+
+// Health check for the alpha store
+export async function alphaStoreHealth(): Promise<{ enabled: boolean; available: boolean; canRead: boolean; reason?: string }> {
+  const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
+  const available = supabaseAvailable()
+  if (!enabled) return { enabled, available, canRead: false, reason: 'SUPABASE_ALPHA_ENABLED is not true' }
+  if (!available) return { enabled, available, canRead: false, reason: 'Missing SUPABASE_URL or key' }
+  try {
+    await sb<any[]>(`alpha_event?select=id&limit=1`, undefined, 'public')
+    return { enabled, available, canRead: true }
+  } catch (e) {
+    return { enabled, available, canRead: false, reason: (e as any)?.message || String(e) }
   }
 }
 

@@ -1846,9 +1846,31 @@ export function registerCommands(bot: Telegraf) {
         }
       }
       if (latest.length === 0) {
-        // Try Supabase store if enabled
-        const { fetchRecentAlpha } = await import('../services/alpha-store')
-        latest = await fetchRecentAlpha({ tokenIds, limit: 1 })
+        // DB-first (per-user unseen): surface recent alpha unseen by this user
+        try {
+          const userId = ctx.from?.id
+          if (userId) {
+            const { fetchRecentAlpha, fetchSeenAlphaIds, markAlphaSeen } = await import('../services/alpha-store')
+            const seenIds = await fetchSeenAlphaIds({ telegramUserId: userId, maxAgeSec: 12*60*60 })
+            const recents = await fetchRecentAlpha({ tokenIds, limit: 3, maxAgeSec: 12*60*60, excludeIds: seenIds })
+            for (const a of recents || []) {
+              try {
+                if (!a.conditionId) continue
+                const m = await gammaApi.getMarket(a.conditionId)
+                const closed = m?.closed === true || m?.archived === true
+                const tokens = Array.isArray(m?.tokens) ? m.tokens : []
+                const winner = tokens.some((t:any)=>t?.winner === true)
+                const extreme = tokens.length>0 && tokens.every((t:any)=>{ const p = parseFloat(String(t?.price ?? 'NaN')); return Number.isFinite(p) && (p>=0.99 || p<=0.01) })
+                if (closed || winner || extreme) continue
+                let message = `✨ <b>${esc(a.title || 'Alpha')}</b>\n\n${a.summary || ''}`
+                const url = getPolymarketMarketUrl(m); if (url) message += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
+                await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '👀 Give me more', callback_data: 'alpha:more:trade' }]] } as any })
+                try { await markAlphaSeen({ alphaId: a.id, telegramUserId: userId }) } catch {}
+                return
+              } catch {}
+            }
+          }
+        } catch {}
       }
       if (latest.length === 0) {
         logger.info('alpha:buffer empty, trying Supabase/store + fallbacks', { tokenIds: tokenIds?.length || 0, query: query || null })
@@ -1940,6 +1962,22 @@ export function registerCommands(bot: Telegraf) {
             } catch {}
             const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
             await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
+            // Persist this alpha to DB if enabled
+            try {
+              const { persistAlphaEvent } = await import('../services/alpha-store')
+              const alphaScore = best.notional >= 50000 ? 90 : best.notional >= 20000 ? 80 : best.notional >= 10000 ? 70 : 60
+              await persistAlphaEvent({
+                id: `${Date.now()}-${best.tokenId}-${Math.round(best.notional)}`,
+                ts: Date.now(),
+                kind: 'whale',
+                tokenId: best.tokenId,
+                conditionId: best.marketId || undefined,
+                alpha: alphaScore,
+                title: 'Fresh Trade',
+                summary: `${best.side || 'TRADE'} $${Math.round(best.notional).toLocaleString()} @ ${(best.price*100).toFixed(1)}¢`,
+                data: { weightedNotionalUsd: best.notional, whaleScore: (best as any).whaleScore ?? null, recommendation: null },
+              } as any)
+            } catch {}
             return
           }
         } catch (e) {
@@ -1985,6 +2023,21 @@ export function registerCommands(bot: Telegraf) {
             if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
             const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
             await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
+            // Persist smart-skew alpha
+            try {
+              const { persistAlphaEvent } = await import('../services/alpha-store')
+              await persistAlphaEvent({
+                id: `${Date.now()}-skew-${bestSkew.pair.cond}`,
+                ts: Date.now(),
+                kind: 'smart_skew',
+                tokenId: bestSkew.direction === 'YES' ? bestSkew.pair.yes : bestSkew.pair.no,
+                conditionId: bestSkew.pair.cond,
+                alpha: bestSkew.alpha,
+                title: `Smart-Skew Alpha ${bestSkew.alpha}`,
+                summary: `${bestSkew.direction} • Skew ${Math.round(bestSkew.skew*100)}% • Pool $${Math.round(bestSkew.smartPoolUsd).toLocaleString()}`,
+                data: bestSkew,
+              } as any)
+            } catch {}
             return
           }
         } catch (e) {
@@ -2224,8 +2277,37 @@ export function registerCommands(bot: Telegraf) {
       // Trade-first refresh path
       if (parts[2] === 'trade') {
         try {
+          // DB first: surface a recent, fresh alpha from store (<=12h, active market)
+          try {
+            const { fetchRecentAlpha } = await import('../services/alpha-store')
+            const recents = await fetchRecentAlpha({ limit: 3, maxAgeSec: 12*60*60 })
+            for (const a of recents || []) {
+              try {
+                // Check market freshness (not resolved/100%)
+                if (a.conditionId) {
+                  const m = await gammaApi.getMarket(a.conditionId)
+                  const closed = m?.closed === true || m?.archived === true
+                  const tokens = Array.isArray(m?.tokens) ? m.tokens : []
+                  const winner = tokens.some((t:any)=>t?.winner === true)
+                  const extreme = tokens.length>0 && tokens.every((t:any)=>{
+                    const p = parseFloat(String(t?.price ?? 'NaN')); return Number.isFinite(p) && (p>=0.99 || p<=0.01)
+                  })
+                  if (!closed && !winner && !extreme) {
+                    let message = `✨ <b>${esc(a.title || 'Alpha')}</b>\n\n${a.summary || ''}`
+                    const url = getPolymarketMarketUrl(m); if (url) message += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
+                    const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
+                    await ctx.reply(message, { parse_mode: 'HTML', reply_markup: kb as any })
+                    return
+                  }
+                }
+              } catch {}
+            }
+          } catch {}
           const { scanAlphaFromTrades } = await import('@smtm/data')
-          const best = await scanAlphaFromTrades({ windowMs: 12*60*60*1000, minNotionalUsd: 1000, limit: 1000, maxBatches: 3, onLog: (m, c) => logger.info({ ...c }, `alpha:trades_first ${m}`) })
+          let best = await scanAlphaFromTrades({ windowMs: 12*60*60*1000, minNotionalUsd: 1000, limit: 1000, maxBatches: 3, onLog: (m, c) => logger.info({ ...c }, `alpha:trades_first ${m}`) })
+          if (!best) {
+            try { best = await scanAlphaFromTrades({ windowMs: 12*60*60*1000, minNotionalUsd: 500, limit: 1000, maxBatches: 3, onLog: (m, c) => logger.info({ ...c }, `alpha:trades_first_retry ${m}`) }) } catch {}
+          }
           if (!best) { await ctx.reply('No fresh trades right now. Try again soon.'); return }
           const notionalStr = `$${Math.round(best.notional).toLocaleString()}`
           let msg = `✨ <b>Fresh Trade</b>\n\n`
@@ -2331,6 +2413,32 @@ export function registerCommands(bot: Telegraf) {
     } catch (e) {
       logger.error('alpha:more failed', e)
       try { await ctx.answerCbQuery('Error loading more alpha') } catch {}
+    }
+  })
+
+  // Alpha DB health check
+  bot.command(['alpha-db','alpha_db'], async (ctx) => {
+    try {
+      const { alphaStoreHealth, fetchRecentAlpha, fetchSeenAlphaIds } = await import('../services/alpha-store')
+      const status = await alphaStoreHealth()
+      let msg = '🗄️ Alpha DB Health\n\n'
+      msg += `Enabled: ${status.enabled ? 'yes' : 'no'}\n`
+      msg += `Available: ${status.available ? 'yes' : 'no'}\n`
+      msg += `Readable: ${status.canRead ? 'yes' : 'no'}\n`
+      if (status.reason && !status.canRead) msg += `Reason: ${status.reason}\n`
+      // Recent counts (best-effort)
+      try {
+        const recent = await fetchRecentAlpha({ limit: 3, maxAgeSec: 12*60*60 })
+        msg += `Recent alpha (<=12h): ${recent.length}\n`
+        if (ctx.from?.id) {
+          const seen = await fetchSeenAlphaIds({ telegramUserId: ctx.from.id, maxAgeSec: 12*60*60 })
+          const unseen = recent.filter(r => !seen.includes(r.id)).length
+          msg += `Unseen for you: ${unseen}\n`
+        }
+      } catch {}
+      await ctx.reply(msg)
+    } catch (e) {
+      await ctx.reply('DB health check failed. Check server logs.')
     }
   })
 

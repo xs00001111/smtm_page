@@ -144,6 +144,30 @@ const ending = await gammaApi.getMarketsEndingSoon(10);
 const conditionId = await gammaApi.findConditionId('trump-2024');
 ```
 
+## Alpha and Analytics
+
+- Real-time and historical data can be combined to surface whale trades, smart-skew, and insider signals.
+- This package exposes helpers used by the Telegram bot, including trade-first scans and holders-based smart-skew.
+
+### Alpha Store (Supabase)
+
+- Tables: `public.alpha_event` (signals) and `analytics.alpha_click` (who saw what, when).
+- Env required:
+  - `SUPABASE_URL` and one of `SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_ANON_KEY`
+  - `SUPABASE_ALPHA_ENABLED=true`
+- Insert: `persistAlphaEvent(ev)` returns inserted id; the bot records each surfaced alpha.
+- Fetch: `fetchRecentAlpha({ limit, maxAgeSec, tokenIds?, conditionId?, excludeIds? })`.
+- Views: `markAlphaSeen({ alphaId, telegramUserId, chatId? })` and `fetchSeenAlphaIds({ telegramUserId, maxAgeSec })`.
+
+### Bot Flow (E2E)
+
+1) DB-first: on `/alpha` and “Give me more”, the bot fetches fresh (<=12h) unseen alpha for the user.
+2) If none, it runs trade-first (global Data API `/trades`) and persists any result to `alpha_event`, then marks it seen.
+3) If trade-first finds nothing, it computes smart-skew from holders for top markets; persists and marks seen on success.
+4) The bot never falls back to the legacy progressive per‑market scan.
+
+Freshness and validity checks exclude resolved/archived markets, winners, and 100%/0% priced markets.
+
 ### CLOB API Client
 
 Real-time prices and orderbook.
