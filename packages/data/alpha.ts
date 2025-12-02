@@ -20,7 +20,24 @@ function isMarketLive(m: any): boolean {
   }
   if (Array.isArray(m.tokens) && m.tokens.length > 0) {
     const allExtreme = m.tokens.every((t: any) => extreme(t?.price))
-    if (allExtreme) return false
+    if (allExtreme) {
+      // Allow extreme-priced markets if they ended within the last 24h (late resolution)
+      if (m.end_date_iso) {
+        const endTs = Date.parse(String(m.end_date_iso))
+        if (Number.isFinite(endTs)) {
+          const within = Date.now() - endTs
+          if (within <= 24*60*60*1000) {
+            // treat as live-enough for alerts
+          } else {
+            return false
+          }
+        } else {
+          return false
+        }
+      } else {
+        return false
+      }
+    }
   }
   // Time-based filters
   const now = Date.now()

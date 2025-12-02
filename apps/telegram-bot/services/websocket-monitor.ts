@@ -824,6 +824,26 @@ export class WebSocketMonitorService {
       }
       // Schedule a reconnect with cooldown if disconnected state
       this.scheduleReconnect();
+      return;
+    }
+
+    // Server-side subscription errors (500s) occasionally bubble as onMessage errors.
+    // Detect common phrases and trigger a controlled reconnect with backoff.
+    const msg = (error && (error as any).message) ? String((error as any).message) : ''
+    if (msg.includes('AddSubscriptions') || msg.includes('Internal') || msg.includes('i/o timeout')) {
+      logger.warn('WebSocket upstream error during subscription; scheduling reconnect with backoff');
+      // Avoid the client auto-reconnecting in a tight loop
+      if (this.client) {
+        // @ts-ignore
+        this.client.autoReconnect = false;
+      }
+      this.scheduleReconnect();
+      return;
+    }
+
+    // Fallback: for any other error, attempt a cautious reconnect if we have subs
+    if (this.hasSubscriptions()) {
+      this.scheduleReconnect();
     }
   }
 

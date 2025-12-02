@@ -1964,9 +1964,9 @@ export function registerCommands(bot: Telegraf) {
             await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
             // Persist this alpha to DB if enabled
             try {
-              const { persistAlphaEvent } = await import('../services/alpha-store')
+              const { persistAlphaEvent, markAlphaSeen } = await import('../services/alpha-store')
               const alphaScore = best.notional >= 50000 ? 90 : best.notional >= 20000 ? 80 : best.notional >= 10000 ? 70 : 60
-              await persistAlphaEvent({
+              const insertedId = await persistAlphaEvent({
                 id: `${Date.now()}-${best.tokenId}-${Math.round(best.notional)}`,
                 ts: Date.now(),
                 kind: 'whale',
@@ -1977,6 +1977,9 @@ export function registerCommands(bot: Telegraf) {
                 summary: `${best.side || 'TRADE'} $${Math.round(best.notional).toLocaleString()} @ ${(best.price*100).toFixed(1)}¢`,
                 data: { weightedNotionalUsd: best.notional, whaleScore: (best as any).whaleScore ?? null, recommendation: null },
               } as any)
+              if (insertedId && ctx.from?.id) {
+                await markAlphaSeen({ alphaId: insertedId, telegramUserId: ctx.from.id, chatId: ctx.chat?.id as any })
+              }
             } catch {}
             return
           }
@@ -2023,10 +2026,10 @@ export function registerCommands(bot: Telegraf) {
             if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
             const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
             await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
-            // Persist smart-skew alpha
+            // Persist smart-skew alpha and mark seen
             try {
-              const { persistAlphaEvent } = await import('../services/alpha-store')
-              await persistAlphaEvent({
+              const { persistAlphaEvent, markAlphaSeen } = await import('../services/alpha-store')
+              const insertedId = await persistAlphaEvent({
                 id: `${Date.now()}-skew-${bestSkew.pair.cond}`,
                 ts: Date.now(),
                 kind: 'smart_skew',
@@ -2037,6 +2040,9 @@ export function registerCommands(bot: Telegraf) {
                 summary: `${bestSkew.direction} • Skew ${Math.round(bestSkew.skew*100)}% • Pool $${Math.round(bestSkew.smartPoolUsd).toLocaleString()}`,
                 data: bestSkew,
               } as any)
+              if (insertedId && ctx.from?.id) {
+                await markAlphaSeen({ alphaId: insertedId, telegramUserId: ctx.from.id, chatId: ctx.chat?.id as any })
+              }
             } catch {}
             return
           }
