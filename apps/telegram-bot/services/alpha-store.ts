@@ -35,8 +35,8 @@ export async function persistAlphaEvent(ev: AlphaEvent): Promise<string | null> 
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   const available = supabaseAvailable()
   if (!enabled || !available) {
-    logger.info(`alpha:store persist skipped enabled=${enabled} available=${available} url=${!!env.SUPABASE_URL} key=${!!(env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY)}`)
-    return
+    logger.debug(`alpha:store persist skipped enabled=${enabled} available=${available}`)
+    return null
   }
   try {
     const body = [mapAlphaEvent(ev)]
