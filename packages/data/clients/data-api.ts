@@ -420,6 +420,19 @@ export class DataApiClient {
       let unrealizedPnL = 0;
       if (openPositions && openPositions.length > 0) {
         for (const position of openPositions) {
+          // Skip redeemable/settled positions that often show currentValue=0 while realized is handled in closed-positions
+          const redeemable = (position as any).redeemable === true
+          const endDate = (position as any).endDate || (position as any).end_date
+          if (redeemable) {
+            continue
+          }
+          if (endDate) {
+            const endTs = Date.parse(String(endDate))
+            if (Number.isFinite(endTs) && Date.now() - endTs > 12 * 60 * 60 * 1000) {
+              // Older than 12h after end; treat as settled to avoid double counting negative open PnL
+              continue
+            }
+          }
           // Prefer (currentValue - initialValue) when available; fallback to snake_case; then provided pnl
           const v = parseFloat(String((position as any).currentValue ?? (position as any).value ?? '0'));
           const iv = parseFloat(String((position as any).initialValue ?? (position as any).initial_value ?? '0'));
