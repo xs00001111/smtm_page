@@ -1903,11 +1903,15 @@ export function registerCommands(bot: Telegraf) {
                 dataApi.getClosedPositions(addr, 200).catch(()=>[]),
                 dataApi.getUserProfileMetrics(addr).catch(()=>({})) as any,
               ])
-              // If computed totalPnL is zero, try scraping profile hero PnL as a parity check
-              if (!pnlAgg.totalPnL) {
-                const uiPnl = await dataApi.getUserPnLFromProfile(addr).catch(()=>null)
-                if (uiPnl != null) (pnlAgg as any).totalPnL = uiPnl
-              }
+              // Always fetch UI hero PnL and prefer it when it disagrees materially
+              try {
+                const uiPnl = await dataApi.getUserPnLFromProfile(disp || addr).catch(()=>null)
+                if (uiPnl != null) {
+                  const comp = Number(pnlAgg.totalPnL || 0)
+                  const disagree = (Math.sign(uiPnl) !== Math.sign(comp)) || (Math.abs(uiPnl) > Math.abs(comp) * 1.5)
+                  if (disagree || Math.abs(comp) < 1) (pnlAgg as any).totalPnL = uiPnl
+                }
+              } catch {}
               const name = disp || short
               const pnlStr = `${pnlAgg.totalPnL >= 0 ? '+' : '-'}$${Math.abs(Math.round(pnlAgg.totalPnL)).toLocaleString()}`
               const winStr = `${Math.round(winr.winRate)}% (${winr.wins}/${winr.total})`
@@ -2336,10 +2340,14 @@ export function registerCommands(bot: Telegraf) {
               dataApi.getUserPositions({ user: addr, limit: 100 }).catch(()=>[]),
               dataApi.getClosedPositions(addr, 200).catch(()=>[]),
             ])
-            if (!(pnlAgg as any).totalPnL) {
-              const uiPnl = await dataApi.getUserPnLFromProfile(addr).catch(()=>null)
-              if (uiPnl != null) (pnlAgg as any).totalPnL = uiPnl
-            }
+            try {
+              const uiPnl = await dataApi.getUserPnLFromProfile(disp || addr).catch(()=>null)
+              if (uiPnl != null) {
+                const comp = Number(pnlAgg.totalPnL || 0)
+                const disagree = (Math.sign(uiPnl) !== Math.sign(comp)) || (Math.abs(uiPnl) > Math.abs(comp) * 1.5)
+                if (disagree || Math.abs(comp) < 1) (pnlAgg as any).totalPnL = uiPnl
+              }
+            } catch {}
             const name = disp || short
             const pnlStr = `${pnlAgg.totalPnL >= 0 ? '+' : '-'}$${Math.abs(Math.round(pnlAgg.totalPnL)).toLocaleString()}`
             const winStr = `${Math.round(winr.winRate)}% (${winr.wins}/${winr.total})`
