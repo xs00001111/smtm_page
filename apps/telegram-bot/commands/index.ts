@@ -1835,7 +1835,7 @@ export function registerCommands(bot: Telegraf) {
 
       const { AlphaAggregator } = await import('../services/alpha-aggregator')
       let latest = AlphaAggregator.getLatest(1, tokenIds)
-      // Try cached best trade (10-15 min) before HTTP
+      // Try cached best trade (10-15 min) before HTTP (disabled when DB-first is off)
       if (latest.length === 0 && DB_FIRST_ENABLED) {
         const { TradeBuffer } = await import('@smtm/data')
         const cached = TradeBuffer.getBestForTokens(tokenIds || [], 15*60*1000)
@@ -1847,7 +1847,7 @@ export function registerCommands(bot: Telegraf) {
           return
         }
       }
-      if (latest.length === 0) {
+      if (latest.length === 0 && DB_FIRST_ENABLED) {
         // DB-first (per-user unseen): surface recent alpha unseen by this user
         try {
           const userId = ctx.from?.id
