@@ -2315,32 +2315,7 @@ export function registerCommands(bot: Telegraf) {
       // Trade-first refresh path
       if (parts[2] === 'trade') {
         try {
-          // DB first: surface a recent, fresh alpha from store (<=12h, active market)
-          try {
-            const { fetchRecentAlpha } = await import('../services/alpha-store')
-            const recents = await fetchRecentAlpha({ limit: 3, maxAgeSec: 12*60*60 })
-            for (const a of recents || []) {
-              try {
-                // Check market freshness (not resolved/100%)
-                if (a.conditionId) {
-                  const m = await gammaApi.getMarket(a.conditionId)
-                  const closed = m?.closed === true || m?.archived === true
-                  const tokens = Array.isArray(m?.tokens) ? m.tokens : []
-                  const winner = tokens.some((t:any)=>t?.winner === true)
-                  const extreme = tokens.length>0 && tokens.every((t:any)=>{
-                    const p = parseFloat(String(t?.price ?? 'NaN')); return Number.isFinite(p) && (p>=0.99 || p<=0.01)
-                  })
-                  if (!closed && !winner && !extreme) {
-                    let message = `✨ <b>${esc(a.title || 'Alpha')}</b>\n\n${a.summary || ''}`
-                    const url = getPolymarketMarketUrl(m); if (url) message += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
-                    const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
-                    await ctx.reply(message, { parse_mode: 'HTML', reply_markup: kb as any })
-                    return
-                  }
-                }
-              } catch {}
-            }
-          } catch {}
+          // DB-first disabled during schema enrichment
           const { scanAlphaFromTrades } = await import('@smtm/data')
           let best = await scanAlphaFromTrades({ windowMs: 12*60*60*1000, minNotionalUsd: 1000, limit: 1000, maxBatches: 3, onLog: (m, c) => logger.info({ ...c }, `alpha:trades_first ${m}`) })
           if (!best) {

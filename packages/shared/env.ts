@@ -29,6 +29,7 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
   SUPABASE_ALPHA_ENABLED: z.string().default('true'),
+  SUPABASE_ANALYTICS_ENABLED: z.string().default('false'),
   TELEGRAM_WEBHOOK_URL: z.string().url().optional(),
   // Resolution monitor tuning
   RESOLUTION_MONITOR_ENABLED: z.string().default('false'),
@@ -69,6 +70,7 @@ export const env = envSchema.parse({
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   SUPABASE_ALPHA_ENABLED: process.env.SUPABASE_ALPHA_ENABLED || 'true',
+  SUPABASE_ANALYTICS_ENABLED: process.env.SUPABASE_ANALYTICS_ENABLED || 'false',
   TELEGRAM_WEBHOOK_URL: process.env.TELEGRAM_WEBHOOK_URL,
   RESOLUTION_MONITOR_ENABLED: process.env.RESOLUTION_MONITOR_ENABLED || 'false',
   RESOLUTION_SCAN_BASE_MINUTES: process.env.RESOLUTION_SCAN_BASE_MINUTES || '10',

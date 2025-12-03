@@ -5,6 +5,9 @@ import type { AlphaEvent } from './alpha-aggregator'
 function supabaseAvailable() {
   return !!(env.SUPABASE_URL && (env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY))
 }
+function analyticsEnabled() {
+  return env.SUPABASE_ANALYTICS_ENABLED === 'true'
+}
 
 function key() { return env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || '' }
 
@@ -98,7 +101,7 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
 // View tracking: record that a telegram user has seen an alpha event
 export async function markAlphaSeen(params: { alphaId: string; telegramUserId: number; chatId?: number }): Promise<void> {
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
-  if (!enabled || !supabaseAvailable()) return
+  if (!enabled || !supabaseAvailable() || !analyticsEnabled()) return
   try {
     logger.info(`alpha:store markAlphaSeen try alphaId=${params.alphaId} userId=${params.telegramUserId} chatId=${params.chatId ?? null}`)
     // Write to analytics.alpha_click for per-user view/click tracking
@@ -116,6 +119,7 @@ export async function markAlphaSeen(params: { alphaId: string; telegramUserId: n
     logger.warn(`alpha:store markAlphaSeen failed table=analytics.alpha_click err=${err} alphaId=${params.alphaId} userId=${params.telegramUserId}`)
     // Fallback: try analytics.alpha_view
     try {
+      if (!analyticsEnabled()) return
       const body2 = [{
         user_id: params.telegramUserId,
         chat_id: params.chatId ?? null,
@@ -134,7 +138,7 @@ export async function markAlphaSeen(params: { alphaId: string; telegramUserId: n
 // Fetch recently seen alpha ids for a user (to exclude from suggestions)
 export async function fetchSeenAlphaIds(params: { telegramUserId: number; maxAgeSec?: number }): Promise<string[]> {
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
-  if (!enabled || !supabaseAvailable()) return []
+  if (!enabled || !supabaseAvailable() || !analyticsEnabled()) return []
   try {
     const maxAgeSec = Math.max(60, params.maxAgeSec || parseInt(env.ALPHA_FRESH_WINDOW_SECONDS || '600', 10))
     const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()
@@ -142,6 +146,7 @@ export async function fetchSeenAlphaIds(params: { telegramUserId: number; maxAge
     let ids = (rows || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
     // Also merge from alpha_view as safety net
     try {
+      if (!analyticsEnabled()) return ids
       const rows2 = await sb<any[]>(`alpha_view?user_id=eq.${params.telegramUserId}&seen_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
       const ids2 = (rows2 || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
       ids = Array.from(new Set([...ids, ...ids2]))
