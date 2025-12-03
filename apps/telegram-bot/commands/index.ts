@@ -1862,10 +1862,28 @@ export function registerCommands(bot: Telegraf) {
                 const winner = tokens.some((t:any)=>t?.winner === true)
                 const extreme = tokens.length>0 && tokens.every((t:any)=>{ const p = parseFloat(String(t?.price ?? 'NaN')); return Number.isFinite(p) && (p>=0.99 || p<=0.01) })
                 if (closed || winner || extreme) continue
-                let message = `✨ <b>${esc(a.title || 'Alpha')}</b>\n\n${a.summary || ''}`
+                // Build richer DB-first card using stored columns
+                let message = ''
+                if (a.kind === 'whale') {
+                  message = `✨ <b>Fresh Trade</b>\n\nTRADE`
+                } else if (a.kind === 'smart_skew') {
+                  const direction = (a.data as any)?.direction || ''
+                  const skew = (a.data as any)?.skew ? Math.round((a.data as any).skew*100) : null
+                  const pool = (a.data as any)?.smart_pool_usd != null ? Math.round(Number((a.data as any).smart_pool_usd)).toLocaleString() : null
+                  message = `✨ <b>Smart-Skew Alpha</b>\n\n`
+                  const parts: string[] = []
+                  if (direction) parts.push(direction)
+                  if (skew!=null) parts.push(`Skew ${skew}%`)
+                  if (pool) parts.push(`Pool $${pool}`)
+                  if (parts.length) message += parts.join(' • ')
+                } else if (a.kind === 'insider') {
+                  message = `✨ <b>Insider Alpha</b>`
+                } else {
+                  message = `✨ <b>${esc(a.title || 'Alpha')}</b>\n\n${a.summary || ''}`
+                }
                 const url = getPolymarketMarketUrl(m); if (url) message += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
                 await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '👀 Give me more', callback_data: 'alpha:more:trade' }]] } as any })
-                try { await markAlphaSeen({ alphaId: a.id, telegramUserId: userId }) } catch {}
+                try { await markAlphaSeen({ alphaId: a.id, telegramUserId: userId, chatId: (ctx.chat?.id as any) }) } catch {}
                 return
               } catch {}
             }
