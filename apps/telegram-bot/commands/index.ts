@@ -3,6 +3,8 @@ import { logger } from '../utils/logger';
 import { getTopRewardMarket, formatRewardInfo } from '../services/rewards';
 import { findMarket, findMarketFuzzy, findWhaleFuzzy, findWhaleFuzzyWide, gammaApi, dataApi, clobApi } from '@smtm/data';
 import { wsMonitor } from '../index';
+// Toggle DB-first surfacing of alpha events (disable while DB schema is being enriched)
+const DB_FIRST_ENABLED = false;
 import { botConfig } from '../config/bot';
 import { linkPolymarketAddress, linkPolymarketUsername, unlinkAll, getLinks, parsePolymarketProfile, resolveUsernameToAddress, resolveUsernameToAddressExact } from '../services/links';
 import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, resolveAction, actionUnfollowMarket, actionUnfollowWhaleAll, actionUnfollowWhaleMarket, actionFollowWhaleAllMany } from '../services/actions';
@@ -1834,7 +1836,7 @@ export function registerCommands(bot: Telegraf) {
       const { AlphaAggregator } = await import('../services/alpha-aggregator')
       let latest = AlphaAggregator.getLatest(1, tokenIds)
       // Try cached best trade (10-15 min) before HTTP
-      if (latest.length === 0) {
+      if (latest.length === 0 && DB_FIRST_ENABLED) {
         const { TradeBuffer } = await import('@smtm/data')
         const cached = TradeBuffer.getBestForTokens(tokenIds || [], 15*60*1000)
         if (cached) {
@@ -1997,7 +1999,15 @@ export function registerCommands(bot: Telegraf) {
                 alpha: alphaScore,
                 title: 'Fresh Trade',
                 summary: `${best.side || 'TRADE'} $${Math.round(best.notional).toLocaleString()} @ ${(best.price*100).toFixed(1)}¢`,
-                data: { weightedNotionalUsd: best.notional, whaleScore: (best as any).whaleScore ?? null, recommendation: null },
+                data: {
+                  weightedNotionalUsd: best.notional,
+                  whaleScore: (best as any).whaleScore ?? null,
+                  recommendation: null,
+                  side: best.side || null,
+                  price: best.price || null,
+                  size: best.size || null,
+                  traderDisplayName: (best as any).displayName || null,
+                },
               } as any)
               if (insertedId && ctx.from?.id) {
                 await markAlphaSeen({ alphaId: insertedId, telegramUserId: ctx.from.id, chatId: ctx.chat?.id as any })

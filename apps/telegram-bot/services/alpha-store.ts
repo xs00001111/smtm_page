@@ -114,6 +114,20 @@ export async function markAlphaSeen(params: { alphaId: string; telegramUserId: n
   } catch (e) {
     const err = (e as any)?.message || String(e)
     logger.warn(`alpha:store markAlphaSeen failed table=analytics.alpha_click err=${err} alphaId=${params.alphaId} userId=${params.telegramUserId}`)
+    // Fallback: try analytics.alpha_view
+    try {
+      const body2 = [{
+        user_id: params.telegramUserId,
+        chat_id: params.chatId ?? null,
+        alpha_event_id: Number.isFinite(Number(params.alphaId)) ? Number(params.alphaId) : null,
+        context: {}
+      }]
+      await sb('alpha_view', { method: 'POST', body: JSON.stringify(body2) }, 'analytics')
+      logger.info('alpha:store markAlphaSeen fallback alpha_view ok')
+    } catch (e2) {
+      const err2 = (e2 as any)?.message || String(e2)
+      logger.warn(`alpha:store markAlphaSeen fallback alpha_view failed err=${err2}`)
+    }
   }
 }
 
@@ -125,7 +139,14 @@ export async function fetchSeenAlphaIds(params: { telegramUserId: number; maxAge
     const maxAgeSec = Math.max(60, params.maxAgeSec || parseInt(env.ALPHA_FRESH_WINDOW_SECONDS || '600', 10))
     const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()
     const rows = await sb<any[]>(`alpha_click?user_id=eq.${params.telegramUserId}&created_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
-    return (rows || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
+    let ids = (rows || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
+    // Also merge from alpha_view as safety net
+    try {
+      const rows2 = await sb<any[]>(`alpha_view?user_id=eq.${params.telegramUserId}&seen_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
+      const ids2 = (rows2 || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
+      ids = Array.from(new Set([...ids, ...ids2]))
+    } catch {}
+    return ids
   } catch (e) {
     const err = (e as any)?.message || String(e)
     logger.warn(`alpha:store fetchSeenAlphaIds failed table=analytics.alpha_click err=${err}`)
@@ -160,6 +181,10 @@ function mapAlphaEvent(ev: AlphaEvent) {
     base.whale_score = ev.data?.whaleScore ?? null
     base.recommendation = ev.data?.recommendation ?? null
     base.notional_usd = ev.data?.weightedNotionalUsd ?? null
+    base.side = ev.data?.side ?? null
+    base.price = ev.data?.price ?? null
+    base.size = ev.data?.size ?? null
+    base.trader_display_name = ev.data?.traderDisplayName ?? null
     base.cluster_count = ev.data?.cluster?.count ?? ev.data?.clusterCount ?? null
     base.cluster_duration_ms = ev.data?.cluster?.durationMs ?? ev.data?.clusterDurationMs ?? null
   } else if (ev.kind === 'smart_skew') {
