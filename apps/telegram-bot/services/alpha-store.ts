@@ -17,10 +17,9 @@ async function sb<T>(path: string, init?: RequestInit, schema: string = 'public'
       Authorization: `Bearer ${key()}`,
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
-      // PostgREST schema targeting: Accept-Profile for reads, Content-Profile for writes
-      ...(init?.method && init.method.toUpperCase() !== 'GET'
-        ? { 'Content-Profile': schema }
-        : { 'Accept-Profile': schema }),
+      // PostgREST schema targeting: include Accept-Profile always; Content-Profile for writes
+      'Accept-Profile': schema,
+      ...(init?.method && init.method.toUpperCase() !== 'GET' ? { 'Content-Profile': schema } : {}),
       ...(init?.headers as any),
     },
   } as any)
@@ -101,6 +100,7 @@ export async function markAlphaSeen(params: { alphaId: string; telegramUserId: n
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   if (!enabled || !supabaseAvailable()) return
   try {
+    logger.info('alpha:store markAlphaSeen try', { alphaId: params.alphaId, userId: params.telegramUserId, chatId: params.chatId || null })
     // Write to analytics.alpha_click for per-user view/click tracking
     const body = [{
       user_id: params.telegramUserId,
@@ -110,8 +110,9 @@ export async function markAlphaSeen(params: { alphaId: string; telegramUserId: n
       context: {}
     }]
     await sb('alpha_click', { method: 'POST', body: JSON.stringify(body) }, 'analytics')
+    logger.info('alpha:store markAlphaSeen ok')
   } catch (e) {
-    logger.warn('alpha:store markAlphaSeen failed', { err: (e as any)?.message || String(e) })
+    logger.warn('alpha:store markAlphaSeen failed', { err: (e as any)?.message || String(e), table: 'analytics.alpha_click', payloadAlphaId: params.alphaId, userId: params.telegramUserId })
   }
 }
 
@@ -125,7 +126,7 @@ export async function fetchSeenAlphaIds(params: { telegramUserId: number; maxAge
     const rows = await sb<any[]>(`alpha_click?user_id=eq.${params.telegramUserId}&created_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
     return (rows || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
   } catch (e) {
-    logger.warn('alpha:store fetchSeenAlphaIds failed', { err: (e as any)?.message || String(e) })
+    logger.warn('alpha:store fetchSeenAlphaIds failed', { err: (e as any)?.message || String(e), table: 'analytics.alpha_click' })
     return []
   }
 }
