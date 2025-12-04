@@ -2437,11 +2437,14 @@ export function registerCommands(bot: Telegraf) {
   bot.command(['alpha-db','alpha_db'], async (ctx) => {
     try {
       const { alphaStoreHealth, fetchRecentAlpha, fetchSeenAlphaIds } = await import('../services/alpha-store')
+      const { env } = await import('@smtm/shared/env')
       const status = await alphaStoreHealth()
       let msg = '🗄️ Alpha DB Health\n\n'
       msg += `Enabled: ${status.enabled ? 'yes' : 'no'}\n`
       msg += `Available: ${status.available ? 'yes' : 'no'}\n`
       msg += `Readable: ${status.canRead ? 'yes' : 'no'}\n`
+      msg += `Save Enabled (SUPABASE_ALPHA_ENABLED): ${env.SUPABASE_ALPHA_ENABLED === 'true' ? 'yes' : 'no'}\n`
+      msg += `Analytics Enabled (SUPABASE_ANALYTICS_ENABLED): ${(env as any).SUPABASE_ANALYTICS_ENABLED === 'true' ? 'yes' : 'no'}\n`
       if (status.reason && !status.canRead) msg += `Reason: ${status.reason}\n`
       // Recent counts (best-effort)
       try {
