@@ -128,33 +128,33 @@ export async function markAlphaSeen(params: { alphaId: string; telegramUserId: n
   if (!enabled || !supabaseAvailable() || !analyticsEnabled()) return
   try {
     logger.info(`alpha:store markAlphaSeen try alphaId=${params.alphaId} userId=${params.telegramUserId} chatId=${params.chatId ?? null}`)
-    // Write to analytics.alpha_click for per-user view/click tracking
-    const body = [{
+    // Primary: write to analytics.alpha_view for per-user view tracking
+    const viewBody = [{
       user_id: params.telegramUserId,
       chat_id: params.chatId ?? null,
       alpha_event_id: Number.isFinite(Number(params.alphaId)) ? Number(params.alphaId) : null,
-      kind: 'view',
       context: {}
     }]
-    await sb('alpha_click', { method: 'POST', body: JSON.stringify(body) }, 'analytics')
-    logger.info('alpha:store markAlphaSeen ok')
+    await sb('alpha_view', { method: 'POST', body: JSON.stringify(viewBody) }, 'analytics')
+    logger.info('alpha:store markAlphaSeen ok (alpha_view)')
   } catch (e) {
     const err = (e as any)?.message || String(e)
-    logger.warn(`alpha:store markAlphaSeen failed table=analytics.alpha_click err=${err} alphaId=${params.alphaId} userId=${params.telegramUserId}`)
-    // Fallback: try analytics.alpha_view
+    logger.warn(`alpha:store markAlphaSeen failed table=analytics.alpha_view err=${err} alphaId=${params.alphaId} userId=${params.telegramUserId}`)
+    // Fallback: try analytics.alpha_click (legacy)
     try {
       if (!analyticsEnabled()) return
       const body2 = [{
         user_id: params.telegramUserId,
         chat_id: params.chatId ?? null,
         alpha_event_id: Number.isFinite(Number(params.alphaId)) ? Number(params.alphaId) : null,
+        kind: 'view',
         context: {}
       }]
-      await sb('alpha_view', { method: 'POST', body: JSON.stringify(body2) }, 'analytics')
-      logger.info('alpha:store markAlphaSeen fallback alpha_view ok')
+      await sb('alpha_click', { method: 'POST', body: JSON.stringify(body2) }, 'analytics')
+      logger.info('alpha:store markAlphaSeen fallback alpha_click ok')
     } catch (e2) {
       const err2 = (e2 as any)?.message || String(e2)
-      logger.warn(`alpha:store markAlphaSeen fallback alpha_view failed err=${err2}`)
+      logger.warn(`alpha:store markAlphaSeen fallback alpha_click failed err=${err2}`)
     }
   }
 }
@@ -166,19 +166,19 @@ export async function fetchSeenAlphaIds(params: { telegramUserId: number; maxAge
   try {
     const maxAgeSec = Math.max(60, params.maxAgeSec || parseInt(env.ALPHA_FRESH_WINDOW_SECONDS || '600', 10))
     const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()
-    const rows = await sb<any[]>(`alpha_click?user_id=eq.${params.telegramUserId}&created_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
-    let ids = (rows || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
-    // Also merge from alpha_view as safety net
+    // Primary: alpha_view
+    const vrows = await sb<any[]>(`alpha_view?user_id=eq.${params.telegramUserId}&seen_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
+    let ids = (vrows || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
+    // Merge alpha_click ids as well
     try {
-      if (!analyticsEnabled()) return ids
-      const rows2 = await sb<any[]>(`alpha_view?user_id=eq.${params.telegramUserId}&seen_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
-      const ids2 = (rows2 || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
+      const crows = await sb<any[]>(`alpha_click?user_id=eq.${params.telegramUserId}&created_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
+      const ids2 = (crows || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
       ids = Array.from(new Set([...ids, ...ids2]))
     } catch {}
     return ids
   } catch (e) {
     const err = (e as any)?.message || String(e)
-    logger.warn(`alpha:store fetchSeenAlphaIds failed table=analytics.alpha_click err=${err}`)
+    logger.warn(`alpha:store fetchSeenAlphaIds failed table=analytics (view/click) err=${err}`)
     return []
   }
 }
