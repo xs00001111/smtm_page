@@ -2507,6 +2507,67 @@ export function registerCommands(bot: Telegraf) {
     }
   })
 
+  // Alpha DB preview: list recent alpha events from DB and show seen status without altering UX
+  bot.command(['alpha_db_preview','alpha-db-preview','alpha_db_unseen'], async (ctx) => {
+    try {
+      const { alphaStoreHealth, fetchRecentAlpha, fetchSeenAlphaIds } = await import('../services/alpha-store')
+      const { env } = await import('@smtm/shared/env')
+      const ok = await alphaStoreHealth()
+      if (!ok.enabled || !ok.available) {
+        await ctx.reply('DB save/read disabled or unavailable. Run /alpha_db for details.')
+        return
+      }
+      const userId = ctx.from?.id
+      const seenIds = (userId && env.SUPABASE_ANALYTICS_ENABLED === 'true')
+        ? await fetchSeenAlphaIds({ telegramUserId: userId, maxAgeSec: 12*60*60 })
+        : []
+      const events = await fetchRecentAlpha({ limit: 5, maxAgeSec: 12*60*60 })
+      if (!events.length) {
+        await ctx.reply('No recent alpha in DB (<=12h).')
+        return
+      }
+      // Build a simple list with seen flag
+      let msg = '🗄️ DB Alpha Preview (<=12h)\n\n'
+      let i = 0
+      for (const a of events) {
+        i += 1
+        const seen = seenIds.includes(a.id)
+        msg += `${i}. ${a.kind} • α=${a.alpha} • seen=${seen ? 'yes' : 'no'}\n   id=${a.id} cond=${a.conditionId || ''}\n`
+      }
+      await ctx.reply(msg)
+
+      // Also show a rich preview for the first unseen if available
+      const firstUnseen = events.find(e => !seenIds.includes(e.id)) || events[0]
+      if (firstUnseen?.conditionId) {
+        try {
+          const m = await gammaApi.getMarket(firstUnseen.conditionId)
+          const url = getPolymarketMarketUrl(m)
+          let card = ''
+          if (firstUnseen.kind === 'whale') {
+            const notional = (firstUnseen.data as any)?.notional_usd ?? (firstUnseen.data as any)?.weightedNotionalUsd
+            const side = (firstUnseen.data as any)?.side || 'TRADE'
+            const notionalStr = notional ? `$${Math.round(Number(notional)).toLocaleString()}` : ''
+            card = `✨ <b>Fresh Trade (DB Preview)</b>\n\n${side} ${notionalStr}`
+          } else if (firstUnseen.kind === 'smart_skew') {
+            const direction = (firstUnseen.data as any)?.direction || ''
+            const skew = (firstUnseen.data as any)?.skew ? Math.round((firstUnseen.data as any).skew*100) : null
+            const pool = (firstUnseen.data as any)?.smart_pool_usd != null ? Math.round(Number((firstUnseen.data as any).smart_pool_usd)).toLocaleString() : null
+            card = `✨ <b>Smart-Skew (DB Preview)</b>\n\n${direction}${skew!=null ? ` • Skew ${skew}%` : ''}${pool? ` • Pool $${pool}`:''}`
+          } else {
+            card = `✨ <b>${firstUnseen.title || 'Alpha (DB Preview)'}</b>\n\n${firstUnseen.summary || ''}`
+          }
+          if (m?.question) card = `✨ <b>${esc(m.question)}</b>\n\n` + card.split('\n\n').slice(1).join('\n\n')
+          if (url) card += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
+          await ctx.reply(card, { parse_mode: 'HTML' })
+        } catch {
+          // Ignore preview errors
+        }
+      }
+    } catch (e) {
+      await ctx.reply('DB preview failed. Check logs for details.')
+    }
+  })
+
   // List subscriptions command
   bot.command('list', async (ctx) => {
     const userId = ctx.from!.id;
