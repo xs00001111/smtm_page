@@ -31,6 +31,17 @@ async function sb<T>(path: string, init?: RequestInit, schema: string = 'public'
   return (ct.includes('application/json') ? await res.json() : (undefined as any))
 }
 
+// Minimal shape for alpha_event when PostgREST schema cache is stale
+function mapAlphaEventMinimal(ev: AlphaEvent) {
+  return {
+    kind: ev.kind,
+    condition_id: ev.conditionId || null,
+    token_id: ev.tokenId,
+    alpha: Math.round(ev.alpha),
+    meta: ev.data || {},
+  } as any
+}
+
 export async function persistAlphaEvent(ev: AlphaEvent): Promise<string | null> {
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   const available = supabaseAvailable()
@@ -40,13 +51,26 @@ export async function persistAlphaEvent(ev: AlphaEvent): Promise<string | null> 
   }
   try {
     const body = [mapAlphaEvent(ev)]
-    const rows: any[] = await sb('alpha_event', { method: 'POST', body: JSON.stringify(body) }, 'public')
+    let rows: any[] = await sb('alpha_event', { method: 'POST', body: JSON.stringify(body) }, 'public')
     const id = rows && rows[0] && rows[0].id ? String(rows[0].id) : null
     logger.info(`alpha:store persisted (public) kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''} alpha=${ev.alpha} id=${id}`)
     return id
   } catch (e) {
     const err = (e as any)?.message || String(e)
     logger.warn(`persistAlphaEvent failed err=${err} kind=${ev.kind} tokenId=${ev.tokenId} conditionId=${ev.conditionId || ''}`)
+    // If the failure is due to schema cache not recognizing new columns (PGRST204), retry with minimal payload
+    if (err.includes('PGRST204') || err.includes('schema cache') || err.includes("Could not find")) {
+      try {
+        const fallback = [mapAlphaEventMinimal(ev)]
+        const rows2: any[] = await sb('alpha_event', { method: 'POST', body: JSON.stringify(fallback) }, 'public')
+        const id2 = rows2 && rows2[0] && rows2[0].id ? String(rows2[0].id) : null
+        logger.info(`alpha:store persisted (public) minimal id=${id2}`)
+        return id2
+      } catch (e2) {
+        const err2 = (e2 as any)?.message || String(e2)
+        logger.warn(`persistAlphaEvent minimal fallback failed err=${err2}`)
+      }
+    }
     return null
   }
 }
