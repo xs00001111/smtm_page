@@ -1853,13 +1853,13 @@ export function registerCommands(bot: Telegraf) {
               const winner = tokens.some((t:any)=>t?.winner === true)
               const extreme = tokens.length>0 && tokens.every((t:any)=>{ const p = parseFloat(String(t?.price ?? 'NaN')); return Number.isFinite(p) && (p>=0.99 || p<=0.01) })
               if (closed || winner || extreme) continue
-              logger.info('alpha:db unseen', {
+              logger.info({
                 id: a.id,
                 kind: a.kind,
                 conditionId: a.conditionId,
                 tokenId: a.tokenId,
                 alpha: a.alpha,
-              })
+              }, 'alpha:db unseen')
             } catch {}
           }
         }
@@ -1922,7 +1922,11 @@ export function registerCommands(bot: Telegraf) {
         } catch {}
       }
       if (latest.length === 0) {
-        logger.info('alpha:buffer empty, trying Supabase/store + fallbacks', { tokenIds: tokenIds?.length || 0, query: query || null })
+        if (DB_FIRST_ENABLED) {
+          logger.info('alpha:buffer empty, trying Supabase/store + fallbacks', { tokenIds: tokenIds?.length || 0, query: query || null })
+        } else {
+          logger.info('alpha:live scan starting', { tokenIds: tokenIds?.length || 0, query: query || null })
+        }
 
         // New: Trade-first alpha scan (Data API global trades)
         try {
@@ -2352,7 +2356,7 @@ export function registerCommands(bot: Telegraf) {
               const seenIds = await fetchSeenAlphaIds({ telegramUserId: userId, maxAgeSec: 12*60*60 })
               const recents = await fetchRecentAlpha({ limit: 3, maxAgeSec: 12*60*60, excludeIds: seenIds })
               for (const a of recents || []) {
-                logger.info('alpha:db unseen', { id: a.id, kind: a.kind, conditionId: a.conditionId, tokenId: a.tokenId, alpha: a.alpha })
+                logger.info({ id: a.id, kind: a.kind, conditionId: a.conditionId, tokenId: a.tokenId, alpha: a.alpha }, 'alpha:db unseen')
               }
             }
           } catch {}
