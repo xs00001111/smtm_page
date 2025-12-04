@@ -5,6 +5,8 @@ import { findMarket, findMarketFuzzy, findWhaleFuzzy, findWhaleFuzzyWide, gammaA
 import { wsMonitor } from '../index';
 // Toggle DB-first surfacing of alpha events (disable while DB schema is being enriched)
 const DB_FIRST_ENABLED = false;
+// Log-only probe: fetch unseen fresh alpha from DB and log, but do not display
+const DB_LOG_ONLY_PROBE = true;
 import { botConfig } from '../config/bot';
 import { linkPolymarketAddress, linkPolymarketUsername, unlinkAll, getLinks, parsePolymarketProfile, resolveUsernameToAddress, resolveUsernameToAddressExact } from '../services/links';
 import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, resolveAction, actionUnfollowMarket, actionUnfollowWhaleAll, actionUnfollowWhaleMarket, actionFollowWhaleAllMany } from '../services/actions';
@@ -1835,6 +1837,33 @@ export function registerCommands(bot: Telegraf) {
 
       const { AlphaAggregator } = await import('../services/alpha-aggregator')
       let latest = AlphaAggregator.getLatest(1, tokenIds)
+      // Log-only: probe DB for unseen fresh alpha (<=12h) and log, do not return it to the user
+      try {
+        if (DB_LOG_ONLY_PROBE && ctx.from?.id) {
+          const userId = ctx.from.id
+          const { fetchRecentAlpha, fetchSeenAlphaIds } = await import('../services/alpha-store')
+          const seenIds = await fetchSeenAlphaIds({ telegramUserId: userId, maxAgeSec: 12*60*60 })
+          const recents = await fetchRecentAlpha({ tokenIds, limit: 3, maxAgeSec: 12*60*60, excludeIds: seenIds })
+          for (const a of recents || []) {
+            try {
+              if (!a.conditionId) continue
+              const m = await gammaApi.getMarket(a.conditionId)
+              const closed = m?.closed === true || m?.archived === true
+              const tokens = Array.isArray(m?.tokens) ? m.tokens : []
+              const winner = tokens.some((t:any)=>t?.winner === true)
+              const extreme = tokens.length>0 && tokens.every((t:any)=>{ const p = parseFloat(String(t?.price ?? 'NaN')); return Number.isFinite(p) && (p>=0.99 || p<=0.01) })
+              if (closed || winner || extreme) continue
+              logger.info('alpha:db unseen', {
+                id: a.id,
+                kind: a.kind,
+                conditionId: a.conditionId,
+                tokenId: a.tokenId,
+                alpha: a.alpha,
+              })
+            } catch {}
+          }
+        }
+      } catch {}
       // Try cached best trade (10-15 min) before HTTP (disabled when DB-first is off)
       if (latest.length === 0 && DB_FIRST_ENABLED) {
         const { TradeBuffer } = await import('@smtm/data')
@@ -2315,6 +2344,18 @@ export function registerCommands(bot: Telegraf) {
       // Trade-first refresh path
       if (parts[2] === 'trade') {
         try {
+          // Log-only DB probe for unseen alpha (do not display)
+          try {
+            if (DB_LOG_ONLY_PROBE && ctx.from?.id) {
+              const userId = ctx.from.id
+              const { fetchRecentAlpha, fetchSeenAlphaIds } = await import('../services/alpha-store')
+              const seenIds = await fetchSeenAlphaIds({ telegramUserId: userId, maxAgeSec: 12*60*60 })
+              const recents = await fetchRecentAlpha({ limit: 3, maxAgeSec: 12*60*60, excludeIds: seenIds })
+              for (const a of recents || []) {
+                logger.info('alpha:db unseen', { id: a.id, kind: a.kind, conditionId: a.conditionId, tokenId: a.tokenId, alpha: a.alpha })
+              }
+            }
+          } catch {}
           // DB-first disabled during schema enrichment
           const { scanAlphaFromTrades } = await import('@smtm/data')
           let best = await scanAlphaFromTrades({ windowMs: 12*60*60*1000, minNotionalUsd: 1000, limit: 1000, maxBatches: 3, onLog: (m, c) => logger.info({ ...c }, `alpha:trades_first ${m}`) })
