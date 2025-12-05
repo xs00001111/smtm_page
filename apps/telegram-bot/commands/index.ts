@@ -32,8 +32,28 @@ async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?
       n = n || no
     }
     if (!y || !n) return null
-    const { computeSmartSkewFromHolders } = await import('@smtm/data')
-    const res = await computeSmartSkewFromHolders({ conditionId, yesTokenId: y, noTokenId: n }, { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`) })
+    const { computeSmartSkewFromHolders, computeSmartSkewAlpha } = await import('@smtm/data')
+    // Lower preview threshold to be more permissive
+    let res = await computeSmartSkewFromHolders(
+      { conditionId, yesTokenId: y!, noTokenId: n! },
+      { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), minSmartPoolUsd: 500, maxWallets: 50 }
+    )
+    // Fallback: if holders pool too small or no wallets evaluated, try trades-based skew
+    const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
+    if ((res.smartPoolUsd || 0) < 500 || walletsEvaluated === 0) {
+      try {
+        const tRes = await computeSmartSkewAlpha({ yesTokenId: y!, noTokenId: n! }, { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), whaleScoreThreshold: 65, windowMs: 30*60*1000 })
+        // Prefer trades result when it has a non-zero pool or higher alpha
+        if (tRes && (tRes.smartPoolUsd > 0 || (tRes.alpha || 0) > (res.alpha || 0))) {
+          (tRes as any)._source = 'trades'
+          res = Object.assign({}, res, tRes)
+        } else {
+          (res as any)._source = 'holders'
+        }
+      } catch {}
+    } else {
+      (res as any)._source = 'holders'
+    }
     SkewCache.set(conditionId, { ts: now, result: res })
     return res
   } catch (e) {
@@ -115,6 +135,41 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   }
   if (marketUrl) msg += `\n\n🔗 <a href=\"${esc(marketUrl)}\">Market</a>`
   return msg
+}
+
+// Analyze examples for additional insights (best-effort and cautious)
+async function analyzeSkewExamples(examples: Array<{ wallet: string; valueUsd?: number; whaleScore?: number; pnl?: number }>): Promise<{ hiReturn: number; newBig: number }> {
+  let hiReturn = 0
+  let newBig = 0
+  const top = (examples || []).slice(0, 2)
+  for (const ex of top) {
+    try {
+      if ((ex.pnl || 0) >= 20000) hiReturn += 1
+    } catch {}
+  }
+  // New wallet heuristic (few positions + young account), best-effort, only top 2 to limit calls
+  for (const ex of top) {
+    try {
+      const addr = ex.wallet
+      const big = (ex.valueUsd || 0) >= 10000
+      if (!big) continue
+      const [openPos, closedPos] = await Promise.all([
+        dataApi.getUserPositions({ user: addr, limit: 50 }).catch(()=>[]),
+        dataApi.getClosedPositions(addr, 100).catch(()=>[]),
+      ])
+      let totalPositions = (openPos?.length || 0) + (closedPos?.length || 0)
+      let firstTs = Infinity
+      for (const p of [...(openPos||[]), ...(closedPos||[])]) {
+        const cAt = (p as any)?.created_at
+        const t = cAt ? Date.parse(String(cAt)) : NaN
+        if (Number.isFinite(t)) firstTs = Math.min(firstTs, t)
+      }
+      const ageDays = Number.isFinite(firstTs) ? Math.max(0, Math.floor((Date.now() - firstTs) / (24*60*60*1000))) : null
+      const isNewWallet = (totalPositions <= 5) && (ageDays == null || ageDays <= 14)
+      if (isNewWallet) newBig += 1
+    } catch {}
+  }
+  return { hiReturn, newBig }
 }
 
 // Safe sender with layered fallbacks and verbose diagnostics
@@ -368,7 +423,18 @@ export function registerCommands(bot: Telegraf) {
           const no = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
           const res = await getSmartSkew(cond, yes, no)
           if (!res) { await ctx.reply('⚠️ Not enough data to assess skew.'); return }
-          const card = formatSkewCard(m.question || 'Market', url, res, false)
+          let card = formatSkewCard(m.question || 'Market', url, res, false)
+          // Add cautious insights based on examples when present
+          try {
+            const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+            if (exs.length) {
+              const insights = await analyzeSkewExamples(exs)
+              const bits: string[] = []
+              if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+              if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`) // cautious wording
+              if (bits.length) card += `\n${bits.join(' • ')}`
+            }
+          } catch {}
           await ctx.reply(card, { parse_mode: 'HTML' })
         } catch (e) {
           logger.warn('skew: handler failed', { err: (e as any)?.message })
@@ -2015,7 +2081,18 @@ export function registerCommands(bot: Telegraf) {
           )
           const marketUrl = getPolymarketMarketUrl(market)
           if (res) {
-            const card = formatSkewCard(market.question || 'Market', marketUrl, res, true)
+            let card = formatSkewCard(market.question || 'Market', marketUrl, res, true)
+            // Cautious informational notes
+            try {
+              const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+              if (exs.length) {
+                const insights = await analyzeSkewExamples(exs)
+                const bits: string[] = []
+                if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`) // cautious wording
+                if (bits.length) card += `\n${bits.join(' • ')}`
+              }
+            } catch {}
             const kb = { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skew:${conditionId}` }]] }
             await ctx.reply(card, { parse_mode: 'HTML', reply_markup: kb as any })
           } else {
