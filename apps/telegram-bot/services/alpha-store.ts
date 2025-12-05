@@ -108,20 +108,23 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
     const limit = Math.min(Math.max(opts?.limit || 1, 1), 50)
     const maxAgeSec = Math.max(60, opts?.maxAgeSec || parseInt(env.ALPHA_FRESH_WINDOW_SECONDS || '600', 10))
     const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()
-    const params: string[] = [
-      `select=id,kind,condition_id,token_id,wallet,alpha,whale_score,recommendation,notional_usd,cluster_count,cluster_duration_ms,skew,smart_pool_usd,direction,insider_score,created_at,side,price,size,trader_display_name,market_title,market_slug,market_url` ,
-      `created_at=gt.${encodeURIComponent(sinceIso)}`,
-      `order=created_at.desc` ,
-      `limit=${limit}`
-    ]
-    // Exclude incomplete whale rows (from minimal fallback writes) unless explicitly disabled
-    if (opts?.onlyComplete !== false) {
-      // Keep smart_skew and insider as-is; require whale rows to have wallet, side, price, and notional_usd
-      params.push(`or=(and(kind.eq.whale,side.not.is.null,price.not.is.null,notional_usd.not.is.null,wallet.not.is.null,condition_id.not.is.null),and(kind.eq.smart_skew),and(kind.eq.insider))`)
+    const selectClause = 'id,kind,condition_id,token_id,wallet,alpha,whale_score,recommendation,notional_usd,cluster_count,cluster_duration_ms,skew,smart_pool_usd,direction,insider_score,created_at,side,price,size,trader_display_name,market_title,market_slug,market_url'
+
+    function buildParams(): string[] {
+      const p: string[] = [
+        `select=${selectClause}`,
+        `created_at=gt.${encodeURIComponent(sinceIso)}`,
+        `order=created_at.desc` ,
+        `limit=${limit}`
+      ]
+      if (opts?.onlyComplete !== false) {
+        p.push(`or=(and(kind.eq.whale,side.not.is.null,price.not.is.null,notional_usd.not.is.null,wallet.not.is.null,condition_id.not.is.null),and(kind.eq.smart_skew),and(kind.eq.insider))`)
+      }
+      if (opts?.conditionId) p.push(`condition_id=eq.${encodeURIComponent(opts.conditionId)}`)
+      if (opts?.tokenIds && opts?.tokenIds.length) p.push(`token_id=in.(${opts.tokenIds.map(encodeURIComponent).join(',')})`)
+      return p
     }
-    if (opts?.conditionId) params.push(`condition_id=eq.${encodeURIComponent(opts.conditionId)}`)
-    if (opts?.tokenIds && opts.tokenIds.length) params.push(`token_id=in.(${opts.tokenIds.map(encodeURIComponent).join(',')})`)
-    const path = `alpha_event?${params.join('&')}`
+    const path = `alpha_event?${buildParams().join('&')}`
     logger.info(`alpha:store fetch path schema=public ${path}`)
     const rows = await sb<any[]>(path, undefined, 'public')
     logger.info(`alpha:store fetch ok rows=${rows?.length || 0}`)
