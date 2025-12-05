@@ -87,7 +87,7 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
     const maxAgeSec = Math.max(60, opts?.maxAgeSec || parseInt(env.ALPHA_FRESH_WINDOW_SECONDS || '600', 10))
     const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()
     const params: string[] = [
-      `select=id,kind,condition_id,token_id,wallet,alpha,whale_score,recommendation,notional_usd,cluster_count,cluster_duration_ms,skew,smart_pool_usd,direction,insider_score,created_at` ,
+      `select=id,kind,condition_id,token_id,wallet,alpha,whale_score,recommendation,notional_usd,cluster_count,cluster_duration_ms,skew,smart_pool_usd,direction,insider_score,created_at,side,price,size,trader_display_name,market_title` ,
       `created_at=gt.${encodeURIComponent(sinceIso)}`,
       `order=created_at.desc` ,
       `limit=${limit}`
