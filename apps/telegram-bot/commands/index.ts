@@ -388,10 +388,26 @@ export function registerCommands(bot: Telegraf) {
             } catch (e) {
               logger.warn('Failed to fetch win rate', { user: entry.user_id, error: (e as any)?.message })
             }
+            // Compute whale score (windowed stats)
+            let whaleScoreStr = '—'
+            try {
+              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+              const stats = await getWalletWhaleStats(entry.user_id, { windowMs: 6*60*60*1000, maxEvents: 500 })
+              const ws = computeWhaleScore(stats, {})
+              whaleScoreStr = `${Math.round(ws)}`
+            } catch {}
+            // Compute whale score (windowed stats)
+            let whaleScoreStr = '—'
+            try {
+              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+              const stats = await getWalletWhaleStats(entry.user_id, { windowMs: 6*60*60*1000, maxEvents: 500 })
+              const ws = computeWhaleScore(stats, {})
+              whaleScoreStr = `${Math.round(ws)}`
+            } catch {}
 
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
-            msg += `   🎯 Win Rate: ${winRateStr}\n`
+            msg += `   🎯 Win Rate: ${winRateStr} • 🐋 Whale Score: ${whaleScoreStr}\n`
             msg += `   🔗 ${profileUrl}\n\n`
 
             // Add buttons: Follow and Detailed Stats (on same row)
@@ -1396,7 +1412,7 @@ export function registerCommands(bot: Telegraf) {
 
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
-            msg += `   🎯 Win Rate: ${winRateStr}\n`
+            msg += `   🎯 Win Rate: ${winRateStr} • 🐋 Whale Score: ${whaleScoreStr}\n`
             msg += `   🔗 ${profileUrl}\n\n`
             addresses.push(entry.user_id)
 
@@ -1441,7 +1457,15 @@ export function registerCommands(bot: Telegraf) {
             const addr = raw.toLowerCase()
             const short = addr.slice(0,6)+'...'+addr.slice(-4)
             const url = getPolymarketProfileUrl(null, addr)
+            // Whale score
+            let whaleScoreStr = '—'
+            try {
+              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+              const stats = await getWalletWhaleStats(addr, { windowMs: 6*60*60*1000, maxEvents: 500 })
+              whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
+            } catch {}
             let message = `🐳 Trader Found\n\n`
+            message += `🐋 Whale Score: ${whaleScoreStr}\n`
             message += `ID: ${addr}\n`
             message += `🔗 ${url}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
@@ -1454,7 +1478,15 @@ export function registerCommands(bot: Telegraf) {
           if (hasAtInput) {
             const uname = (parsedForAt?.username || raw).replace(/^@/, '')
             const profileUrl = `https://polymarket.com/@${encodeURIComponent(uname)}`
+            // Whale score
+            let whaleScoreStr = '—'
+            try {
+              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+              const stats = await getWalletWhaleStats(addr, { windowMs: 6*60*60*1000, maxEvents: 500 })
+              whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
+            } catch {}
             let message = `🐳 Profile\n\n`
+            message += `🐋 Whale Score: ${whaleScoreStr}\n`
             message += `Handle: @${uname}\n`
             message += `🔗 ${profileUrl}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
@@ -1545,7 +1577,14 @@ export function registerCommands(bot: Telegraf) {
               const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id)
               message += `${i+1}. ${name} (${short})\n`
               message += `   ID: ${whale.user_id}\n`
-              message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+              // Whale score
+              let whaleScoreStr = '—'
+              try {
+                const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+                const stats = await getWalletWhaleStats(whale.user_id, { windowMs: 6*60*60*1000, maxEvents: 500 })
+                whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
+              } catch {}
+              message += `   💰 PnL: ${pnl} | Vol: ${vol} • 🐋 Score: ${whaleScoreStr}\n`
               message += `   Rank: #${whale.rank}\n`
               message += `   🔗 ${profileUrl}\n\n`
               try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
@@ -1577,10 +1616,17 @@ export function registerCommands(bot: Telegraf) {
             const pnl = whale.pnl > 0 ? `+$${Math.round(whale.pnl).toLocaleString()}` : `-$${Math.abs(Math.round(whale.pnl)).toLocaleString()}`
             const vol = `$${Math.round(whale.vol).toLocaleString()}`
             const profileUrl = getPolymarketProfileUrl(whale.user_name, whale.user_id)
+            // Whale score
+            let whaleScoreStr = '—'
+            try {
+              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+              const stats = await getWalletWhaleStats(whale.user_id, { windowMs: 6*60*60*1000, maxEvents: 500 })
+              whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
+            } catch {}
             let message = `🐳 Exact Match\n\n`
             message += `1. ${name} (${short})\n`
             message += `   ID: ${whale.user_id}\n`
-            message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
+            message += `   💰 PnL: ${pnl} | Vol: ${vol} • 🐋 Score: ${whaleScoreStr}\n`
             message += `   Rank: #${whale.rank}\n`
             message += `   🔗 ${profileUrl}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
@@ -1619,10 +1665,20 @@ export function registerCommands(bot: Telegraf) {
       }
       msg += '\n';
       const keyboard: { text: string; callback_data: string }[][] = []
-      whales.forEach(async ([addr, bal], i) => {
+      // Enrich with whale score (sequential to avoid burst)
+      for (let i=0; i<whales.length; i++) {
+        const [addr, bal] = whales[i]
         const short = addr.slice(0,6)+'...'+addr.slice(-4)
         const profileUrl = getPolymarketProfileUrl(null, addr)
+        // Whale score
+        let whaleScoreStr = '—'
+        try {
+          const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+          const stats = await getWalletWhaleStats(addr, { windowMs: 6*60*60*1000, maxEvents: 500 })
+          whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
+        } catch {}
         msg += `${i+1}. ${short}  — balance: ${Math.round(bal)}\n`
+        msg += `   🐋 Whale Score: ${whaleScoreStr}\n`
         msg += `   ID: ${addr}\n`
         msg += `   🔗 ${profileUrl}\n`
         msg += `   ${'<code>'+esc(`/follow ${addr}`)+'</code>'}\n`
@@ -1633,7 +1689,7 @@ export function registerCommands(bot: Telegraf) {
             { text: `Here`, callback_data: `act:${tokHere}` },
           ])
         } catch {}
-      })
+      }
       msg += `\n💡 Follow market price: <code>${esc(`/follow ${market.condition_id}`)}</code>`
       try {
         const tokMarket = await actionFollowMarket(market.condition_id, market.question)
