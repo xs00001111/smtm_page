@@ -9,6 +9,27 @@ function analyticsEnabled() {
   return env.SUPABASE_ANALYTICS_ENABLED === 'true'
 }
 
+let analyticsSchemaExposed: boolean | null = null
+async function ensureAnalyticsSchemaExposed(): Promise<boolean> {
+  if (analyticsSchemaExposed != null) return analyticsSchemaExposed
+  try {
+    // Probe a lightweight read to confirm analytics schema exposure
+    await sb<any[]>(`alpha_view?select=alpha_event_id&limit=1`, undefined, 'analytics')
+    analyticsSchemaExposed = true
+  } catch (e) {
+    const msg = (e as any)?.message || String(e)
+    // PGRST106: schema not exposed in PostgREST config
+    if (msg.includes('PGRST106') || msg.includes('schema must be one of')) {
+      logger.warn('alpha:store analytics schema not exposed; configure Settings > API > Exposed schemas to include "analytics"')
+      analyticsSchemaExposed = false
+    } else {
+      // Other errors: consider schema available but table may be missing; avoid flapping
+      analyticsSchemaExposed = false
+    }
+  }
+  return analyticsSchemaExposed
+}
+
 function key() { return env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || '' }
 
 async function sb<T>(path: string, init?: RequestInit, schema: string = 'public'): Promise<T> {
@@ -132,6 +153,7 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
 export async function markAlphaSeen(params: { alphaId: string; telegramUserId: number; chatId?: number }): Promise<void> {
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   if (!enabled || !supabaseAvailable() || !analyticsEnabled()) return
+  if (!(await ensureAnalyticsSchemaExposed())) return
   try {
     logger.info(`alpha:store markAlphaSeen try alphaId=${params.alphaId} userId=${params.telegramUserId} chatId=${params.chatId ?? null}`)
     // Primary: write to analytics.alpha_view for per-user view tracking
@@ -142,13 +164,12 @@ export async function markAlphaSeen(params: { alphaId: string; telegramUserId: n
       context: {}
     }]
     await sb('alpha_view', { method: 'POST', body: JSON.stringify(viewBody) }, 'analytics')
-    logger.info('alpha:store markAlphaSeen ok (alpha_view)')
+    logger.info('alpha:store markAlphaSeen ok (analytics.alpha_view)')
   } catch (e) {
     const err = (e as any)?.message || String(e)
     logger.warn(`alpha:store markAlphaSeen failed table=analytics.alpha_view err=${err} alphaId=${params.alphaId} userId=${params.telegramUserId}`)
     // Fallback: try analytics.alpha_click (legacy)
     try {
-      if (!analyticsEnabled()) return
       const body2 = [{
         user_id: params.telegramUserId,
         chat_id: params.chatId ?? null,
@@ -157,10 +178,10 @@ export async function markAlphaSeen(params: { alphaId: string; telegramUserId: n
         context: {}
       }]
       await sb('alpha_click', { method: 'POST', body: JSON.stringify(body2) }, 'analytics')
-      logger.info('alpha:store markAlphaSeen fallback alpha_click ok')
+      logger.info('alpha:store markAlphaSeen fallback analytics.alpha_click ok')
     } catch (e2) {
       const err2 = (e2 as any)?.message || String(e2)
-      logger.warn(`alpha:store markAlphaSeen fallback alpha_click failed err=${err2}`)
+      logger.warn(`alpha:store markAlphaSeen fallback analytics.alpha_click failed err=${err2}`)
     }
   }
 }
@@ -169,10 +190,11 @@ export async function markAlphaSeen(params: { alphaId: string; telegramUserId: n
 export async function fetchSeenAlphaIds(params: { telegramUserId: number; maxAgeSec?: number }): Promise<string[]> {
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   if (!enabled || !supabaseAvailable() || !analyticsEnabled()) return []
+  if (!(await ensureAnalyticsSchemaExposed())) return []
   try {
     const maxAgeSec = Math.max(60, params.maxAgeSec || parseInt(env.ALPHA_FRESH_WINDOW_SECONDS || '600', 10))
     const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()
-    // Primary: alpha_view
+    // Primary: analytics.alpha_view
     const vrows = await sb<any[]>(`alpha_view?user_id=eq.${params.telegramUserId}&seen_at=gt.${encodeURIComponent(sinceIso)}&select=alpha_event_id`, undefined, 'analytics')
     let ids = (vrows || []).map((r:any)=> String(r.alpha_event_id)).filter(Boolean)
     // Merge alpha_click ids as well
