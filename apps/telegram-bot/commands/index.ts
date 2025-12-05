@@ -225,6 +225,40 @@ function tokenToCond(tok: string): string | null {
   } catch { return null }
 }
 
+// Detect event URL without a specific market slug
+function isEventUrlWithoutMarket(u: string): boolean {
+  try {
+    const url = new URL(u)
+    const parts = url.pathname.split('/').filter(Boolean)
+    const idx = parts.findIndex(p => p === 'event')
+    return idx >= 0 && parts[idx+1] && !parts[idx+2]
+  } catch { return false }
+}
+
+// Extract all sub-market slugs from a Polymarket event page
+async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
+  try {
+    const resp = await fetch(eventUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0)' } })
+    if (!resp.ok) return []
+    const html = await resp.text()
+    const match = html.match(/<script[^>]*id=\"__NEXT_DATA__\"[^>]*>([^<]+)<\/script>/)
+    if (!match || !match[1]) return []
+    const nextData = JSON.parse(match[1])
+    const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
+    const slugs = new Set<string>()
+    for (const q of queries) {
+      const data = q?.state?.data
+      if (Array.isArray(data)) {
+        for (const m of data) {
+          const s = m?.slug || m?.market_slug
+          if (s) slugs.add(String(s))
+        }
+      }
+    }
+    return Array.from(slugs)
+  } catch { return [] }
+}
+
 /**
  * Generate Polymarket profile URL for a whale/trader
  * @param username - User's display name (e.g., "Car")
@@ -331,14 +365,23 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
               if (match && match[1]) {
                 const nextData = JSON.parse(match[1])
                 const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
+                // Try to find a markets array and pick the heaviest by volume/liquidity
+                let candidates: any[] = []
                 for (const query of queries) {
-                  const markets = query?.state?.data
-                  if (Array.isArray(markets) && markets.length > 0 && markets[0]?.slug) {
-                    // Found markets array, use the first one
-                    const firstMarket = markets[0]
-                    logger.info('resolveMarketFromInput: extracted first market from event page', { slug: firstMarket.slug })
-                    // Now fetch the full market data by slug
-                    const fullMarket = await findMarket(firstMarket.slug)
+                  const data = query?.state?.data
+                  if (Array.isArray(data) && data.length && (data[0]?.slug || data[0]?.market_slug)) {
+                    candidates = data
+                    break
+                  }
+                }
+                if (candidates.length) {
+                  const ranked = [...candidates].map((m:any)=>({ m, vol: Number(m.volume||0), liq: Number(m.liquidity||0) }))
+                  ranked.sort((a,b)=> (b.vol||0) - (a.vol||0) || (b.liq||0) - (a.liq||0))
+                  const best = ranked[0]?.m
+                  const bestSlug = best?.slug || best?.market_slug
+                  if (bestSlug) {
+                    logger.info('resolveMarketFromInput: picked best sub-market from event', { slug: bestSlug })
+                    const fullMarket = await findMarket(bestSlug)
                     if (fullMarket) return fullMarket
                   }
                 }
@@ -1941,6 +1984,46 @@ export function registerCommands(bot: Telegraf) {
       const commandPromise = (async () => {
         await ctx.reply('🔍 Loading market overview...')
         logger.info('overview: resolving market from input (strict mode)', { query })
+        // Special: If input is an event URL (no specific market slug), compute skew for all sub-markets
+        if (isEventUrlWithoutMarket(query)) {
+          try {
+            const slugs = await getEventSubMarketSlugs(query)
+            if (!slugs.length) {
+              await ctx.reply('❌ No sub-markets found on this event page.');
+              return
+            }
+            // Fetch full markets by slug sequentially to be gentle on rate limits
+            for (const slug of slugs) {
+              try {
+                const m = await findMarket(slug)
+                if (!m) continue
+                const conditionId = m.condition_id || m.conditionId
+                const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                const no  = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                if (!conditionId || !yes || !no) continue
+                const res = await getSmartSkew(conditionId, yes, no)
+                const marketUrl = getPolymarketMarketUrl(m)
+                if (res) {
+                  let card = formatSkewCard(m.question || slug, marketUrl, res, true)
+                  try {
+                    const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                    if (exs.length) {
+                      const insights = await analyzeSkewExamples(exs)
+                      const bits: string[] = []
+                      if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                      if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                      if (bits.length) card += `\n${bits.join(' • ')}`
+                    }
+                  } catch {}
+                  await ctx.reply(card, { parse_mode: 'HTML' })
+                }
+              } catch {}
+            }
+            return
+          } catch (e) {
+            logger.warn('overview: event sub-markets failed', { err: (e as any)?.message })
+          }
+        }
         // Strict mode: only accept URLs or condition IDs, no fuzzy search
         const market = await resolveMarketFromInput(query, false)
         if (!market) {
