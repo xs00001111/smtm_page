@@ -13,6 +13,83 @@ import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, reso
 import { logActionEvent } from '../services/analytics';
 import { recordSurveyResponse } from '../services/survey';
 
+// Lightweight skew cache to avoid recomputation storms (10 minutes)
+const SkewCache: Map<string, { ts: number; result: any }> = new Map()
+const SKEW_CACHE_MS = 10 * 60 * 1000
+
+async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?: string): Promise<any | null> {
+  const now = Date.now()
+  const cached = SkewCache.get(conditionId)
+  if (cached && (now - cached.ts) < SKEW_CACHE_MS) return cached.result
+  try {
+    // Resolve token IDs if not supplied
+    let y = yesTokenId, n = noTokenId
+    if (!y || !n) {
+      const m = await gammaApi.getMarket(conditionId)
+      const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+      const no = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+      y = y || yes
+      n = n || no
+    }
+    if (!y || !n) return null
+    const { computeSmartSkewFromHolders } = await import('@smtm/data')
+    const res = await computeSmartSkewFromHolders({ conditionId, yesTokenId: y, noTokenId: n }, { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`) })
+    SkewCache.set(conditionId, { ts: now, result: res })
+    return res
+  } catch (e) {
+    logger.warn('skew:get failed', { conditionId, err: (e as any)?.message || String(e) })
+    return null
+  }
+}
+
+function formatSkewBadge(res: any | null): string | null {
+  if (!res || !Number.isFinite(res.skew)) return null
+  const s = res.skew
+  if (s >= 0.65) return '⚖️ Skew: Strong YES'
+  if (s <= 0.35) return '⚖️ Skew: Strong NO'
+  return null
+}
+
+function formatSkewCard(title: string, marketUrl: string | null, res: any, detailed = false): string {
+  const dirEmoji = res.direction === 'YES' ? '✅' : (res.direction === 'NO' ? '❌' : '⚖️')
+  const pool = Math.round(Number(res.smartPoolUsd||0)).toLocaleString()
+  const skewPct = Math.round((Number(res.skew)||0)*100)
+  let msg = `⚖️ <b>Smart Money Skew</b>\n\n` +
+            `${dirEmoji} ${res.direction || 'Neutral'} • Skew ${skewPct}% • Pool $${pool}`
+  if (detailed) {
+    // Best-effort volume breakdown if available
+    try {
+      const v = (res as any).volumes
+      if (v && (v.yesWhale!=null || v.noWhale!=null || v.yesRetail!=null || v.noRetail!=null)) {
+        const yesW = v.yesWhale ? `$${Math.round(v.yesWhale).toLocaleString()}` : '$0'
+        const noW = v.noWhale ? `$${Math.round(v.noWhale).toLocaleString()}` : '$0'
+        const yesR = v.yesRetail ? `$${Math.round(v.yesRetail).toLocaleString()}` : '$0'
+        const noR = v.noRetail ? `$${Math.round(v.noRetail).toLocaleString()}` : '$0'
+        msg += `\nBy wallets: 🐋 Yes ${yesW} / No ${noW} • 👥 Yes ${yesR} / No ${noR}`
+      }
+    } catch {}
+    // Examples only when direction is strong (skew >= 65% or <= 35%)
+    try {
+      const s = Number(res.skew||0)
+      const showExamples = s >= 0.65 || s <= 0.35
+      if (showExamples && Array.isArray((res as any).examples) && (res as any).examples.length) {
+        const exs = (res as any).examples.slice(0,3)
+        msg += `\n\nTop Wallets (${res.direction}):\n`
+        for (const ex of exs) {
+          const w = String(ex.wallet)
+          const short = `${w.slice(0,6)}…${w.slice(-4)}`
+          const val = ex.valueUsd!=null ? `$${Math.round(ex.valueUsd).toLocaleString()}` : '$0'
+          const ws = ex.whaleScore!=null ? ` • 🐋 ${Math.round(ex.whaleScore)}` : ''
+          const pnl = ex.pnl!=null ? ` • PnL ${(ex.pnl>=0?'+':'-')}$${Math.abs(Math.round(ex.pnl)).toLocaleString()}` : ''
+          msg += `• <code>${short}</code> — ${val}${ws}${pnl}\n`
+        }
+      }
+    } catch {}
+  }
+  if (marketUrl) msg += `\n\n🔗 <a href=\"${esc(marketUrl)}\">Market</a>`
+  return msg
+}
+
 /**
  * Generate Polymarket profile URL for a whale/trader
  * @param username - User's display name (e.g., "Car")
@@ -196,6 +273,26 @@ export function registerCommands(bot: Telegraf) {
     try {
       const data = (ctx.callbackQuery as any)?.data as string | undefined
       if (!data) return await next()
+      // Smart Skew (markets)
+      if (data.startsWith('skew:')) {
+        const cond = data.split(':')[1]
+        if (!cond) { await ctx.answerCbQuery('Missing market id'); return }
+        await ctx.answerCbQuery('Calculating skew…')
+        try {
+          const m = await gammaApi.getMarket(cond)
+          const url = getPolymarketMarketUrl(m)
+          const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+          const no = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+          const res = await getSmartSkew(cond, yes, no)
+          if (!res) { await ctx.reply('⚠️ Not enough data to assess skew.'); return }
+          const card = formatSkewCard(m.question || 'Market', url, res, false)
+          await ctx.reply(card, { parse_mode: 'HTML' })
+        } catch (e) {
+          logger.warn('skew: handler failed', { err: (e as any)?.message })
+          await ctx.reply('❌ Failed to compute skew. Try again later.')
+        }
+        return
+      }
       // Alpha pagination
       if (data.startsWith('alpha:more:')) {
         const parts = data.split(':')
@@ -491,6 +588,7 @@ export function registerCommands(bot: Telegraf) {
           const keyboard: { text: string; callback_data: string }[][] = []
 
           let followButton: { text: string; callback_data: string } | null = null
+          let skewButton: { text: string; callback_data: string } | null = null
           for (let i = offset; i < displayEnd; i++) {
             const market = markets[i]
             const idx = i + 1
@@ -551,22 +649,32 @@ export function registerCommands(bot: Telegraf) {
             message += `   📊 Price: ${price}%\n`
             message += `   💰 Volume: ${volDisplay}\n`
             message += `   🧊 Liquidity: ${liqDisplay}\n`
+            // Optional skew badge from cache
+            if (cond) {
+              const cached = SkewCache.get(cond)
+              const badge = cached ? formatSkewBadge(cached.result) : null
+              if (badge) message += `   ${badge}\n`
+            }
             if (url) { message += `   🔗 ${url}\n` }
             if (cond) {
               message += `   ➕ Follow: /follow ${cond}\n\n`
               try {
                 const tok = await actionFollowMarket(cond, market.question || 'Market')
                 followButton = { text: `Follow`, callback_data: `act:${tok}` }
+                skewButton = { text: '⚖️ Smart Skew', callback_data: `skew:${cond}` }
               } catch {}
             } else {
               message += `   ➕ Follow: /follow <copy market id from event>\n\n`
             }
           }
 
-          // Add buttons on same row: Follow + "Give me 1 more"
+          // Add buttons on same row: Follow + Smart Skew + "Give me 1 more"
           const buttonRow: { text: string; callback_data: string }[] = []
           if (followButton) {
             buttonRow.push(followButton)
+          }
+          if (skewButton) {
+            buttonRow.push(skewButton)
           }
           if (remaining > 0) {
             buttonRow.push({ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayEnd}` })
@@ -1763,6 +1871,24 @@ export function registerCommands(bot: Telegraf) {
         logger.info('overview: sending orderbook message', { tokenId: token.token_id })
         await ctx.reply(msg, { parse_mode: 'HTML' })
         logger.info('overview: orderbook message sent', { tokenId: token.token_id })
+
+        // Smart Money Skew block (detailed)
+        try {
+          const res = await getSmartSkew(conditionId,
+            (market.tokens||[]).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id,
+            (market.tokens||[]).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id,
+          )
+          const marketUrl = getPolymarketMarketUrl(market)
+          if (res) {
+            const card = formatSkewCard(market.question || 'Market', marketUrl, res, true)
+            const kb = { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skew:${conditionId}` }]] }
+            await ctx.reply(card, { parse_mode: 'HTML', reply_markup: kb as any })
+          } else {
+            await ctx.reply('⚖️ Smart Money Skew: not enough data to assess for this market.', { disable_web_page_preview: true })
+          }
+        } catch (e) {
+          logger.warn('overview: skew block failed', { err: (e as any)?.message })
+        }
 
         // Build net position overview (YES only)
         if (set && set.holders.length > 0) {
@@ -3090,6 +3216,7 @@ export function registerCommands(bot: Telegraf) {
       const displayMarkets = markets.slice(0, displayCount)
 
       let followButton: { text: string; callback_data: string } | null = null
+      let skewButton: { text: string; callback_data: string } | null = null
       let idx = 0
       for (const market of displayMarkets as any[]) {
         idx += 1
@@ -3151,6 +3278,12 @@ export function registerCommands(bot: Telegraf) {
         message += `   📊 Price: ${price}%\n`
         message += `   💰 Volume: ${volDisplay}\n`
         message += `   🧊 Liquidity: ${liqDisplay}\n`
+        // Optional skew badge from cache (do not compute here)
+        if (cond) {
+          const cached = SkewCache.get(cond)
+          const badge = cached ? formatSkewBadge(cached.result) : null
+          if (badge) message += `   ${badge}\n`
+        }
         if (url) { message += `   🔗 ${url}\n` }
         if (cond) {
           message += `   ➕ Follow: /follow ${cond}\n\n`
@@ -3162,14 +3295,18 @@ export function registerCommands(bot: Telegraf) {
           try {
             const tok = await actionFollowMarket(cond, market.question || 'Market')
             followButton = { text: `Follow`, callback_data: `act:${tok}` }
+            skewButton = { text: '⚖️ Smart Skew', callback_data: `skew:${cond}` }
           } catch {}
         }
       }
 
-      // Add buttons on same row: Follow + "Give me 1 more"
+      // Add buttons on same row: Follow + Smart Skew + "Give me 1 more"
       const buttonRow: { text: string; callback_data: string }[] = []
       if (followButton) {
         buttonRow.push(followButton)
+      }
+      if (skewButton) {
+        buttonRow.push(skewButton)
       }
       if (remaining > 0) {
         buttonRow.push({ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayCount}` })
