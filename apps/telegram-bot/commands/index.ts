@@ -190,16 +190,19 @@ export function registerCommands(bot: Telegraf) {
     );
   });
 
-  // Inline button handler for one‑tap follow actions
-  bot.on('callback_query', async (ctx) => {
+  // Inline button handler for alpha pagination (basic) and follow actions
+  // Note: defer alpha:more:trade to the advanced handler below
+  bot.on('callback_query', async (ctx, next) => {
     try {
       const data = (ctx.callbackQuery as any)?.data as string | undefined
-      if (!data) return
+      if (!data) return await next()
       // Alpha pagination
       if (data.startsWith('alpha:more:')) {
-        await ctx.answerCbQuery('Loading more alpha...')
         const parts = data.split(':')
-        const offset = parseInt(parts[2] || '1', 10)
+        // Hand off special "trade" path to the advanced handler
+        if (parts[2] === 'trade') return await next()
+        await ctx.answerCbQuery('Loading more alpha...')
+        const offset = Number.isFinite(parseInt(parts[2] || '1', 10)) ? parseInt(parts[2] || '1', 10) : 1
         const tokenIdsArg = parts[3] ? parts[3].split(',') : undefined
         const { AlphaAggregator } = await import('../services/alpha-aggregator')
         const list = AlphaAggregator.getLatest(offset + 1, tokenIdsArg)
@@ -581,7 +584,7 @@ export function registerCommands(bot: Telegraf) {
         return
       }
 
-      if (!data.startsWith('act:')) return
+      if (!data.startsWith('act:')) return await next()
       const id = data.slice(4)
       const rec = await resolveAction(id)
       if (!rec) { await ctx.answerCbQuery('Action expired. Try again.'); return }
