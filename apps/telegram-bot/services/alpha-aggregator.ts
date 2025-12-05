@@ -12,6 +12,8 @@ export interface AlphaEvent {
   tokenId: string
   conditionId?: string
   marketName?: string
+  marketSlug?: string
+  marketUrl?: string
   wallet?: string
   alpha: number
   title: string

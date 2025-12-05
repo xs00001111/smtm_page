@@ -39,6 +39,7 @@ function mapAlphaEventMinimal(ev: AlphaEvent) {
     token_id: ev.tokenId,
     alpha: Math.round(ev.alpha),
     meta: ev.data || {},
+    market_title: ev.marketName || null,
   } as any
 }
 
@@ -87,7 +88,7 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
     const maxAgeSec = Math.max(60, opts?.maxAgeSec || parseInt(env.ALPHA_FRESH_WINDOW_SECONDS || '600', 10))
     const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()
     const params: string[] = [
-      `select=id,kind,condition_id,token_id,wallet,alpha,whale_score,recommendation,notional_usd,cluster_count,cluster_duration_ms,skew,smart_pool_usd,direction,insider_score,created_at,side,price,size,trader_display_name,market_title` ,
+      `select=id,kind,condition_id,token_id,wallet,alpha,whale_score,recommendation,notional_usd,cluster_count,cluster_duration_ms,skew,smart_pool_usd,direction,insider_score,created_at,side,price,size,trader_display_name,market_title,market_slug,market_url` ,
       `created_at=gt.${encodeURIComponent(sinceIso)}`,
       `order=created_at.desc` ,
       `limit=${limit}`
@@ -205,6 +206,9 @@ function mapAlphaEvent(ev: AlphaEvent) {
     wallet: ev.wallet || null,
     alpha: Math.round(ev.alpha),
     meta: ev.data || {},
+    market_title: ev.marketName || null,
+    market_slug: ev.marketSlug || null,
+    market_url: ev.marketUrl || null,
   }
   if (ev.kind === 'whale') {
     base.whale_score = ev.data?.whaleScore ?? null

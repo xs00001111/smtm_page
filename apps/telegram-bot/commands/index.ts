@@ -2023,11 +2023,19 @@ export function registerCommands(bot: Telegraf) {
             const notionalStr = `$${Math.round(best.notional).toLocaleString()}`
             let msg = `✨ <b>Fresh Trade</b>\n\n`
             msg += `${best.side || 'TRADE'} ${notionalStr} @ ${(best.price*100).toFixed(1)}¢\n`
+            let marketTitle: string | undefined
+            let marketSlug: string | undefined
+            let marketUrl: string | null | undefined
             try {
               const m = await gammaApi.getMarket(best.marketId)
-              const url = getPolymarketMarketUrl(m)
-              if (m?.question) msg = `✨ <b>${esc(m.question)}</b>\n\n` + msg
-              if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
+              marketUrl = getPolymarketMarketUrl(m)
+              // event slug preferred
+              marketSlug = (Array.isArray(m?.events) && m.events[0]?.slug) ? String(m.events[0].slug) : (m?.slug ? String(m.slug) : undefined)
+              if (m?.question) {
+                marketTitle = String(m.question)
+                msg = `✨ <b>${esc(marketTitle)}</b>\n\n` + msg
+              }
+              if (marketUrl) msg += `\n🔗 <a href=\"${esc(marketUrl)}\">Market</a>`
             } catch {}
             // Enrich trader details: PnL, win rate, portfolio, new wallet badge, categories
             try {
@@ -2118,6 +2126,9 @@ export function registerCommands(bot: Telegraf) {
                 conditionId: best.marketId || undefined,
                 wallet: (best as any).wallet || null,
                 alpha: alphaScore,
+                marketName: marketTitle,
+                marketSlug,
+                marketUrl: marketUrl || undefined,
                 title: 'Fresh Trade',
                 summary: `${best.side || 'TRADE'} $${Math.round(best.notional).toLocaleString()} @ ${(best.price*100).toFixed(1)}¢`,
                 data: {
@@ -2640,6 +2651,82 @@ export function registerCommands(bot: Telegraf) {
             const price = d.price
             const priceStr = Number.isFinite(Number(price)) ? ` @ ${(Number(price)*100).toFixed(1)}¢` : ''
             card = `✨ <b>Fresh Trade (DB Preview)</b>\n\n${side}${notionalStr ? ` ${notionalStr}` : ''}${priceStr}`
+            // Enrich trader and context similar to live output
+            try {
+              const addr = (firstAny.wallet || '').toLowerCase()
+              if (addr) {
+                const disp = (d.trader_display_name || d.traderDisplayName || '') as string
+                const profileUrl = getPolymarketProfileUrl(disp || null, addr)
+                const short = `${addr.slice(0,6)}…${addr.slice(-4)}`
+                const [pnlAgg, winr, val, openPos, closedPos, prof] = await Promise.all([
+                  dataApi.getUserAccuratePnL(addr).catch(()=>({ totalPnL: 0, realizedPnL:0, unrealizedPnL:0, currentValue:0 })),
+                  dataApi.getUserWinRate(addr).catch(()=>({ wins:0, total:0, winRate:0 })),
+                  dataApi.getUserValue(addr).catch(()=>({ user: addr, value:'0', positions_count: 0 })),
+                  dataApi.getUserPositions({ user: addr, limit: 100 }).catch(()=>[]),
+                  dataApi.getClosedPositions(addr, 200).catch(()=>[]),
+                  dataApi.getUserProfileMetrics(addr).catch(()=>({})) as any,
+                ])
+                // Prefer UI hero PnL when it disagrees materially
+                try {
+                  const uiPnl = await dataApi.getUserPnLFromProfile(disp || addr).catch(()=>null)
+                  if (uiPnl != null) {
+                    const comp = Number(pnlAgg.totalPnL || 0)
+                    const disagree = (Math.sign(uiPnl) !== Math.sign(comp)) || (Math.abs(uiPnl) > Math.abs(comp) * 1.5)
+                    if (disagree || Math.abs(comp) < 1) (pnlAgg as any).totalPnL = uiPnl
+                  }
+                } catch {}
+                const name = disp || short
+                const pnlStr = `${pnlAgg.totalPnL >= 0 ? '+' : '-'}$${Math.abs(Math.round(pnlAgg.totalPnL)).toLocaleString()}`
+                const winStr = `${Math.round(winr.winRate)}% (${winr.wins}/${winr.total})`
+                const valNum = parseFloat(String((val as any).value || '0'))
+                const valStr = `$${Math.round(valNum).toLocaleString()}`
+                const whaleScore = (d.whale_score != null ? d.whale_score : d.whaleScore)
+                const whaleStr = whaleScore != null ? ` • 🐋 ${Math.round(Number(whaleScore))}` : ''
+                // Trades in last 12h (best-effort)
+                let trades12h = 0
+                try {
+                  const raw = await dataApi.getTrades({ user: addr, limit: 1000 })
+                  const cutoff = Date.now() - 12*60*60*1000
+                  trades12h = (raw || []).filter((t:any)=>{
+                    const r = t.timestamp || t.match_time || t.last_update
+                    const ts = typeof r === 'number' ? (r > 1e12 ? r : r*1000) : Date.parse(String(r))
+                    return Number.isFinite(ts) && ts >= cutoff
+                  }).length
+                } catch {}
+                // New wallet badge heuristics: few positions and young account
+                let totalPositions = (val as any).positions_count || 0
+                if (!totalPositions) totalPositions = (openPos?.length || 0) + (closedPos?.length || 0)
+                let firstTs = Infinity
+                for (const p of [...(openPos||[]), ...(closedPos||[])]) {
+                  const cAt = (p as any)?.created_at
+                  const t = cAt ? Date.parse(String(cAt)) : NaN
+                  if (Number.isFinite(t)) firstTs = Math.min(firstTs, t)
+                }
+                const ageDays = Number.isFinite(firstTs) ? Math.max(0, Math.floor((Date.now() - firstTs) / (24*60*60*1000))) : null
+                const isNewWallet = (totalPositions <= 5) && (ageDays == null || ageDays <= 14)
+                const newBadge = isNewWallet ? ' • 🆕' : ''
+                // Categories
+                const notionalNum = Math.round(Number(notional || 0))
+                const highReturn = (pnlAgg.totalPnL >= 20000 && winr.winRate >= 55)
+                const insiderish = (notionalNum >= 20000) && (isNewWallet || (Number(whaleScore) >= 80))
+                const catParts: string[] = []
+                if (highReturn) catParts.push('📈 High Return')
+                if (insiderish) catParts.push('🕵️ Potential Insider')
+                // Tags: use market data fetched above
+                let tagsLine = ''
+                if (Array.isArray(m?.tags) && m.tags.length) {
+                  const tags = Array.from(new Set(m.tags)).slice(0,4).join(', ')
+                  tagsLine = `\n🏷️ Tags: ${esc(tags)}`
+                }
+                // Append trader section
+                card += `\n\n👤 Trader: <a href=\"${esc(profileUrl)}\">${esc(name)}</a>${whaleStr}${newBadge}`
+                card += `\n📈 PnL: ${pnlStr} • 🏆 Win: ${winStr}`
+                card += `\n💼 Portfolio: ${valStr}`
+                if (trades12h) card += `\n🧾 Trades (12h): ${trades12h}`
+                if (tagsLine) card += tagsLine
+                if (catParts.length) card += `\n🔎 ${catParts.join(' • ')}`
+              }
+            } catch {}
           } else if (firstAny.kind === 'smart_skew') {
             const direction = (firstAny.data as any)?.direction || ''
             const skew = (firstAny.data as any)?.skew ? Math.round((firstAny.data as any).skew*100) : null
