@@ -590,8 +590,7 @@ export function registerCommands(bot: Telegraf) {
           }
           const displayLabel = segmentLabels[segment] || '📈 Trending'
 
-          const escapeMd = (s: string) => s.replace(/[\\*_`\[\]]/g, '\\$&')
-          let message = `${displayLabel}\n\n`
+          let message = `${esc(displayLabel)}\n\n`
           const keyboard: { text: string; callback_data: string }[][] = []
 
           let followButton: { text: string; callback_data: string } | null = null
@@ -599,7 +598,7 @@ export function registerCommands(bot: Telegraf) {
           for (let i = offset; i < displayEnd; i++) {
             const market = markets[i]
             const idx = i + 1
-            const title = escapeMd(String(market.question || 'Untitled market'))
+            const title = esc(String(market.question || 'Untitled market'))
 
             // Parse outcome prices
             let priceNum = NaN
@@ -662,16 +661,16 @@ export function registerCommands(bot: Telegraf) {
               const badge = cached ? formatSkewBadge(cached.result) : null
               if (badge) message += `   ${badge}\n`
             }
-            if (url) { message += `   🔗 ${url}\n` }
+            if (url) { message += `   🔗 ${esc(url)}\n` }
             if (cond) {
-              message += `   ➕ Follow: /follow ${cond}\n\n`
+              message += `   ➕ Follow: <code>/follow ${esc(cond)}</code>\n\n`
               try {
                 const tok = await actionFollowMarket(cond, market.question || 'Market')
                 followButton = { text: `Follow`, callback_data: `act:${tok}` }
                 skewButton = { text: '⚖️ Smart Skew', callback_data: `skew:${cond}` }
               } catch {}
             } else {
-              message += `   ➕ Follow: /follow <copy market id from event>\n\n`
+              message += `   ➕ Follow: <code>${esc('/follow <copy market id from event>')}</code>\n\n`
             }
           }
 
@@ -691,7 +690,7 @@ export function registerCommands(bot: Telegraf) {
           }
 
           message += '💡 Tap Follow to get alerts for any of these markets.'
-          await ctx.reply(message, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } as any })
+          await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
         } catch (e: any) {
           logger.error('markets:showmore: failed to load markets', { error: e?.message })
           await ctx.reply('❌ Unable to load more markets. Try again later.')
@@ -3250,10 +3249,7 @@ export function registerCommands(bot: Telegraf) {
         return;
       }
 
-      // Escape only characters that need escaping in Telegram Markdown: _ * [ ] ` \
-      // Note: Parentheses () do NOT need escaping in Telegram Markdown
-      const escapeMd = (s: string) => s.replace(/[\\*_`\[\]]/g, '\\$&')
-      let message = `${displayLabel}\n\n`;
+      let message = `${esc(displayLabel)}\n\n`;
       const keyboard: { text: string; callback_data: string }[][] = []
 
       // Show only first market initially for cleaner UI
@@ -3267,7 +3263,7 @@ export function registerCommands(bot: Telegraf) {
       let idx = 0
       for (const market of displayMarkets as any[]) {
         idx += 1
-        const title = escapeMd(String(market.question || 'Untitled market'))
+        const title = esc(String(market.question || 'Untitled market'))
 
         // Parse outcome prices from string array
         let priceNum = NaN
@@ -3331,11 +3327,11 @@ export function registerCommands(bot: Telegraf) {
           const badge = cached ? formatSkewBadge(cached.result) : null
           if (badge) message += `   ${badge}\n`
         }
-        if (url) { message += `   🔗 ${url}\n` }
+        if (url) { message += `   🔗 ${esc(url)}\n` }
         if (cond) {
-          message += `   ➕ Follow: /follow ${cond}\n\n`
+          message += `   ➕ Follow: <code>/follow ${esc(cond)}</code>\n\n`
         } else {
-          message += `   ➕ Follow: /follow <copy market id from event>\n\n`
+          message += `   ➕ Follow: <code>${esc('/follow <copy market id from event>')}</code>\n\n`
         }
         // Store follow button for later (to combine with "Give me 1 more" on same row)
         if (cond) {
@@ -3369,7 +3365,7 @@ export function registerCommands(bot: Telegraf) {
         '• /markets breaking - Breaking markets\n' +
         '• /markets new - Newly created';
 
-      await ctx.reply(message, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } as any });
+      await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any });
     } catch (error: any) {
       logger.error('Error in markets command', {
         error: error?.message || String(error),
