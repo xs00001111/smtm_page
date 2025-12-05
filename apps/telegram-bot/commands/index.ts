@@ -122,6 +122,24 @@ async function replySafe(ctx: any, message: string, keyboard?: any): Promise<voi
   throw new Error('markets: all reply attempts failed')
 }
 
+// Encode/decode helpers for callback data (fit Telegram 64-byte limit)
+function condToToken(cond: string): string {
+  try {
+    const hex = String(cond || '')
+    const clean = hex.startsWith('0x') ? hex.slice(2) : hex
+    const b64 = Buffer.from(clean, 'hex').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/,'')
+    return b64
+  } catch { return '' }
+}
+function tokenToCond(tok: string): string | null {
+  try {
+    const b64 = tok.replace(/-/g,'+').replace(/_/g,'/')
+    const buf = Buffer.from(b64, 'base64')
+    const hex = buf.toString('hex')
+    return hex ? ('0x'+hex) : null
+  } catch { return null }
+}
+
 /**
  * Generate Polymarket profile URL for a whale/trader
  * @param username - User's display name (e.g., "Car")
@@ -306,8 +324,14 @@ export function registerCommands(bot: Telegraf) {
       const data = (ctx.callbackQuery as any)?.data as string | undefined
       if (!data) return await next()
       // Smart Skew (markets)
-      if (data.startsWith('skew:')) {
-        const cond = data.split(':')[1]
+      if (data.startsWith('skew:') || data.startsWith('skw:')) {
+        const raw = data.split(':')[1]
+        let cond = raw
+        // Decode base64url token if using compact form (skw:)
+        if (data.startsWith('skw:')) {
+          const dec = tokenToCond(raw)
+          if (dec) cond = dec
+        }
         if (!cond) { await ctx.answerCbQuery('Missing market id'); return }
         await ctx.answerCbQuery('Calculating skew…')
         try {
@@ -698,8 +722,14 @@ export function registerCommands(bot: Telegraf) {
               message += `   ➕ Follow: <code>/follow ${esc(cond)}</code>\n\n`
               try {
                 const tok = await actionFollowMarket(cond, market.question || 'Market')
-                followButton = { text: `Follow`, callback_data: `act:${tok}` }
-                skewButton = { text: '⚖️ Smart Skew', callback_data: `skew:${cond}` }
+                if (String(`act:${tok}`).length <= 64) {
+                  followButton = { text: `Follow`, callback_data: `act:${tok}` }
+                }
+                const cbt = condToToken(cond)
+                const cb = `skw:${cbt}`
+                if (cbt && cb.length <= 64) {
+                  skewButton = { text: '⚖️ Smart Skew', callback_data: cb }
+                }
               } catch {}
             } else {
               message += `   ➕ Follow: <code>${esc('/follow <copy market id from event>')}</code>\n\n`
@@ -3369,8 +3399,14 @@ export function registerCommands(bot: Telegraf) {
         if (cond) {
           try {
             const tok = await actionFollowMarket(cond, market.question || 'Market')
-            followButton = { text: `Follow`, callback_data: `act:${tok}` }
-            skewButton = { text: '⚖️ Smart Skew', callback_data: `skew:${cond}` }
+            if (String(`act:${tok}`).length <= 64) {
+              followButton = { text: `Follow`, callback_data: `act:${tok}` }
+            }
+            const cbt = condToToken(cond)
+            const cb = `skw:${cbt}`
+            if (cbt && cb.length <= 64) {
+              skewButton = { text: '⚖️ Smart Skew', callback_data: cb }
+            }
           } catch {}
         }
       }
