@@ -76,7 +76,7 @@ export async function persistAlphaEvent(ev: AlphaEvent): Promise<string | null> 
   }
 }
 
-export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId?: string; limit?: number; maxAgeSec?: number; excludeIds?: string[] }): Promise<AlphaEvent[]> {
+export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId?: string; limit?: number; maxAgeSec?: number; excludeIds?: string[]; onlyComplete?: boolean }): Promise<AlphaEvent[]> {
   const enabled = env.SUPABASE_ALPHA_ENABLED === 'true'
   const available = supabaseAvailable()
   if (!available || !enabled) {
@@ -93,6 +93,11 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
       `order=created_at.desc` ,
       `limit=${limit}`
     ]
+    // Exclude incomplete whale rows (from minimal fallback writes) unless explicitly disabled
+    if (opts?.onlyComplete !== false) {
+      // Keep smart_skew and insider as-is; require whale rows to have wallet, side, price, and notional_usd
+      params.push(`or=(and(kind.eq.whale,side.not.is.null,price.not.is.null,notional_usd.not.is.null,wallet.not.is.null,condition_id.not.is.null),and(kind.eq.smart_skew),and(kind.eq.insider))`)
+    }
     if (opts?.conditionId) params.push(`condition_id=eq.${encodeURIComponent(opts.conditionId)}`)
     if (opts?.tokenIds && opts.tokenIds.length) params.push(`token_id=in.(${opts.tokenIds.map(encodeURIComponent).join(',')})`)
     const path = `alpha_event?${params.join('&')}`
