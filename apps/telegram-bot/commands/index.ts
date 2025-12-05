@@ -52,10 +52,24 @@ function formatSkewBadge(res: any | null): string | null {
 
 function formatSkewCard(title: string, marketUrl: string | null, res: any, detailed = false): string {
   const dirEmoji = res.direction === 'YES' ? '✅' : (res.direction === 'NO' ? '❌' : '⚖️')
-  const pool = Math.round(Number(res.smartPoolUsd||0)).toLocaleString()
-  const skewPct = Math.round((Number(res.skew)||0)*100)
+  const poolNum = Number(res.smartPoolUsd || 0)
+  const pool = Math.round(poolNum).toLocaleString()
+  const skew = Number(res.skew || 0)
+  const skewPct = Math.round(skew * 100)
+  // Strength labeling
+  let strength = 'Neutral'
+  if (skew >= 0.80 || skew <= 0.20) strength = 'Extreme'
+  else if (skew >= 0.65 || skew <= 0.35) strength = 'Strong'
+  else if (skew >= 0.55 || skew <= 0.45) strength = 'Lean'
   let msg = `⚖️ <b>Smart Money Skew</b>\n\n` +
             `${dirEmoji} ${res.direction || 'Neutral'} • Skew ${skewPct}% • Pool $${pool}`
+  // Always add a compact context line
+  try {
+    const meta = (res as any).meta || {}
+    const wallets = meta.walletsEvaluated != null ? ` • Wallets ${meta.walletsEvaluated}` : ''
+    const thr = meta.whaleScoreThreshold != null ? ` • Whale≥${meta.whaleScoreThreshold}` : ''
+    msg += `\nStrength: ${strength}${wallets}${thr}`
+  } catch {}
   if (detailed) {
     // Best-effort volume breakdown if available
     try {
@@ -85,6 +99,9 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
         }
       }
     } catch {}
+    if (poolNum < 1) {
+      msg += `\n💤 Low smart-pool liquidity`
+    }
   }
   if (marketUrl) msg += `\n\n🔗 <a href=\"${esc(marketUrl)}\">Market</a>`
   return msg
@@ -3426,12 +3443,7 @@ export function registerCommands(bot: Telegraf) {
         keyboard.push(buttonRow)
       }
 
-      message += '💡 Tap Follow to get alerts, or "Give me 1 more" to see more markets.\n\n';
-      message +=
-        '📂 Browse by category (matches Polymarket):\n' +
-        '• /markets - Trending (default)\n' +
-        '• /markets breaking - Breaking markets\n' +
-        '• /markets new - Newly created';
+      // Footer removed for brevity
 
       await replySafe(ctx, message, { inline_keyboard: keyboard })
     } catch (error: any) {
