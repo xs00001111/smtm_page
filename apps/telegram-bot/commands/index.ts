@@ -2518,16 +2518,17 @@ export function registerCommands(bot: Telegraf) {
         return
       }
       const userId = ctx.from?.id
+      // For preview, lower criteria aggressively: look back 72h and do not filter by seen status for display
       const seenIds = (userId && env.SUPABASE_ANALYTICS_ENABLED === 'true')
-        ? await fetchSeenAlphaIds({ telegramUserId: userId, maxAgeSec: 12*60*60 })
+        ? await fetchSeenAlphaIds({ telegramUserId: userId, maxAgeSec: 72*60*60 })
         : []
-      const events = await fetchRecentAlpha({ limit: 5, maxAgeSec: 12*60*60 })
+      const events = await fetchRecentAlpha({ limit: 10, maxAgeSec: 72*60*60 })
       if (!events.length) {
         await ctx.reply('No recent alpha in DB (<=12h).')
         return
       }
       // Build a simple list with seen flag
-      let msg = '🗄️ DB Alpha Preview (<=12h)\n\n'
+      let msg = '🗄️ DB Alpha Preview (<=72h)\n\n'
       let i = 0
       for (const a of events) {
         i += 1
@@ -2537,24 +2538,24 @@ export function registerCommands(bot: Telegraf) {
       await ctx.reply(msg)
 
       // Also show a rich preview for the first unseen if available
-      const firstUnseen = events.find(e => !seenIds.includes(e.id)) || events[0]
-      if (firstUnseen?.conditionId) {
+      const firstAny = events[0]
+      if (firstAny?.conditionId) {
         try {
-          const m = await gammaApi.getMarket(firstUnseen.conditionId)
+          const m = await gammaApi.getMarket(firstAny.conditionId)
           const url = getPolymarketMarketUrl(m)
           let card = ''
-          if (firstUnseen.kind === 'whale') {
-            const notional = (firstUnseen.data as any)?.notional_usd ?? (firstUnseen.data as any)?.weightedNotionalUsd
-            const side = (firstUnseen.data as any)?.side || 'TRADE'
+          if (firstAny.kind === 'whale') {
+            const notional = (firstAny.data as any)?.notional_usd ?? (firstAny.data as any)?.weightedNotionalUsd
+            const side = (firstAny.data as any)?.side || 'TRADE'
             const notionalStr = notional ? `$${Math.round(Number(notional)).toLocaleString()}` : ''
             card = `✨ <b>Fresh Trade (DB Preview)</b>\n\n${side} ${notionalStr}`
-          } else if (firstUnseen.kind === 'smart_skew') {
-            const direction = (firstUnseen.data as any)?.direction || ''
-            const skew = (firstUnseen.data as any)?.skew ? Math.round((firstUnseen.data as any).skew*100) : null
-            const pool = (firstUnseen.data as any)?.smart_pool_usd != null ? Math.round(Number((firstUnseen.data as any).smart_pool_usd)).toLocaleString() : null
+          } else if (firstAny.kind === 'smart_skew') {
+            const direction = (firstAny.data as any)?.direction || ''
+            const skew = (firstAny.data as any)?.skew ? Math.round((firstAny.data as any).skew*100) : null
+            const pool = (firstAny.data as any)?.smart_pool_usd != null ? Math.round(Number((firstAny.data as any).smart_pool_usd)).toLocaleString() : null
             card = `✨ <b>Smart-Skew (DB Preview)</b>\n\n${direction}${skew!=null ? ` • Skew ${skew}%` : ''}${pool? ` • Pool $${pool}`:''}`
           } else {
-            card = `✨ <b>${firstUnseen.title || 'Alpha (DB Preview)'}</b>\n\n${firstUnseen.summary || ''}`
+            card = `✨ <b>${firstAny.title || 'Alpha (DB Preview)'}</b>\n\n${firstAny.summary || ''}`
           }
           if (m?.question) card = `✨ <b>${esc(m.question)}</b>\n\n` + card.split('\n\n').slice(1).join('\n\n')
           if (url) card += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
