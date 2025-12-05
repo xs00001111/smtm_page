@@ -690,7 +690,18 @@ export function registerCommands(bot: Telegraf) {
           }
 
           message += '💡 Tap Follow to get alerts for any of these markets.'
-          await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
+          try {
+            await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
+          } catch (e: any) {
+            logger.error('markets:showmore reply failed (HTML)', { err: e?.message || String(e), desc: (e as any)?.response?.description })
+            try {
+              const plain = message.replace(/<[^>]+>/g, '')
+              await ctx.reply(plain, { reply_markup: { inline_keyboard: keyboard } as any })
+            } catch (e2: any) {
+              logger.error('markets:showmore fallback reply failed (plain)', { err: e2?.message || String(e2) })
+              throw e2
+            }
+          }
         } catch (e: any) {
           logger.error('markets:showmore: failed to load markets', { error: e?.message })
           await ctx.reply('❌ Unable to load more markets. Try again later.')
@@ -3365,7 +3376,19 @@ export function registerCommands(bot: Telegraf) {
         '• /markets breaking - Breaking markets\n' +
         '• /markets new - Newly created';
 
-      await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any });
+      try {
+        await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any });
+      } catch (e: any) {
+        logger.error('markets: reply failed (HTML)', { err: e?.message || String(e), code: (e as any)?.code, desc: (e as any)?.response?.description })
+        // Fallback: strip HTML tags and resend without parse_mode
+        try {
+          const plain = message.replace(/<[^>]+>/g, '')
+          await ctx.reply(plain, { reply_markup: { inline_keyboard: keyboard } as any })
+        } catch (e2: any) {
+          logger.error('markets: fallback reply failed (plain)', { err: e2?.message || String(e2) })
+          throw e2
+        }
+      }
     } catch (error: any) {
       logger.error('Error in markets command', {
         error: error?.message || String(error),
