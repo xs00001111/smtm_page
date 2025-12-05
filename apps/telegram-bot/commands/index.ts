@@ -91,8 +91,11 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   if (skew >= 0.80 || skew <= 0.20) strength = 'Extreme'
   else if (skew >= 0.65 || skew <= 0.35) strength = 'Strong'
   else if (skew >= 0.55 || skew <= 0.45) strength = 'Lean'
+  // Source hint: holdings vs trades (flow)
+  const src = (res as any)?._source === 'trades' ? 'Recent trades (flow)' : 'Current holders (positions)'
   let msg = `⚖️ <b>Smart Money Skew</b>\n\n` +
-            `${dirEmoji} ${res.direction || 'Neutral'} • Skew ${skewPct}% • Pool $${pool}`
+            `${dirEmoji} ${res.direction || 'Neutral'} • Skew ${skewPct}% • Pool $${pool}\n` +
+            `Source: ${src}`
   // Always add a compact context line (only when we have enough data)
   try {
     const meta = (res as any).meta || {}
@@ -1514,7 +1517,7 @@ export function registerCommands(bot: Telegraf) {
                     try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${i}`, callback_data: `act:${tok}` }]) } catch {}
                     addresses.push(addr)
                   }
-                  try { const tokAll = await actionFollowWhaleAllMany(addresses); keyboard.push([{ text: 'Follow Top 10', callback_data: `act:${tokAll}` }]) } catch {}
+                  try { const tokAll = await actionFollowWhaleAllMany(addresses); const cb = `act:${tokAll}`; if (cb.length<=64) keyboard.push([{ text: 'Follow Top 10', callback_data: cb }]) } catch {}
                   await ctx.reply(msg, { reply_markup: { inline_keyboard: keyboard } as any })
                   return
                 }
@@ -1565,7 +1568,8 @@ export function registerCommands(bot: Telegraf) {
             const buttons: { text: string; callback_data: string }[] = []
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
-              buttons.push({ text: `🐳 Follow`, callback_data: `act:${tok}` })
+              const cb = `act:${tok}`
+              if (cb.length <= 64) buttons.push({ text: `🐳 Follow`, callback_data: cb })
             } catch {}
             buttons.push({ text: `📊 Stats`, callback_data: `whale:stats:${entry.user_id}` })
             keyboard.push(buttons)
@@ -1577,8 +1581,8 @@ export function registerCommands(bot: Telegraf) {
             keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `whales:showmore:${nextOffset}` }])
           }
 
-          msg += '💡 Tap 🐳 Follow to get alerts, 📊 Stats for accurate PnL, or "Give me 1 more" to see more traders.'
-          await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
+          msg += '💡 Tap 🐳 Follow to get alerts, or 📊 Stats for accurate PnL.'
+          await replySafe(ctx, msg, { inline_keyboard: keyboard })
           return
         } catch (e: any) {
           logger.error('whales: leaderboard failed', { error: e?.message })
@@ -1614,8 +1618,8 @@ export function registerCommands(bot: Telegraf) {
             message += `ID: ${addr}\n`
             message += `🔗 ${url}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
-            try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${short}`, callback_data: `act:${tok}` }]) } catch {}
-            await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+            try { const tok = await actionFollowWhaleAll(addr); const cb = `act:${tok}`; if (cb.length<=64) keyboard.push([{ text: `Follow ${short}`, callback_data: cb }]) } catch {}
+                await replySafe(ctx, message, { inline_keyboard: keyboard })
             return
           }
           const parsedForAt = parsePolymarketProfile(raw)
@@ -1623,15 +1627,7 @@ export function registerCommands(bot: Telegraf) {
           if (hasAtInput) {
             const uname = (parsedForAt?.username || raw).replace(/^@/, '')
             const profileUrl = `https://polymarket.com/@${encodeURIComponent(uname)}`
-            // Whale score
-            let whaleScoreStr = '—'
-            try {
-              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
-              const stats = await getWalletWhaleStats(addr, { windowMs: 6*60*60*1000, maxEvents: 500 })
-              whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
-            } catch {}
             let message = `🐳 Profile\n\n`
-            message += `🐋 Whale Score: ${whaleScoreStr}\n`
             message += `Handle: @${uname}\n`
             message += `🔗 ${profileUrl}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
@@ -1639,8 +1635,17 @@ export function registerCommands(bot: Telegraf) {
               const addr = await resolveUsernameToAddress(uname)
               if (addr) {
                 const short = addr.slice(0,6)+'...'+addr.slice(-4)
+                // Whale score (after we have address)
+                let whaleScoreStr = '—'
+                try {
+                  const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+                  const stats = await getWalletWhaleStats(addr, { windowMs: 6*60*60*1000, maxEvents: 500 })
+                  whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
+                } catch {}
+                message = `🐳 Profile\n\n🐋 Whale Score: ${whaleScoreStr}\n` + message.split('\n').slice(2).join('\n')
                 const tok = await actionFollowWhaleAll(addr)
-                keyboard.push([{ text: `Follow ${short}`, callback_data: `act:${tok}` }])
+                const cb = `act:${tok}`
+                if (cb.length<=64) keyboard.push([{ text: `Follow ${short}`, callback_data: cb }])
               }
             } catch {}
             await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
@@ -1674,7 +1679,7 @@ export function registerCommands(bot: Telegraf) {
                   message += `   🔗 ${profileUrl}\n\n`
                   try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
                 }
-                await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+                await replySafe(ctx, message, { inline_keyboard: keyboard })
                 return
               }
               // Save exact match with negative PnL, but continue searching
@@ -1735,7 +1740,7 @@ export function registerCommands(bot: Telegraf) {
               try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
             }
             message += '💡 Use /whales for global leaderboard or add a market id to scope.'
-            await ctx.reply(message, { reply_markup: { inline_keyboard: keyboard } as any })
+            await replySafe(ctx, message, { inline_keyboard: keyboard })
             return
           }
 
