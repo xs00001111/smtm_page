@@ -90,6 +90,38 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   return msg
 }
 
+// Safe sender with layered fallbacks and verbose diagnostics
+async function replySafe(ctx: any, message: string, keyboard?: any): Promise<void> {
+  const kb = keyboard ? { reply_markup: keyboard } : undefined
+  const len = message?.length || 0
+  try {
+    await ctx.reply(message, { parse_mode: 'HTML', ...(kb as any) })
+    return
+  } catch (e: any) {
+    const desc = e?.response?.description
+    logger.error(`markets: send HTML failed len=${len} desc=${desc || e?.message || e}`)
+  }
+  try {
+    const plain = String(message || '').replace(/<[^>]+>/g, '')
+    await ctx.reply(plain, kb as any)
+    return
+  } catch (e2: any) {
+    const desc2 = e2?.response?.description
+    logger.error(`markets: send plain failed len=${len} desc=${desc2 || e2?.message || e2}`)
+  }
+  if (keyboard) {
+    try {
+      await ctx.reply(message, { parse_mode: 'HTML' as any })
+      await ctx.reply('Actions:', { reply_markup: keyboard as any })
+      return
+    } catch (e3: any) {
+      const desc3 = e3?.response?.description
+      logger.error(`markets: split send failed desc=${desc3 || e3?.message || e3}`)
+    }
+  }
+  throw new Error('markets: all reply attempts failed')
+}
+
 /**
  * Generate Polymarket profile URL for a whale/trader
  * @param username - User's display name (e.g., "Car")
@@ -690,18 +722,7 @@ export function registerCommands(bot: Telegraf) {
           }
 
           message += '💡 Tap Follow to get alerts for any of these markets.'
-          try {
-            await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
-          } catch (e: any) {
-            logger.error('markets:showmore reply failed (HTML)', { err: e?.message || String(e), desc: (e as any)?.response?.description })
-            try {
-              const plain = message.replace(/<[^>]+>/g, '')
-              await ctx.reply(plain, { reply_markup: { inline_keyboard: keyboard } as any })
-            } catch (e2: any) {
-              logger.error('markets:showmore fallback reply failed (plain)', { err: e2?.message || String(e2) })
-              throw e2
-            }
-          }
+          await replySafe(ctx, message, { inline_keyboard: keyboard })
         } catch (e: any) {
           logger.error('markets:showmore: failed to load markets', { error: e?.message })
           await ctx.reply('❌ Unable to load more markets. Try again later.')
@@ -3376,19 +3397,7 @@ export function registerCommands(bot: Telegraf) {
         '• /markets breaking - Breaking markets\n' +
         '• /markets new - Newly created';
 
-      try {
-        await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any });
-      } catch (e: any) {
-        logger.error('markets: reply failed (HTML)', { err: e?.message || String(e), code: (e as any)?.code, desc: (e as any)?.response?.description })
-        // Fallback: strip HTML tags and resend without parse_mode
-        try {
-          const plain = message.replace(/<[^>]+>/g, '')
-          await ctx.reply(plain, { reply_markup: { inline_keyboard: keyboard } as any })
-        } catch (e2: any) {
-          logger.error('markets: fallback reply failed (plain)', { err: e2?.message || String(e2) })
-          throw e2
-        }
-      }
+      await replySafe(ctx, message, { inline_keyboard: keyboard })
     } catch (error: any) {
       logger.error('Error in markets command', {
         error: error?.message || String(error),
