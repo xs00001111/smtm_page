@@ -56,6 +56,16 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   const pool = Math.round(poolNum).toLocaleString()
   const skew = Number(res.skew || 0)
   const skewPct = Math.round(skew * 100)
+  const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
+  const poolLow = poolNum < 3000
+
+  // If there isn't enough data, surface a simple, clear message
+  if (poolLow || walletsEvaluated === 0) {
+    let msg = `⚖️ <b>Smart Money Skew</b>\n\n`
+    msg += `No signal yet (insufficient data)`
+    if (marketUrl) msg += `\n\n🔗 <a href=\"${esc(marketUrl)}\">Market</a>`
+    return msg
+  }
   // Strength labeling
   let strength = 'Neutral'
   if (skew >= 0.80 || skew <= 0.20) strength = 'Extreme'
@@ -63,7 +73,7 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   else if (skew >= 0.55 || skew <= 0.45) strength = 'Lean'
   let msg = `⚖️ <b>Smart Money Skew</b>\n\n` +
             `${dirEmoji} ${res.direction || 'Neutral'} • Skew ${skewPct}% • Pool $${pool}`
-  // Always add a compact context line
+  // Always add a compact context line (only when we have enough data)
   try {
     const meta = (res as any).meta || {}
     const wallets = meta.walletsEvaluated != null ? ` • Wallets ${meta.walletsEvaluated}` : ''
