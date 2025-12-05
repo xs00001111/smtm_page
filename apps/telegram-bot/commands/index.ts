@@ -2225,6 +2225,82 @@ export function registerCommands(bot: Telegraf) {
     }
   })
 
+  // Smart Skew command: compute and show skew for a single market or all sub‑markets of an event
+  bot.command('skew', async (ctx) => {
+    const rawText = ctx.message.text
+    const args = rawText.split(/\s+/).filter(Boolean).slice(1)
+    if (args.length === 0) {
+      await ctx.reply('Usage: /skew <market_url|id|event_url>\n\nExamples:\n• /skew https://polymarket.com/event/...\n• /skew 0x<condition_id>')
+      return
+    }
+    const input = args.join(' ').trim()
+    try {
+      await ctx.reply('⚖️ Calculating smart skew...')
+      // Case A: Event URL without specific market -> compute for all sub‑markets
+      if (isEventUrlWithoutMarket(input)) {
+        const slugs = await getEventSubMarketSlugs(input)
+        if (!slugs.length) { await ctx.reply('❌ No sub‑markets found for this event.'); return }
+        for (const slug of slugs) {
+          try {
+            const m = await findMarket(slug)
+            if (!m) continue
+            const conditionId = m.condition_id || m.conditionId
+            const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+            const no  = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+            if (!conditionId || !yes || !no) continue
+            const res = await getSmartSkew(conditionId, yes, no)
+            const url = getPolymarketMarketUrl(m)
+            if (!res) continue
+            let card = formatSkewCard(m.question || slug, url, res, true)
+            // Cautious insights
+            try {
+              const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+              if (exs.length) {
+                const insights = await analyzeSkewExamples(exs)
+                const bits: string[] = []
+                if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                if (bits.length) card += `\n${bits.join(' • ')}`
+              }
+            } catch {}
+            // Refresh button
+            const tok = condToToken(conditionId)
+            const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+            await replySafe(ctx, card, kb)
+          } catch {}
+        }
+        return
+      }
+      // Case B: Single market (URL/ID/slug) -> compute and show once
+      const market = await resolveMarketFromInput(input, false)
+      if (!market) { await ctx.reply('❌ Market not found. Provide full URL or 0x<condition_id>.'); return }
+      const conditionId = market.condition_id || market.conditionId
+      const yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+      const no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+      if (!conditionId || !yes || !no) { await ctx.reply('❌ Missing market outcomes for skew.'); return }
+      const res = await getSmartSkew(conditionId, yes, no)
+      if (!res) { await ctx.reply('⚠️ Not enough data to assess skew.'); return }
+      const url = getPolymarketMarketUrl(market)
+      let card = formatSkewCard(market.question || 'Market', url, res, true)
+      try {
+        const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+        if (exs.length) {
+          const insights = await analyzeSkewExamples(exs)
+          const bits: string[] = []
+          if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+          if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+          if (bits.length) card += `\n${bits.join(' • ')}`
+        }
+      } catch {}
+      const tok = condToToken(conditionId)
+      const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+      await replySafe(ctx, card, kb)
+    } catch (e:any) {
+      logger.error('skew command failed', { err: e?.message })
+      await ctx.reply('❌ Failed to compute skew. Try again later.')
+    }
+  })
+
   // Alpha: return the freshest alpha found (optionally filter by market)
   bot.command('alpha', async (ctx) => {
     try {
