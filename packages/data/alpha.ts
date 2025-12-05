@@ -106,6 +106,11 @@ export interface WhaleAlphaResult {
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 export async function getWalletWhaleStats(wallet: string, opts?: WhaleStatsOptions): Promise<WhaleStats> {
+  // Guard: invalid wallet -> return neutral stats without calling external APIs
+  const isAddr = typeof wallet === 'string' && /^0x[a-fA-F0-9]{40}$/.test(wallet)
+  if (!isAddr) {
+    return { avgBetUsd: 0, tradesPerHour: 0, winRate: 0, sampleCount: 0, windowHours: (opts?.windowMs ?? 6*60*60*1000) / 3600000 }
+  }
   const windowMs = opts?.windowMs ?? 6 * 60 * 60 * 1000 // 6h
   const maxEvents = opts?.maxEvents ?? 500
   const recentTrades = TradeBuffer.getTrades(maxEvents, { sinceMs: windowMs, wallet })
@@ -357,11 +362,15 @@ export async function computeSmartSkewFromHolders(
 
   const yesH = (byToken.get(yesTokenId) || []).map(h=>({ wallet: h.address, usd: toUsd(h.balance, h.value, yesPrice) }))
   const noH  = (byToken.get(noTokenId)  || []).map(h=>({ wallet: h.address, usd: toUsd(h.balance, h.value, noPrice) }))
+  const isAddr = (w: string) => /^0x[a-fA-F0-9]{40}$/.test(w)
+  // Filter out invalid/anonymous holder entries to avoid downstream API errors
+  const yesHF = yesH.filter(h => isAddr(h.wallet))
+  const noHF  = noH.filter(h => isAddr(h.wallet))
   // Sort by USD and cap wallets to evaluate
-  yesH.sort((a,b)=>b.usd - a.usd)
-  noH.sort((a,b)=>b.usd - a.usd)
-  const yesEval = yesH.slice(0, Math.min(maxWallets, yesH.length))
-  const noEval  = noH.slice(0, Math.min(maxWallets, noH.length))
+  yesHF.sort((a,b)=>b.usd - a.usd)
+  noHF.sort((a,b)=>b.usd - a.usd)
+  const yesEval = yesHF.slice(0, Math.min(maxWallets, yesHF.length))
+  const noEval  = noHF.slice(0, Math.min(maxWallets, noHF.length))
 
   // Score wallets and compute PnL for examples
   const scoreCache = new Map<string, number>()
