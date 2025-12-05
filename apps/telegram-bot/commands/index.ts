@@ -3,8 +3,8 @@ import { logger } from '../utils/logger';
 import { getTopRewardMarket, formatRewardInfo } from '../services/rewards';
 import { findMarket, findMarketFuzzy, findWhaleFuzzy, findWhaleFuzzyWide, gammaApi, dataApi, clobApi } from '@smtm/data';
 import { wsMonitor } from '../index';
-// Toggle DB-first surfacing of alpha events (disable while DB schema is being enriched)
-const DB_FIRST_ENABLED = false;
+// Toggle DB-first surfacing of alpha events (enable to surface unseen DB alpha before live scan)
+const DB_FIRST_ENABLED = true;
 // Log-only probe: fetch unseen fresh alpha from DB and log, but do not display
 const DB_LOG_ONLY_PROBE = true;
 import { botConfig } from '../config/bot';
