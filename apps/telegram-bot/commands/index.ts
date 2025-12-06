@@ -32,28 +32,20 @@ async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?
       n = n || no
     }
     if (!y || !n) return null
-    const { computeSmartSkewFromHolders, computeSmartSkewAlpha } = await import('@smtm/data')
-    // Lower preview threshold to be more permissive
+    const { computeSmartSkewFromHolders } = await import('@smtm/data')
+    // Use holder-based skew (current positions, not time-based trades)
+    // Lower threshold to show more markets
     let res = await computeSmartSkewFromHolders(
       { conditionId, yesTokenId: y!, noTokenId: n! },
-      { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), minSmartPoolUsd: 500, maxWallets: 50 }
+      { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), minSmartPoolUsd: 100, maxWallets: 100 }
     )
-    // Fallback: if holders pool too small or no wallets evaluated, try trades-based skew
+
+    // Mark source for debugging
+    (res as any)._source = 'holders'
+
+    // Check if we have meaningful data
     const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
-    if ((res.smartPoolUsd || 0) < 500 || walletsEvaluated === 0) {
-      try {
-        const tRes = await computeSmartSkewAlpha({ yesTokenId: y!, noTokenId: n!, conditionId }, { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), whaleScoreThreshold: 65, windowMs: 30*60*1000 })
-        // Prefer trades result when it has a non-zero pool or higher alpha
-        if (tRes && (tRes.smartPoolUsd > 0 || (tRes.alpha || 0) > (res.alpha || 0))) {
-          (tRes as any)._source = 'trades'
-          res = Object.assign({}, res, tRes)
-        } else {
-          (res as any)._source = 'holders'
-        }
-      } catch {}
-    } else {
-      (res as any)._source = 'holders'
-    }
+    const hasData = (res.smartPoolUsd || 0) >= 100 && walletsEvaluated > 0
     SkewCache.set(conditionId, { ts: now, result: res })
     return res
   } catch (e) {
@@ -79,10 +71,18 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
   const poolLow = poolNum < 3000
 
-  // If there isn't enough data, surface a simple, clear message
+  // If there isn't enough data, surface a clear, specific message
   if (poolLow || walletsEvaluated === 0) {
     let msg = `⚖️ <b>Smart Money Skew</b>\n\n`
-    msg += `No signal yet (insufficient data)`
+    if (walletsEvaluated === 0) {
+      msg += `❌ No whale holders found\n\n`
+      msg += `This market doesn't have enough smart money positions to calculate skew.`
+    } else if (poolLow) {
+      msg += `❌ Insufficient whale activity\n\n`
+      msg += `Smart money pool: $${poolNum.toLocaleString()} (need $3,000+)\n`
+      msg += `Whale holders: ${walletsEvaluated}\n\n`
+      msg += `Not enough large positions to show reliable signal.`
+    }
     if (marketUrl) msg += `\n\n🔗 <a href=\"${esc(marketUrl)}\">Market</a>`
     return msg
   }
