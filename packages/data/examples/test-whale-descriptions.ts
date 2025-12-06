@@ -8,6 +8,8 @@ import {
   generateAlphaWhaleDescription,
   classifyWhaleArchetype,
   buildDescriptionInput,
+  getDescriptionCacheStats,
+  clearDescriptionCache,
   type WhaleDescriptionInput,
 } from '../whale-descriptions'
 
@@ -294,3 +296,44 @@ edgeCases.forEach((testCase, index) => {
 
 console.log('\n' + '='.repeat(80))
 console.log('✅ Edge cases completed!\n')
+
+// Test caching performance
+console.log('🧪 Testing Cache Performance\n')
+console.log('='.repeat(80))
+
+clearDescriptionCache()
+console.log('\n✓ Cache cleared')
+
+const sampleInput = buildDescriptionInput({
+  whaleScore: 85,
+  pnl: 100000,
+  winRate: 72,
+  avgBetSize: 15000,
+  tradesPerHour: 1.2,
+  portfolioValue: 150000,
+  totalTrades: 80,
+  tags: ['Politics'],
+  isNewWallet: false,
+})
+
+// First call (cache miss)
+const start1 = Date.now()
+const desc1 = generateWhaleDescription(sampleInput)
+const time1 = Date.now() - start1
+
+// Second call (cache hit)
+const start2 = Date.now()
+const desc2 = generateWhaleDescription(sampleInput)
+const time2 = Date.now() - start2
+
+console.log(`\n1st call (cache miss): ${time1}ms`)
+console.log(`   ${desc1}`)
+console.log(`\n2nd call (cache hit):  ${time2}ms`)
+console.log(`   ${desc2}`)
+console.log(`\n⚡ Speedup: ${(time1 / Math.max(time2, 0.001)).toFixed(1)}x faster`)
+
+const stats = getDescriptionCacheStats()
+console.log(`\n📊 Cache Stats: ${stats.size}/${stats.maxSize} entries`)
+
+console.log('\n' + '='.repeat(80))
+console.log('✅ Cache performance test completed!\n')

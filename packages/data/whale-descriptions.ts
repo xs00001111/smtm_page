@@ -3,6 +3,77 @@
  * Provides personality-driven summaries of traders for /whale and /alpha commands
  */
 
+// Simple in-memory cache for whale descriptions
+interface CacheEntry {
+  description: string
+  timestamp: number
+  whaleScore: number
+}
+
+class DescriptionCache {
+  private cache: Map<string, CacheEntry> = new Map()
+  private readonly ttlMs: number = 30 * 60 * 1000 // 30 minutes
+  private readonly maxSize: number = 1000 // Max cache entries
+
+  getCacheKey(input: WhaleDescriptionInput, context: 'leaderboard' | 'alpha'): string {
+    // Include whale score in key to invalidate when score changes significantly
+    const scoreRounded = Math.floor(input.whaleScore / 10) * 10 // Round to nearest 10
+    const pnlRounded = Math.floor(input.pnl / 10000) * 10000 // Round to nearest 10k
+    return `${input.whaleScore}_${scoreRounded}_${pnlRounded}_${context}_${input.isNewWallet ? 'new' : 'established'}`
+  }
+
+  get(input: WhaleDescriptionInput, context: 'leaderboard' | 'alpha'): string | null {
+    const key = this.getCacheKey(input, context)
+    const entry = this.cache.get(key)
+
+    if (!entry) return null
+
+    // Check if expired
+    const now = Date.now()
+    if (now - entry.timestamp > this.ttlMs) {
+      this.cache.delete(key)
+      return null
+    }
+
+    // Check if whale score changed significantly (>15 points)
+    if (Math.abs(entry.whaleScore - input.whaleScore) > 15) {
+      this.cache.delete(key)
+      return null
+    }
+
+    return entry.description
+  }
+
+  set(input: WhaleDescriptionInput, context: 'leaderboard' | 'alpha', description: string): void {
+    // Evict oldest entries if cache is full
+    if (this.cache.size >= this.maxSize) {
+      const oldestKey = this.cache.keys().next().value
+      if (oldestKey) this.cache.delete(oldestKey)
+    }
+
+    const key = this.getCacheKey(input, context)
+    this.cache.set(key, {
+      description,
+      timestamp: Date.now(),
+      whaleScore: input.whaleScore,
+    })
+  }
+
+  clear(): void {
+    this.cache.clear()
+  }
+
+  getStats(): { size: number; maxSize: number } {
+    return {
+      size: this.cache.size,
+      maxSize: this.maxSize,
+    }
+  }
+}
+
+// Global cache instance
+const descriptionCache = new DescriptionCache()
+
 export interface WhaleDescriptionInput {
   // Core metrics
   whaleScore: number // 0-100
@@ -161,12 +232,18 @@ export function classifyWhaleArchetype(input: WhaleDescriptionInput): ArchetypeC
 
 /**
  * Generate a human-readable description based on archetype and stats
+ * Uses caching to improve performance
  */
 export function generateWhaleDescription(
   input: WhaleDescriptionInput,
   options: WhaleDescriptionOptions = {}
 ): string {
   const { maxLength = 120, includeEmoji = true, context = 'leaderboard' } = options
+
+  // Check cache first
+  const cached = descriptionCache.get(input, context)
+  if (cached) return cached
+
   const classification = classifyWhaleArchetype(input)
   const { archetype } = classification
 
@@ -259,6 +336,9 @@ export function generateWhaleDescription(
     description = description.substring(0, maxLength - 3) + '...'
   }
 
+  // Cache the generated description
+  descriptionCache.set(input, context, description)
+
   return description
 }
 
@@ -271,6 +351,20 @@ export function generateAlphaWhaleDescription(
   options: WhaleDescriptionOptions = {}
 ): string {
   return generateWhaleDescription(input, { ...options, context: 'alpha' })
+}
+
+/**
+ * Get cache statistics for monitoring
+ */
+export function getDescriptionCacheStats(): { size: number; maxSize: number } {
+  return descriptionCache.getStats()
+}
+
+/**
+ * Clear the description cache (useful for testing or memory management)
+ */
+export function clearDescriptionCache(): void {
+  descriptionCache.clear()
 }
 
 /**
