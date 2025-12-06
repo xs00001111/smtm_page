@@ -1636,8 +1636,9 @@ export function registerCommands(bot: Telegraf) {
                 isNewWallet,
               })
 
-              // Generate description (only if we have sufficient data)
-              if (whaleScore >= 50 || stats.sampleCount >= 10) {
+              // Generate description for leaderboard whales (always show for top traders)
+              // Fallback to data quality check for edge cases
+              if (stats.sampleCount >= 5 || whaleScore >= 40) {
                 whaleDescription = generateWhaleDescription(descInput, { context: 'leaderboard' })
               }
             } catch (e) {
