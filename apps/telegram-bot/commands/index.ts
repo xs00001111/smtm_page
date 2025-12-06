@@ -2531,6 +2531,97 @@ export function registerCommands(bot: Telegraf) {
                     if (urlM?.question) message = `✨ <b>${esc(urlM.question)}</b>\n\n` + message.split('\n\n').slice(1).join('\n\n')
                     // Defer appending the market link to the common footer below
                   } catch {}
+
+                  // Generate whale description for alpha context
+                  let whaleDescription = ''
+                  try {
+                    const addr = (a.wallet || '').toLowerCase()
+                    if (addr) {
+                      const { getWalletWhaleStats, computeWhaleScore, generateAlphaWhaleDescription, buildDescriptionInput } = await import('@smtm/data')
+                      const stats = await getWalletWhaleStats(addr, { windowMs: 6*60*60*1000, maxEvents: 500 })
+                      const whaleScore = computeWhaleScore(stats, {})
+
+                      // Fetch portfolio value for richer descriptions
+                      let portfolioValue = 0
+                      let totalPositions = 0
+                      try {
+                        const userValue = await dataApi.getUserValue(addr)
+                        portfolioValue = parseFloat(String(userValue?.value || '0'))
+                        totalPositions = userValue?.positions_count || 0
+                      } catch {}
+
+                      // Fetch win rate
+                      let winRate = 0
+                      try {
+                        const wr = await dataApi.getUserWinRate(addr)
+                        winRate = wr.winRate || 0
+                      } catch {}
+
+                      // Fetch recent trades for context
+                      let recentTrades12h = 0
+                      try {
+                        const raw = await dataApi.getTrades({ user: addr, limit: 1000 })
+                        const cutoff = Date.now() - 12*60*60*1000
+                        recentTrades12h = (raw || []).filter((t:any)=>{
+                          const r = t.timestamp || t.match_time || t.last_update
+                          const ts = typeof r === 'number' ? (r > 1e12 ? r : r*1000) : Date.parse(String(r))
+                          return Number.isFinite(ts) && ts >= cutoff
+                        }).length
+                      } catch {}
+
+                      // Determine if new wallet
+                      const isNewWallet = totalPositions <= 5
+
+                      // Get market tags for context
+                      let marketTags: string[] = []
+                      try {
+                        if (a.conditionId) {
+                          const tm = await gammaApi.getMarket(a.conditionId)
+                          if (Array.isArray(tm?.tags)) marketTags = tm.tags.slice(0, 2)
+                        }
+                      } catch {}
+
+                      // Get PnL for description
+                      let pnl = 0
+                      try {
+                        const pnlData = await dataApi.getUserAccuratePnL(addr)
+                        pnl = pnlData.totalPnL || 0
+                      } catch {}
+
+                      // Build description input with current trade context
+                      const descInput = buildDescriptionInput({
+                        whaleScore,
+                        pnl,
+                        winRate,
+                        avgBetSize: stats.avgBetUsd,
+                        tradesPerHour: stats.tradesPerHour,
+                        portfolioValue,
+                        accountAgeDays: null,
+                        totalTrades: stats.sampleCount,
+                        recentTrades12h,
+                        tags: marketTags,
+                        isNewWallet,
+                        currentTrade: {
+                          notionalUsd: d.notional_usd ?? d.weightedNotionalUsd ?? 0,
+                          side: d.side === 'BUY' ? 'BUY' : 'SELL',
+                          marketCategory: marketTags[0],
+                        },
+                      })
+
+                      // Generate alpha-aware description (only if sufficient data)
+                      if (stats.sampleCount >= 5 || whaleScore >= 40) {
+                        whaleDescription = generateAlphaWhaleDescription(descInput, { maxLength: 140 })
+                      }
+                    }
+                  } catch (e) {
+                    logger.warn('Failed to generate whale description for alpha', { error: (e as any)?.message })
+                  }
+
+                  // Add description to message if generated
+                  if (whaleDescription) {
+                    message += `\n\n${whaleDescription}`
+                  }
+
                   // Enrich trader details to match live output when wallet is available
                   try {
                     const addr = (a.wallet || '').toLowerCase()
