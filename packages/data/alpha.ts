@@ -397,6 +397,8 @@ export async function computeSmartSkewFromHolders(
     const list = Array.isArray(row?.holders) ? row.holders : []
     byToken.set(String(row?.token), list.map((h:any)=>({ address: String(h.address).toLowerCase(), balance: parseFloat(String(h.balance||'0')), value: h.value != null ? parseFloat(String(h.value)) : undefined })))
   }
+  const holderTokens = Array.from(byToken.keys())
+  log('skew.holders.tokens', { tokensCount: holderTokens.length, sample: holderTokens.slice(0, 4) })
   // Fetch prices to estimate USD if needed
   let yesPrice: number | null = null
   let noPrice: number | null = null
@@ -409,8 +411,44 @@ export async function computeSmartSkewFromHolders(
     return 0
   }
 
-  const yesH = (byToken.get(yesTokenId) || []).map(h=>({ wallet: h.address, usd: toUsd(h.balance, h.value, yesPrice) }))
-  const noH  = (byToken.get(noTokenId)  || []).map(h=>({ wallet: h.address, usd: toUsd(h.balance, h.value, noPrice) }))
+  let yesListRaw = byToken.get(yesTokenId)
+  let noListRaw  = byToken.get(noTokenId)
+
+  // Fallback 1: If map keys don't match token ids returned by Gamma, select the two largest holder buckets
+  if ((yesListRaw == null || yesListRaw.length === 0 || noListRaw == null || noListRaw.length === 0) && holderTokens.length >= 2) {
+    try {
+      const priceCache = new Map<string, number|null>()
+      const getPrice = async (tok: string): Promise<number|null> => {
+        if (priceCache.has(tok)) return priceCache.get(tok) as any
+        let p: number|null = null
+        try { p = await clobApi.getCurrentPrice(tok) } catch {}
+        priceCache.set(tok, p)
+        return p
+      }
+      const tokenUsd: Array<{ token: string; usd: number }> = []
+      for (const tok of holderTokens) {
+        const list = byToken.get(tok) || []
+        const p = await getPrice(tok)
+        const sum = list.reduce((acc, h)=> acc + toUsd(h.balance, h.value, p), 0)
+        tokenUsd.push({ token: tok, usd: sum })
+      }
+      tokenUsd.sort((a,b)=> b.usd - a.usd)
+      if (tokenUsd.length >= 2 && (tokenUsd[0].usd > 0 || tokenUsd[1].usd > 0)) {
+        const tYes = tokenUsd[0].token
+        const tNo  = tokenUsd[1].token
+        yesTokenId = tYes
+        noTokenId  = tNo
+        yesPrice = priceCache.get(tYes) ?? yesPrice
+        noPrice  = priceCache.get(tNo)  ?? noPrice
+        yesListRaw = byToken.get(tYes)
+        noListRaw  = byToken.get(tNo)
+        log('skew.holders.fallback_tokens', { picked: [tYes, tNo], usd: [tokenUsd[0].usd, tokenUsd[1].usd] })
+      }
+    } catch {}
+  }
+
+  const yesH = (yesListRaw || []).map(h=>({ wallet: h.address, usd: toUsd(h.balance, h.value, yesPrice) }))
+  const noH  = (noListRaw  || []).map(h=>({ wallet: h.address, usd: toUsd(h.balance, h.value, noPrice) }))
   const isAddr = (w: string) => /^0x[a-fA-F0-9]{40}$/.test(w)
   // Filter out invalid/anonymous holder entries to avoid downstream API errors
   const yesHF = yesH.filter(h => isAddr(h.wallet))
@@ -445,6 +483,19 @@ export async function computeSmartSkewFromHolders(
   for (const h of noEval) {
     const sc = scoreCache.get(h.wallet) || 0
     if (sc >= whaleScoreThreshold) noWhale += h.usd; else noRetail += h.usd
+  }
+
+  // Fallback 2: if whale pool is zero but we have meaningful holders, loosen criteria using top holders by USD
+  const yesSumRaw = yesHF.reduce((a,b)=>a+b.usd, 0)
+  const noSumRaw  = noHF.reduce((a,b)=>a+b.usd, 0)
+  if ((yesWhale + noWhale) === 0 && (yesSumRaw + noSumRaw) > 0) {
+    // Treat top-N holders as whales to avoid false "no data" when wallets exist but score is low (e.g., new accounts)
+    const topN = 3
+    const yesTop = [...yesHF].sort((a,b)=>b.usd-a.usd).slice(0, topN)
+    const noTop  = [...noHF].sort((a,b)=>b.usd-a.usd).slice(0, topN)
+    yesWhale = yesTop.reduce((a,b)=>a+b.usd, 0)
+    noWhale  = noTop.reduce((a,b)=>a+b.usd, 0)
+    log('skew.holders.fallback_topN', { topN, yesTopUsd: yesWhale, noTopUsd: noWhale })
   }
   const smartPoolUsd = yesWhale + noWhale
   const denom = yesWhale + noWhale
