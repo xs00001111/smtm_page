@@ -591,15 +591,6 @@ export function registerCommands(bot: Telegraf) {
               const ws = computeWhaleScore(stats, {})
               whaleScoreStr = `${Math.round(ws)}`
             } catch {}
-            // Compute whale score (windowed stats)
-            let whaleScoreStr = '—'
-            try {
-              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
-              const stats = await getWalletWhaleStats(entry.user_id, { windowMs: 6*60*60*1000, maxEvents: 500 })
-              const ws = computeWhaleScore(stats, {})
-              whaleScoreStr = `${Math.round(ws)}`
-            } catch {}
-
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr} • 🐋 Whale Score: ${whaleScoreStr}\n`
