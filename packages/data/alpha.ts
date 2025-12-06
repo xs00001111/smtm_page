@@ -244,8 +244,56 @@ export async function computeSmartSkewAlpha(
 
   // Gather recent raw trades for both tokens
   const maxScan = 2000
-  const all = TradeBuffer.getTrades(maxScan, { sinceMs: windowMs, tokenIds: [params.yesTokenId, params.noTokenId] })
-  log('skew.trades_window', { count: all.length })
+  let all = TradeBuffer.getTrades(maxScan, { sinceMs: windowMs, tokenIds: [params.yesTokenId, params.noTokenId] })
+  log('skew.trades_window_buffer', { count: all.length })
+
+  // Fallback to API if TradeBuffer is empty (common for markets without recent WebSocket activity)
+  if (all.length === 0) {
+    log('skew.fallback_api', { reason: 'buffer_empty' })
+    try {
+      // Fetch trades from Data API
+      const cutoff = Date.now() - windowMs
+      const apiTrades: any[] = []
+
+      // Fetch for both tokens
+      for (const tokenId of [params.yesTokenId, params.noTokenId]) {
+        try {
+          const trades = await dataApi.getTrades({ asset_id: tokenId, limit: Math.min(500, maxScan / 2) })
+          log('skew.api_trades', { tokenId, count: (trades || []).length })
+
+          // Convert API trades to TradeBuffer format and filter by time window
+          for (const t of trades || []) {
+            const tsRaw: any = t.timestamp || t.match_time || t.last_update
+            const ts = typeof tsRaw === 'number' ? (tsRaw > 1e12 ? tsRaw : tsRaw * 1000) : Date.parse(String(tsRaw))
+            if (!Number.isFinite(ts) || ts < cutoff) continue
+
+            const price = parseFloat(String(t.price || '0'))
+            const size = parseFloat(String(t.size || '0'))
+            const notional = price * size
+            if (!Number.isFinite(notional) || notional <= 0) continue
+
+            apiTrades.push({
+              tokenId: String(t.asset_id || t.asset || tokenId),
+              wallet: String(t.proxyWallet || t.user || '').toLowerCase(),
+              price,
+              size,
+              notional,
+              timestamp: ts,
+            })
+          }
+        } catch (e) {
+          log('skew.api_error', { tokenId, error: String((e as any)?.message || e) })
+        }
+      }
+
+      all = apiTrades
+      log('skew.fallback_result', { count: all.length })
+    } catch (e) {
+      log('skew.fallback_failed', { error: String((e as any)?.message || e) })
+    }
+  }
+
+  log('skew.trades_window', { count: all.length, source: all.length > 0 ? 'buffer_or_api' : 'empty' })
 
   // Identify unique wallets in window (cap to reduce API calls)
   const wallets = Array.from(new Set(all.map((e) => (e.wallet || '').toLowerCase()).filter(Boolean))).slice(0, maxWallets)
