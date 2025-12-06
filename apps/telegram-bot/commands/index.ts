@@ -1601,12 +1601,45 @@ export function registerCommands(bot: Telegraf) {
               logger.warn('Failed to fetch win rate', { user: entry.user_id, error: (e as any)?.message })
             }
 
-            // Fetch whale score
+            // Fetch whale score and generate description
             let whaleScoreStr = '—'
+            let whaleDescription = ''
             try {
-              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+              const { getWalletWhaleStats, computeWhaleScore, generateWhaleDescription, buildDescriptionInput } = await import('@smtm/data')
               const stats = await getWalletWhaleStats(entry.user_id, { windowMs: 6*60*60*1000, maxEvents: 500 })
-              whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
+              const whaleScore = computeWhaleScore(stats, {})
+              whaleScoreStr = `${Math.round(whaleScore)}`
+
+              // Fetch additional data for description
+              let portfolioValue = 0
+              let accountAgeDays = null
+              let totalPositions = 0
+              try {
+                const userValue = await dataApi.getUserValue(entry.user_id)
+                portfolioValue = parseFloat(String(userValue?.value || '0'))
+                totalPositions = userValue?.positions_count || 0
+              } catch {}
+
+              // Determine if new wallet (simple heuristic based on positions)
+              const isNewWallet = totalPositions <= 5
+
+              // Build description input
+              const descInput = buildDescriptionInput({
+                whaleScore,
+                pnl: entry.pnl,
+                winRate: parseFloat(String(winRateStr)) || 0,
+                avgBetSize: stats.avgBetUsd,
+                tradesPerHour: stats.tradesPerHour,
+                portfolioValue,
+                accountAgeDays,
+                totalTrades: stats.sampleCount,
+                isNewWallet,
+              })
+
+              // Generate description (only if we have sufficient data)
+              if (whaleScore >= 50 || stats.sampleCount >= 10) {
+                whaleDescription = generateWhaleDescription(descInput, { context: 'leaderboard' })
+              }
             } catch (e) {
               logger.warn('Failed to fetch whale score', { user: entry.user_id, error: (e as any)?.message })
             }
@@ -1614,6 +1647,9 @@ export function registerCommands(bot: Telegraf) {
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr} • 🐋 Whale Score: ${whaleScoreStr}\n`
+            if (whaleDescription) {
+              msg += `   \n   ${whaleDescription}\n`
+            }
             msg += `   🔗 ${profileUrl}\n\n`
             addresses.push(entry.user_id)
 
