@@ -583,17 +583,51 @@ export function registerCommands(bot: Telegraf) {
             } catch (e) {
               logger.warn('Failed to fetch win rate', { user: entry.user_id, error: (e as any)?.message })
             }
-            // Compute whale score (windowed stats)
+            // Compute whale score and generate description (windowed stats)
             let whaleScoreStr = '—'
+            let whaleDescription = ''
             try {
-              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+              const { getWalletWhaleStats, computeWhaleScore, generateWhaleDescription, buildDescriptionInput } = await import('@smtm/data')
               const stats = await getWalletWhaleStats(entry.user_id, { windowMs: 6*60*60*1000, maxEvents: 500 })
-              const ws = computeWhaleScore(stats, {})
-              whaleScoreStr = `${Math.round(ws)}`
+              const whaleScore = computeWhaleScore(stats, {})
+              whaleScoreStr = `${Math.round(whaleScore)}`
+
+              // Fetch additional data for description
+              let portfolioValue = 0
+              let totalPositions = 0
+              try {
+                const userValue = await dataApi.getUserValue(entry.user_id)
+                portfolioValue = parseFloat(String(userValue?.value || '0'))
+                totalPositions = userValue?.positions_count || 0
+              } catch {}
+
+              // Determine if new wallet
+              const isNewWallet = totalPositions <= 5
+
+              // Build description input
+              const descInput = buildDescriptionInput({
+                whaleScore,
+                pnl: entry.pnl,
+                winRate: parseFloat(String(winRateStr)) || 0,
+                avgBetSize: stats.avgBetUsd,
+                tradesPerHour: stats.tradesPerHour,
+                portfolioValue,
+                accountAgeDays: null,
+                totalTrades: stats.sampleCount,
+                isNewWallet,
+              })
+
+              // Generate description for leaderboard whales
+              if (stats.sampleCount >= 5 || whaleScore >= 40) {
+                whaleDescription = generateWhaleDescription(descInput, { context: 'leaderboard' })
+              }
             } catch {}
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr} • 🐋 Whale Score: ${whaleScoreStr}\n`
+            if (whaleDescription) {
+              msg += `   \n   ${whaleDescription}\n`
+            }
             msg += `   🔗 ${profileUrl}\n\n`
 
             // Add buttons: Follow and Detailed Stats (on same row)
