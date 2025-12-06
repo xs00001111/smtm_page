@@ -232,7 +232,7 @@ export interface SmartSkewResult {
 }
 
 export async function computeSmartSkewAlpha(
-  params: { yesTokenId: string; noTokenId: string },
+  params: { yesTokenId: string; noTokenId: string; conditionId?: string },
   cfg?: (SmartSkewConfig & WhaleScoreConfig & WhaleStatsOptions) & { onLog?: (msg: string, ctx?: any) => void }
 ): Promise<SmartSkewResult> {
   const log = cfg?.onLog || (() => {})
@@ -240,7 +240,7 @@ export async function computeSmartSkewAlpha(
   const windowMs = cfg?.windowMs ?? 30 * 60 * 1000
   const minSmartPoolUsd = cfg?.minSmartPoolUsd ?? 3000
   const maxWallets = cfg?.maxWallets ?? 50
-  log('skew.start', { yes: params.yesTokenId, no: params.noTokenId, windowMs, whaleScoreThreshold, minSmartPoolUsd, maxWallets })
+  log('skew.start', { yes: params.yesTokenId, no: params.noTokenId, conditionId: params.conditionId, windowMs, whaleScoreThreshold, minSmartPoolUsd, maxWallets })
 
   // Gather recent raw trades for both tokens
   const maxScan = 2000
@@ -248,46 +248,47 @@ export async function computeSmartSkewAlpha(
   log('skew.trades_window_buffer', { count: all.length })
 
   // Fallback to API if TradeBuffer is empty (common for markets without recent WebSocket activity)
-  if (all.length === 0) {
-    log('skew.fallback_api', { reason: 'buffer_empty' })
+  if (all.length === 0 && params.conditionId) {
+    log('skew.fallback_api', { reason: 'buffer_empty', conditionId: params.conditionId })
     try {
-      // Fetch trades from Data API
+      // Fetch trades from Data API using conditionId (market parameter)
       const cutoff = Date.now() - windowMs
       const apiTrades: any[] = []
 
-      // Fetch for both tokens
-      for (const tokenId of [params.yesTokenId, params.noTokenId]) {
-        try {
-          const trades = await dataApi.getTrades({ asset_id: tokenId, limit: Math.min(500, maxScan / 2) })
-          log('skew.api_trades', { tokenId, count: (trades || []).length })
+      try {
+        const trades = await dataApi.getTrades({ market: [params.conditionId], limit: Math.min(1000, maxScan) })
+        log('skew.api_trades', { conditionId: params.conditionId, count: (trades || []).length })
 
-          // Convert API trades to TradeBuffer format and filter by time window
-          for (const t of trades || []) {
-            const tsRaw: any = t.timestamp || t.match_time || t.last_update
-            const ts = typeof tsRaw === 'number' ? (tsRaw > 1e12 ? tsRaw : tsRaw * 1000) : Date.parse(String(tsRaw))
-            if (!Number.isFinite(ts) || ts < cutoff) continue
+        // Convert API trades to TradeBuffer format and filter by time window + tokenId
+        for (const t of trades || []) {
+          const tsRaw: any = t.timestamp || t.match_time || t.last_update
+          const ts = typeof tsRaw === 'number' ? (tsRaw > 1e12 ? tsRaw : tsRaw * 1000) : Date.parse(String(tsRaw))
+          if (!Number.isFinite(ts) || ts < cutoff) continue
 
-            const price = parseFloat(String(t.price || '0'))
-            const size = parseFloat(String(t.size || '0'))
-            const notional = price * size
-            if (!Number.isFinite(notional) || notional <= 0) continue
+          const tokenId = String(t.asset_id || t.asset || '').trim()
+          // Only include trades for our YES/NO tokens
+          if (tokenId !== params.yesTokenId && tokenId !== params.noTokenId) continue
 
-            apiTrades.push({
-              tokenId: String(t.asset_id || t.asset || tokenId),
-              wallet: String(t.proxyWallet || t.user || '').toLowerCase(),
-              price,
-              size,
-              notional,
-              timestamp: ts,
-            })
-          }
-        } catch (e) {
-          log('skew.api_error', { tokenId, error: String((e as any)?.message || e) })
+          const price = parseFloat(String(t.price || '0'))
+          const size = parseFloat(String(t.size || '0'))
+          const notional = price * size
+          if (!Number.isFinite(notional) || notional <= 0) continue
+
+          apiTrades.push({
+            tokenId,
+            wallet: String(t.proxyWallet || t.user || '').toLowerCase(),
+            price,
+            size,
+            notional,
+            timestamp: ts,
+          })
         }
+      } catch (e) {
+        log('skew.api_error', { conditionId: params.conditionId, error: String((e as any)?.message || e) })
       }
 
       all = apiTrades
-      log('skew.fallback_result', { count: all.length })
+      log('skew.fallback_result', { count: all.length, yesCount: all.filter(t => t.tokenId === params.yesTokenId).length, noCount: all.filter(t => t.tokenId === params.noTokenId).length })
     } catch (e) {
       log('skew.fallback_failed', { error: String((e as any)?.message || e) })
     }

@@ -16,10 +16,10 @@ class DescriptionCache {
   private readonly maxSize: number = 1000 // Max cache entries
 
   getCacheKey(input: WhaleDescriptionInput, context: 'leaderboard' | 'alpha'): string {
-    // Include whale score in key to invalidate when score changes significantly
+    // Use rounded values for better cache hit rate (scores 80-89 all map to 80)
     const scoreRounded = Math.floor(input.whaleScore / 10) * 10 // Round to nearest 10
     const pnlRounded = Math.floor(input.pnl / 10000) * 10000 // Round to nearest 10k
-    return `${input.whaleScore}_${scoreRounded}_${pnlRounded}_${context}_${input.isNewWallet ? 'new' : 'established'}`
+    return `${scoreRounded}_${pnlRounded}_${context}_${input.isNewWallet ? 'new' : 'established'}`
   }
 
   get(input: WhaleDescriptionInput, context: 'leaderboard' | 'alpha'): string | null {

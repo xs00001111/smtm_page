@@ -42,7 +42,7 @@ async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?
     const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
     if ((res.smartPoolUsd || 0) < 500 || walletsEvaluated === 0) {
       try {
-        const tRes = await computeSmartSkewAlpha({ yesTokenId: y!, noTokenId: n! }, { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), whaleScoreThreshold: 65, windowMs: 30*60*1000 })
+        const tRes = await computeSmartSkewAlpha({ yesTokenId: y!, noTokenId: n!, conditionId }, { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), whaleScoreThreshold: 65, windowMs: 30*60*1000 })
         // Prefer trades result when it has a non-zero pool or higher alpha
         if (tRes && (tRes.smartPoolUsd > 0 || (tRes.alpha || 0) > (res.alpha || 0))) {
           (tRes as any)._source = 'trades'
@@ -575,9 +575,11 @@ export function registerCommands(bot: Telegraf) {
 
             // Fetch win rate
             let winRateStr = '—'
+            let winRateNum = 0
             try {
               const { winRate } = await dataApi.getUserWinRate(entry.user_id, 500)
               if (winRate > 0) {
+                winRateNum = winRate
                 winRateStr = `${winRate.toFixed(1)}%`
               }
             } catch (e) {
@@ -608,7 +610,7 @@ export function registerCommands(bot: Telegraf) {
               const descInput = buildDescriptionInput({
                 whaleScore,
                 pnl: entry.pnl,
-                winRate: parseFloat(String(winRateStr)) || 0,
+                winRate: winRateNum,
                 avgBetSize: stats.avgBetUsd,
                 tradesPerHour: stats.tradesPerHour,
                 portfolioValue,
@@ -1626,9 +1628,11 @@ export function registerCommands(bot: Telegraf) {
 
             // Fetch win rate
             let winRateStr = '—'
+            let winRateNum = 0
             try {
               const { winRate } = await dataApi.getUserWinRate(entry.user_id, 500)
               if (winRate > 0) {
+                winRateNum = winRate
                 winRateStr = `${winRate.toFixed(1)}%`
               }
             } catch (e) {
@@ -1661,7 +1665,7 @@ export function registerCommands(bot: Telegraf) {
               const descInput = buildDescriptionInput({
                 whaleScore,
                 pnl: entry.pnl,
-                winRate: parseFloat(String(winRateStr)) || 0,
+                winRate: winRateNum,
                 avgBetSize: stats.avgBetUsd,
                 tradesPerHour: stats.tradesPerHour,
                 portfolioValue,
