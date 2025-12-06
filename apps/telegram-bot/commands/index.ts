@@ -32,16 +32,20 @@ async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?
       n = n || no
     }
     if (!y || !n) return null
+    // Avoid TS non-null assertions in object literals for esbuild compatibility
+    const yTok: string = y as string
+    const nTok: string = n as string
     const { computeSmartSkewFromHolders } = await import('@smtm/data')
     // Use holder-based skew (current positions, not time-based trades)
     // Lower threshold to show more markets
     let res = await computeSmartSkewFromHolders(
-      { conditionId, yesTokenId: y!, noTokenId: n! },
+      { conditionId, yesTokenId: yTok, noTokenId: nTok },
       { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), minSmartPoolUsd: 100, maxWallets: 100 }
     )
 
-    // Mark source for debugging
-    (res as any)._source = 'holders'
+    // Mark source for debugging (avoid assigning to parenthesized assertion)
+    const resAny: any = res
+    resAny._source = 'holders'
 
     // Check if we have meaningful data
     const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
@@ -2428,8 +2432,9 @@ export function registerCommands(bot: Telegraf) {
       const nowTs = Date.now()
       if (userId) {
         // Initialize locks map if not present
-        if (!(global as any)._alphaLocks) (global as any)._alphaLocks = new Map<number, { running: boolean; lastTs: number }>()
-        const alphaLocks: Map<number, { running: boolean; lastTs: number }> = (global as any)._alphaLocks
+        const gAny: any = global as any
+        if (!gAny._alphaLocks) gAny._alphaLocks = new Map<number, { running: boolean; lastTs: number }>()
+        const alphaLocks: Map<number, { running: boolean; lastTs: number }> = gAny._alphaLocks
         const prev = alphaLocks.get(userId)
         if (prev?.running) {
           await ctx.reply('⏳ A scan is already running for you. Please wait…')
@@ -2647,7 +2652,10 @@ export function registerCommands(bot: Telegraf) {
                         if (uiPnl != null) {
                           const comp = Number(pnlAgg.totalPnL || 0)
                           const disagree = (Math.sign(uiPnl) !== Math.sign(comp)) || (Math.abs(uiPnl) > Math.abs(comp) * 1.5)
-                          if (disagree || Math.abs(comp) < 1) (pnlAgg as any).totalPnL = uiPnl
+                          if (disagree || Math.abs(comp) < 1) {
+                            const pnlAggAny: any = pnlAgg
+                            pnlAggAny.totalPnL = uiPnl
+                          }
                         }
                       } catch {}
                       const name = disp || short
@@ -2772,7 +2780,10 @@ export function registerCommands(bot: Telegraf) {
                 if (uiPnl != null) {
                   const comp = Number(pnlAgg.totalPnL || 0)
                   const disagree = (Math.sign(uiPnl) !== Math.sign(comp)) || (Math.abs(uiPnl) > Math.abs(comp) * 1.5)
-                  if (disagree || Math.abs(comp) < 1) (pnlAgg as any).totalPnL = uiPnl
+                  if (disagree || Math.abs(comp) < 1) {
+                    const pnlAggAny: any = pnlAgg
+                    pnlAggAny.totalPnL = uiPnl
+                  }
                 }
               } catch {}
               const name = disp || short
@@ -3207,7 +3218,10 @@ export function registerCommands(bot: Telegraf) {
               if (uiPnl != null) {
                 const comp = Number(pnlAgg.totalPnL || 0)
                 const disagree = (Math.sign(uiPnl) !== Math.sign(comp)) || (Math.abs(uiPnl) > Math.abs(comp) * 1.5)
-                if (disagree || Math.abs(comp) < 1) (pnlAgg as any).totalPnL = uiPnl
+                if (disagree || Math.abs(comp) < 1) {
+                  const pnlAggAny: any = pnlAgg
+                  pnlAggAny.totalPnL = uiPnl
+                }
               }
             } catch {}
             const name = disp || short
@@ -3387,7 +3401,10 @@ export function registerCommands(bot: Telegraf) {
                   if (uiPnl != null) {
                     const comp = Number(pnlAgg.totalPnL || 0)
                     const disagree = (Math.sign(uiPnl) !== Math.sign(comp)) || (Math.abs(uiPnl) > Math.abs(comp) * 1.5)
-                    if (disagree || Math.abs(comp) < 1) (pnlAgg as any).totalPnL = uiPnl
+                    if (disagree || Math.abs(comp) < 1) {
+                      const pnlAggAny: any = pnlAgg
+                      pnlAggAny.totalPnL = uiPnl
+                    }
                   }
                 } catch {}
                 const name = disp || short
