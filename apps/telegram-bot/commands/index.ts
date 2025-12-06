@@ -1601,6 +1601,16 @@ export function registerCommands(bot: Telegraf) {
               logger.warn('Failed to fetch win rate', { user: entry.user_id, error: (e as any)?.message })
             }
 
+            // Fetch whale score
+            let whaleScoreStr = '—'
+            try {
+              const { getWalletWhaleStats, computeWhaleScore } = await import('@smtm/data')
+              const stats = await getWalletWhaleStats(entry.user_id, { windowMs: 6*60*60*1000, maxEvents: 500 })
+              whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
+            } catch (e) {
+              logger.warn('Failed to fetch whale score', { user: entry.user_id, error: (e as any)?.message })
+            }
+
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr} • 🐋 Whale Score: ${whaleScoreStr}\n`
