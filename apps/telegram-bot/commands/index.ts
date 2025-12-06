@@ -2272,12 +2272,46 @@ export function registerCommands(bot: Telegraf) {
         return
       }
       // Case B: Single market (URL/ID/slug) -> compute and show once
-      const market = await resolveMarketFromInput(input, false)
+      let market = await resolveMarketFromInput(input, false)
       if (!market) { await ctx.reply('❌ Market not found. Provide full URL or 0x<condition_id>.'); return }
-      const conditionId = market.condition_id || market.conditionId
-      const yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
-      const no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
-      if (!conditionId || !yes || !no) { await ctx.reply('❌ Missing market outcomes for skew.'); return }
+      let conditionId = market.condition_id || market.conditionId
+      let yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+      let no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+      // Robust fallback: if tokens missing, try refetch by condition ID or slug
+      if (!yes || !no) {
+        try {
+          if (conditionId) {
+            const ref = await gammaApi.getMarket(conditionId)
+            if (ref?.tokens?.length) {
+              market = Object.assign({}, market, ref)
+              yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+              no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+            }
+          }
+        } catch {}
+      }
+      if (!yes || !no) {
+        // Last attempt: if input is a URL with a market slug, resolve by slug directly
+        try {
+          const looksUrl = /^https?:\/\//i.test(input)
+          if (looksUrl) {
+            const u = new URL(input)
+            const parts = u.pathname.split('/').filter(Boolean)
+            const idx = parts.findIndex(p=>p==='event')
+            const slug = idx>=0 ? (parts[idx+2] || parts[idx+1]) : ''
+            if (slug) {
+              const m2 = await findMarket(decodeURIComponent(slug))
+              if (m2?.tokens?.length) {
+                market = m2
+                conditionId = market.condition_id || market.conditionId
+                yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+              }
+            }
+          }
+        } catch {}
+      }
+      if (!conditionId || !yes || !no) { await ctx.reply('❌ Missing market outcomes for skew (try pasting the market page URL without extra parameters).'); return }
       const res = await getSmartSkew(conditionId, yes, no)
       if (!res) { await ctx.reply('⚠️ Not enough data to assess skew.'); return }
       const url = getPolymarketMarketUrl(market)
