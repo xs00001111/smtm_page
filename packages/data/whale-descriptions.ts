@@ -132,6 +132,16 @@ export interface ArchetypeClassification {
 export function classifyWhaleArchetype(input: WhaleDescriptionInput): ArchetypeClassification {
   const { whaleScore, winRate, avgBetSize, tradesPerHour, isNewWallet, pnl, totalTrades, tags } = input
 
+  // Edge case: High win rate + huge negative PnL = unrealized losses (Polymarket API bug)
+  // Check this FIRST before other archetypes to avoid misclassification as sharpshooter/elite
+  if (pnl < -50000 && winRate >= 80) {
+    return {
+      archetype: 'struggling-trader',
+      confidence: 0.95,
+      traits: ['unrealized-losses', 'api-data-lag', 'high-closed-winrate']
+    }
+  }
+
   // Elite Whale: High score + high win rate + proven track record
   if (whaleScore >= 85 && winRate >= 70 && totalTrades >= 50) {
     return {
@@ -318,8 +328,17 @@ export function generateWhaleDescription(
     }
 
     case 'struggling-trader': {
-      const issue = input.pnl < -10000 ? 'significant losses' : 'mixed performance'
-      description = `${emoji}Trader with ${issue}. ${Math.round(input.winRate)}% win rate, rebuilding.`
+      // Edge case: High win rate but huge negative PnL = unrealized losses on open positions
+      // (Likely Polymarket API bug where resolved losing positions aren't marked as closed)
+      if (input.pnl < -50000 && input.winRate >= 90) {
+        const lossK = Math.abs(Math.round(input.pnl / 1000))
+        description = `${emoji}Perfect closed record, but -$${lossK}k in unrealized losses on open positions.`
+      } else if (input.pnl < -10000 && input.winRate >= 80) {
+        description = `${emoji}High win rate on closed trades, but large unrealized losses dragging total down.`
+      } else {
+        const issue = input.pnl < -10000 ? 'significant losses' : 'mixed performance'
+        description = `${emoji}Trader with ${issue}. ${Math.round(input.winRate)}% win rate, rebuilding.`
+      }
       break
     }
 
