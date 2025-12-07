@@ -526,6 +526,7 @@ export async function computeSmartSkewFromHolders(
   }
   const aboveYes = yesEval.filter(h => (scoreCache.get(h.wallet) || 0) >= whaleScoreThreshold).length
   const aboveNo  = noEval.filter(h => (scoreCache.get(h.wallet) || 0) >= whaleScoreThreshold).length
+  const whalesDetected = aboveYes + aboveNo
   log('skew.holders.scores', {
     whaleScoreThreshold,
     yesWhale,
@@ -577,7 +578,14 @@ export async function computeSmartSkewFromHolders(
       yesRetail: parseFloat(yesRetail.toFixed(2)),
       noRetail: parseFloat(noRetail.toFixed(2)),
     },
-    meta: { whaleScoreThreshold, windowMs: 0, walletsEvaluated: evalWallets.length },
+    meta: {
+      whaleScoreThreshold,
+      windowMs: 0,
+      walletsEvaluated: evalWallets.length,
+      whalesDetected,
+      yesWhaleCount: aboveYes,
+      noWhaleCount: aboveNo,
+    },
     examples,
   }
 }

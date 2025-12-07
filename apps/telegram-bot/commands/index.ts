@@ -73,6 +73,7 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   const skew = Number(res.skew || 0)
   const skewPct = Math.round(skew * 100)
   const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
+  const whalesDetected = Number(((res as any)?.meta?.whalesDetected) || 0)
   const poolLow = poolNum < 3000
   // Confidence label and cautions (do not short‑circuit)
   let confidence: 'High' | 'Medium' | 'Low' = 'High'
@@ -96,7 +97,7 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
     msg += `\nStrength: ${strength}${wallets}${thr}`
   } catch {}
   // Add cautions instead of returning early
-  if (walletsEvaluated === 0) {
+  if (whalesDetected === 0) {
     msg += `\n⚠️ Verified-whale holders not detected — using holder snapshots; interpret cautiously.`
   }
   if (poolLow) {
