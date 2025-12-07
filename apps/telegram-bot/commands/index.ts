@@ -74,22 +74,10 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   const skewPct = Math.round(skew * 100)
   const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
   const poolLow = poolNum < 3000
-
-  // If there isn't enough data, surface a clear, specific message
-  if (poolLow || walletsEvaluated === 0) {
-    let msg = `⚖️ <b>Smart Money Skew</b>\n\n`
-    if (walletsEvaluated === 0) {
-      msg += `❌ No whale holders found\n\n`
-      msg += `This market doesn't have enough smart money positions to calculate skew.`
-    } else if (poolLow) {
-      msg += `❌ Insufficient whale activity\n\n`
-      msg += `Smart money pool: $${poolNum.toLocaleString()} (need $3,000+)\n`
-      msg += `Whale holders: ${walletsEvaluated}\n\n`
-      msg += `Not enough large positions to show reliable signal.`
-    }
-    if (marketUrl) msg += `\n\n🔗 <a href=\"${esc(marketUrl)}\">Market</a>`
-    return msg
-  }
+  // Confidence label and cautions (do not short‑circuit)
+  let confidence: 'High' | 'Medium' | 'Low' = 'High'
+  if (poolLow || walletsEvaluated === 0) confidence = 'Low'
+  else if (poolNum < 5000 || walletsEvaluated < 3) confidence = 'Medium'
   // Strength labeling
   let strength = 'Neutral'
   if (skew >= 0.80 || skew <= 0.20) strength = 'Extreme'
@@ -99,7 +87,7 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   const src = (res as any)?._source === 'trades' ? 'Recent trades (flow)' : 'Current holders (positions)'
   let msg = `⚖️ <b>Smart Money Skew</b>\n\n` +
             `${dirEmoji} ${res.direction || 'Neutral'} • Skew ${skewPct}% • Pool $${pool}\n` +
-            `Source: ${src}`
+            `Confidence: ${confidence} • Source: ${src}`
   // Always add a compact context line (only when we have enough data)
   try {
     const meta = (res as any).meta || {}
@@ -107,6 +95,13 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
     const thr = meta.whaleScoreThreshold != null ? ` • Whale≥${meta.whaleScoreThreshold}` : ''
     msg += `\nStrength: ${strength}${wallets}${thr}`
   } catch {}
+  // Add cautions instead of returning early
+  if (walletsEvaluated === 0) {
+    msg += `\n⚠️ Verified-whale holders not detected — using holder snapshots; interpret cautiously.`
+  }
+  if (poolLow) {
+    msg += `\n⚠️ Smart-pool liquidity below $3,000; signal may be noisy.`
+  }
   if (detailed) {
     // Best-effort volume breakdown if available
     try {
