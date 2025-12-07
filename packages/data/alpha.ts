@@ -373,6 +373,9 @@ export async function computeSmartSkewFromHolders(
   // Resolve token IDs if not provided
   let yesTokenId = params.yesTokenId
   let noTokenId = params.noTokenId
+  // Also capture snapshot prices from Gamma as a robust fallback when CLOB mid-price is unavailable
+  let yesSnapPrice: number | null = null
+  let noSnapPrice: number | null = null
   try {
     if (!yesTokenId || !noTokenId) {
       const m = await gammaApi.getMarket(params.conditionId)
@@ -380,6 +383,9 @@ export async function computeSmartSkewFromHolders(
       const noT = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')
       yesTokenId = yesTokenId || yesT?.token_id
       noTokenId = noTokenId || noT?.token_id
+      // Capture snapshot prices if available on Gamma payload
+      try { yesSnapPrice = yesT?.price != null ? parseFloat(String(yesT.price)) : null } catch { yesSnapPrice = null }
+      try { noSnapPrice  = noT?.price  != null ? parseFloat(String(noT.price))  : null } catch { noSnapPrice  = null }
     }
   } catch {}
   if (!yesTokenId || !noTokenId) {
@@ -408,6 +414,9 @@ export async function computeSmartSkewFromHolders(
   let noPrice: number | null = null
   try { yesPrice = await clobApi.getCurrentPrice(yesTokenId) } catch {}
   try { noPrice = await clobApi.getCurrentPrice(noTokenId) } catch {}
+  // Fallback to Gamma snapshot prices if CLOB mid-price is not available
+  if (!Number.isFinite(yesPrice as any) || yesPrice == null) yesPrice = yesSnapPrice
+  if (!Number.isFinite(noPrice as any)  || noPrice  == null) noPrice  = noSnapPrice
 
   const toUsd = (bal: number, v?: number, price?: number|null) => {
     if (Number.isFinite(v as any)) return (v as any) as number
@@ -442,8 +451,17 @@ export async function computeSmartSkewFromHolders(
         const tNo  = tokenUsd[1].token
         yesTokenId = tYes
         noTokenId  = tNo
+        // Try CLOB prices first, then fallback to Gamma snapshot prices for the selected tokens
         yesPrice = priceCache.get(tYes) ?? yesPrice
         noPrice  = priceCache.get(tNo)  ?? noPrice
+        // If still missing, attempt to map back to Gamma token snapshot prices
+        try {
+          const m2 = await gammaApi.getMarket(params.conditionId)
+          const tYesMeta = (m2.tokens || []).find((t:any)=> String(t.token_id) === String(tYes))
+          const tNoMeta  = (m2.tokens || []).find((t:any)=> String(t.token_id) === String(tNo))
+          if (!Number.isFinite(yesPrice as any) || yesPrice == null) yesPrice = tYesMeta?.price != null ? parseFloat(String(tYesMeta.price)) : yesPrice
+          if (!Number.isFinite(noPrice as any)  || noPrice  == null) noPrice  = tNoMeta?.price  != null ? parseFloat(String(tNoMeta.price))  : noPrice
+        } catch {}
         yesListRaw = byToken.get(tYes)
         noListRaw  = byToken.get(tNo)
         log('skew.holders.fallback_tokens', { picked: [tYes, tNo], usd: [tokenUsd[0].usd, tokenUsd[1].usd] })

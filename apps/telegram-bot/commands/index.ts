@@ -2355,12 +2355,66 @@ export function registerCommands(bot: Telegraf) {
         }
         return
       }
-      // Case B: Single market (URL/ID/slug) -> compute and show once
+      // Case B: Single market (URL/ID/slug) — if it is an event container with sub‑markets, compute for each sub‑market; otherwise compute once
       let market = await resolveMarketFromInput(input, false)
       if (!market) { await ctx.reply('❌ Market not found. Provide full URL or 0x<condition_id>.'); return }
       let conditionId = market.condition_id || market.conditionId
       let yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
       let no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+      // If this looks like an event container (no YES/NO tokens or multi‑date series), expand to sub‑markets using the event page
+      try {
+        const eventUrlMaybe = getPolymarketMarketUrl(market)
+        if (eventUrlMaybe) {
+          const slugs = await getEventSubMarketSlugs(eventUrlMaybe)
+          // If multiple sub‑markets exist, compute skew for each unresolved child
+          if (Array.isArray(slugs) && slugs.length > 1) {
+            const children: Array<{ slug: string; m: any; cid: string; y: string; n: string; endTs: number | null }> = []
+            for (const slug of slugs) {
+              try {
+                const m = await findMarket(slug)
+                if (!m) continue
+                const cid = m.condition_id || m.conditionId
+                const y  = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                const n  = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                // Skip resolved/archived children
+                const anyWinner = Array.isArray(m.tokens) && m.tokens.some((t:any)=> t?.winner===true)
+                if (!cid || !y || !n || anyWinner || m.closed === true || m.archived === true) continue
+                let endTs: number | null = null
+                try { endTs = m.end_date_iso ? Date.parse(String(m.end_date_iso)) : null } catch { endTs = null }
+                children.push({ slug, m, cid, y, n, endTs })
+              } catch {}
+            }
+            // Sort by end date ascending when available
+            children.sort((a,b)=>{
+              const ax = a.endTs ?? Number.POSITIVE_INFINITY
+              const bx = b.endTs ?? Number.POSITIVE_INFINITY
+              return ax - bx
+            })
+            for (const ch of children) {
+              try {
+                const res = await getSmartSkew(ch.cid, ch.y, ch.n)
+                const url = getPolymarketMarketUrl(ch.m)
+                if (!res) continue
+                let card = formatSkewCard(ch.m.question || ch.slug, url, res, true)
+                try {
+                  const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                  if (exs.length) {
+                    const insights = await analyzeSkewExamples(exs)
+                    const bits: string[] = []
+                    if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                    if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                    if (bits.length) card += `\n${bits.join(' • ')}`
+                  }
+                } catch {}
+                const tok = condToToken(ch.cid)
+                const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+                await replySafe(ctx, card, kb)
+              } catch {}
+            }
+            return
+          }
+        }
+      } catch {}
       // Robust fallback: if tokens missing, try refetch by condition ID or slug
       if (!yes || !no) {
         try {
