@@ -37,10 +37,10 @@ async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?
     const nTok: string = n as string
     const { computeSmartSkewFromHolders } = await import('@smtm/data')
     // Use holder-based skew (current positions, not time-based trades)
-    // Lower threshold to show more markets
+    // Tune for responsiveness in UI: cap evaluated wallets moderately
     let res = await computeSmartSkewFromHolders(
       { conditionId, yesTokenId: yTok, noTokenId: nTok },
-      { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), minSmartPoolUsd: 100, maxWallets: 100 }
+      { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), minSmartPoolUsd: 100, maxWallets: 40 }
     )
 
     // Mark source for debugging (avoid assigning to parenthesized assertion)
@@ -238,7 +238,21 @@ function isEventUrlWithoutMarket(u: string): boolean {
 // Extract all sub-market slugs from a Polymarket event page
 async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
   try {
-    const resp = await fetch(eventUrl, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0)' } })
+    // Fetch with a hard timeout and browser-like headers to avoid hanging on bot protection
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 7000)
+    const resp = await fetch(eventUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Referer': 'https://polymarket.com/',
+      } as any,
+      signal: controller.signal as any,
+    } as any)
+    clearTimeout(timeout)
     if (!resp.ok) return []
     const html = await resp.text()
     const match = html.match(/<script[^>]*id=\"__NEXT_DATA__\"[^>]*>([^<]+)<\/script>/)
@@ -256,7 +270,55 @@ async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
       }
     }
     return Array.from(slugs)
-  } catch { return [] }
+  } catch (e) { try { logger.warn('getEventSubMarketSlugs failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
+}
+
+// Extract sub‑market metadata (conditionId, slug, tokens) from an event page
+async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 7000)
+    const resp = await fetch(eventUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Referer': 'https://polymarket.com/',
+      } as any,
+      signal: controller.signal as any,
+    } as any)
+    clearTimeout(timeout)
+    if (!resp.ok) return []
+    const html = await resp.text()
+    const match = html.match(/<script[^>]*id=\"__NEXT_DATA__\"[^>]*>([^<]+)<\/script>/)
+    if (!match || !match[1]) return []
+    const nextData = JSON.parse(match[1])
+    const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
+    const out: Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
+    for (const q of queries) {
+      const data = q?.state?.data
+      if (Array.isArray(data)) {
+        for (const m of data) {
+          const slug = m?.slug || m?.market_slug
+          const cid = m?.condition_id || m?.conditionId
+          if (slug && cid) {
+            out.push({ slug: String(slug), conditionId: String(cid), tokens: m?.tokens, question: m?.question, end_date_iso: m?.end_date_iso, closed: m?.closed, archived: m?.archived })
+          }
+        }
+      } else if (data && (data.slug || data.market_slug) && (data.condition_id || data.conditionId)) {
+        const slug = data.slug || data.market_slug
+        const cid = data.condition_id || data.conditionId
+        out.push({ slug: String(slug), conditionId: String(cid), tokens: data.tokens, question: data.question, end_date_iso: data.end_date_iso, closed: data.closed, archived: data.archived })
+      }
+    }
+    // De‑dupe by conditionId
+    const seen = new Set<string>()
+    const uniq: typeof out = []
+    for (const m of out) { if (!seen.has(m.conditionId)) { seen.add(m.conditionId); uniq.push(m) } }
+    return uniq
+  } catch (e) { try { logger.warn('getEventSubMarkets failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
 }
 
 /**
@@ -2366,23 +2428,36 @@ export function registerCommands(bot: Telegraf) {
       try {
         const eventUrlMaybe = getPolymarketMarketUrl(market)
         if (eventUrlMaybe) {
-          const slugs = await getEventSubMarketSlugs(eventUrlMaybe)
+          // Prefer structured extraction with condition IDs to avoid slug → market lookups
+          const childrenRaw = await getEventSubMarkets(eventUrlMaybe)
           // If multiple sub‑markets exist, compute skew for each unresolved child
-          if (Array.isArray(slugs) && slugs.length > 1) {
+          if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
             const children: Array<{ slug: string; m: any; cid: string; y: string; n: string; endTs: number | null }> = []
-            for (const slug of slugs) {
+            for (const child of childrenRaw) {
               try {
-                const m = await findMarket(slug)
-                if (!m) continue
-                const cid = m.condition_id || m.conditionId
-                const y  = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
-                const n  = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
-                // Skip resolved/archived children
-                const anyWinner = Array.isArray(m.tokens) && m.tokens.some((t:any)=> t?.winner===true)
-                if (!cid || !y || !n || anyWinner || m.closed === true || m.archived === true) continue
+                const m = child
+                const cid = child.conditionId
+                // Resolve YES/NO tokens from the payload; fallback to API if missing
+                let y: string | undefined = undefined
+                let n: string | undefined = undefined
+                const toks: any[] = Array.isArray((child as any).tokens) ? (child as any).tokens as any[] : []
+                if (toks.length) {
+                  y = toks.find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                  n = toks.find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                }
+                if (!y || !n) {
+                  try {
+                    const m2 = await gammaApi.getMarket(cid)
+                    const yesT = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                    const noT  = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                    if (yesT && noT) { y = yesT; n = noT }
+                  } catch {}
+                }
+                const anyWinner = Array.isArray((child as any).tokens) && (child as any).tokens.some((t:any)=> t?.winner===true)
+                if (!cid || !y || !n || anyWinner || child.closed === true || child.archived === true) continue
                 let endTs: number | null = null
-                try { endTs = m.end_date_iso ? Date.parse(String(m.end_date_iso)) : null } catch { endTs = null }
-                children.push({ slug, m, cid, y, n, endTs })
+                try { endTs = child.end_date_iso ? Date.parse(String(child.end_date_iso)) : null } catch { endTs = null }
+                children.push({ slug: child.slug, m: child, cid, y, n, endTs })
               } catch {}
             }
             // Sort by end date ascending when available
@@ -2391,26 +2466,33 @@ export function registerCommands(bot: Telegraf) {
               const bx = b.endTs ?? Number.POSITIVE_INFINITY
               return ax - bx
             })
-            for (const ch of children) {
-              try {
-                const res = await getSmartSkew(ch.cid, ch.y, ch.n)
-                const url = getPolymarketMarketUrl(ch.m)
-                if (!res) continue
-                let card = formatSkewCard(ch.m.question || ch.slug, url, res, true)
+            // Safety cap: avoid excessively large event expansions (send first 10 if huge)
+            const toSend = children.slice(0, 10)
+            // Process in small batches to avoid one slow child blocking others
+            const batchSize = 3
+            for (let i = 0; i < toSend.length; i += batchSize) {
+              const batch = toSend.slice(i, i + batchSize)
+              await Promise.all(batch.map(async (ch) => {
                 try {
-                  const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
-                  if (exs.length) {
-                    const insights = await analyzeSkewExamples(exs)
-                    const bits: string[] = []
-                    if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
-                    if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
-                    if (bits.length) card += `\n${bits.join(' • ')}`
-                  }
+                  const res = await getSmartSkew(ch.cid, ch.y, ch.n)
+                  const url = getPolymarketMarketUrl(ch.m)
+                  if (!res) return
+                  let card = formatSkewCard(ch.m.question || ch.slug, url, res, true)
+                  try {
+                    const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                    if (exs.length) {
+                      const insights = await analyzeSkewExamples(exs)
+                      const bits: string[] = []
+                      if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                      if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                      if (bits.length) card += `\n${bits.join(' • ')}`
+                    }
+                  } catch {}
+                  const tok = condToToken(ch.cid)
+                  const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+                  await replySafe(ctx, card, kb)
                 } catch {}
-                const tok = condToToken(ch.cid)
-                const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
-                await replySafe(ctx, card, kb)
-              } catch {}
+              }))
             }
             return
           }
