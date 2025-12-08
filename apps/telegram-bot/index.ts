@@ -72,7 +72,6 @@ async function start() {
       { command: 'follow', description: 'Follow market or wallet alerts' },
       { command: 'unfollow', description: 'Stop following' },
       { command: 'list', description: 'List your follows' },
-      { command: 'status', description: 'Check connection status' },
     ]);
 
     // Restore stored data before deciding to start WS
