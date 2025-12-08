@@ -261,7 +261,22 @@ async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: strin
       m.events && Array.isArray(m.events) && m.events.some(e => e.slug === eventSlug)
     )
 
-    logger.info({ total: markets.length, matching: eventMarkets.length }, 'getMarketsByEvent: filtered results')
+    // Debug: log sample of what events look like
+    const sampleEvents = markets.slice(0, 5).map(m => ({
+      question: m.question?.slice(0, 50),
+      events: m.events?.map(e => e.slug)
+    }))
+
+    // Also search for markets that might be related by question text
+    const relatedByQuestion = markets.filter(m =>
+      m.question?.toLowerCase().includes(eventSlug.toLowerCase().replace(/-/g, ' '))
+    ).map(m => ({
+      question: m.question?.slice(0, 80),
+      slug: m.slug,
+      events: m.events?.map(e => e.slug)
+    }))
+
+    logger.info({ total: markets.length, matching: eventMarkets.length, sampleEvents, relatedByQuestion }, 'getMarketsByEvent: filtered results')
 
     return eventMarkets.map(m => ({
       slug: m.slug || m.market_slug || '',
