@@ -512,6 +512,41 @@ export async function computeSmartSkewFromHolders(
   const noH  = (noListRaw  || []).map(h=>({ wallet: h.address, usd: toUsd(h.balance, h.value, noPrice) }))
   log('skew.holders.prices', { yesPrice, noPrice, yesCount: yesH.length, noCount: noH.length })
   const isAddr = (w: string) => /^0x[a-fA-F0-9]{40}$/.test(w)
+  // Resolve non-0x handles to addresses (best-effort) for top wallets
+  const resolveCache: Map<string, string> = (global as any)._polyHandleCache || new Map<string, string>()
+  ;(global as any)._polyHandleCache = resolveCache
+  const tryResolveHandle = async (handle: string): Promise<string|undefined> => {
+    if (!handle || isAddr(handle)) return handle.toLowerCase()
+    if (resolveCache.has(handle)) return resolveCache.get(handle)
+    const candidates = [
+      `https://polymarket.com/@${encodeURIComponent(handle)}`,
+      `https://polymarket.com/profile/${encodeURIComponent('@'+handle)}`,
+    ]
+    for (const url of candidates) {
+      try {
+        const ctrl = new AbortController()
+        const to = setTimeout(()=>ctrl.abort(), 4000)
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+            'Accept': 'text/html,application/xhtml+xml',
+            'Referer': 'https://polymarket.com/',
+          } as any,
+          signal: ctrl.signal as any,
+        } as any)
+        clearTimeout(to)
+        if (!res.ok) continue
+        const html = await res.text()
+        let m = html.match(/\/profile\/(0x[a-fA-F0-9]{40})/)
+        if (m && m[1]) { const addr = m[1].toLowerCase(); resolveCache.set(handle, addr); return addr }
+        m = html.match(/"user[_]?id"\s*:\s*"(0x[a-fA-F0-9]{40})"/i)
+        if (m && m[1]) { const addr = m[1].toLowerCase(); resolveCache.set(handle, addr); return addr }
+        m = html.match(/0x[a-fA-F0-9]{40}/)
+        if (m && m[0]) { const addr = m[0].toLowerCase(); resolveCache.set(handle, addr); return addr }
+      } catch {}
+    }
+    return undefined
+  }
   // Filter out invalid/anonymous holder entries to avoid downstream API errors
   let yesHF = yesH.filter(h => isAddr(h.wallet))
   let noHF  = noH.filter(h => isAddr(h.wallet))
@@ -525,6 +560,19 @@ export async function computeSmartSkewFromHolders(
   // Sort by USD and cap wallets to evaluate
   yesHF.sort((a,b)=>b.usd - a.usd)
   noHF.sort((a,b)=>b.usd - a.usd)
+  // Attempt to resolve top non-address handles to 0x to improve scoring
+  const resolveTop = async (arr: Array<{wallet:string;usd:number}>) => {
+    const top = arr.slice(0, Math.min(10, arr.length))
+    await Promise.allSettled(top.map(async (h, i)=>{
+      if (!isAddr(h.wallet)) {
+        const guess = h.wallet.replace(/^@/, '')
+        const addr = await tryResolveHandle(guess)
+        if (addr) arr[i].wallet = addr
+      }
+    }))
+  }
+  try { await resolveTop(yesHF) } catch {}
+  try { await resolveTop(noHF) } catch {}
   const yesEval = yesHF.slice(0, Math.min(maxWallets, yesHF.length))
   const noEval  = noHF.slice(0, Math.min(maxWallets, noHF.length))
   log('skew.holders.sums_raw', {
@@ -622,6 +670,9 @@ export async function computeSmartSkewFromHolders(
       whalesDetected,
       yesWhaleCount: aboveYes,
       noWhaleCount: aboveNo,
+      yesUsdRaw: parseFloat(yesSumRaw.toFixed(2)),
+      noUsdRaw: parseFloat(noSumRaw.toFixed(2)),
+      hasData: smartPoolUsd >= minSmartPoolUsd && whalesDetected > 0,
     },
     examples,
   }

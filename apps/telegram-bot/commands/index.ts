@@ -49,7 +49,9 @@ async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?
 
     // Check if we have meaningful data
     const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
-    const hasData = (res.smartPoolUsd || 0) >= 100 && walletsEvaluated > 0
+    const hasDataMeta = (res as any)?.meta?.hasData
+    const hasData = typeof hasDataMeta === 'boolean' ? hasDataMeta : ((res.smartPoolUsd || 0) >= 100 && walletsEvaluated > 0)
+    if (!hasData) return null
     SkewCache.set(conditionId, { ts: now, result: res })
     return res
   } catch (e) {
