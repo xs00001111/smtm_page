@@ -400,17 +400,36 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
         }
         for (const m of data) {
           const cid = m?.condition_id || m?.conditionId
-          if (cid && looksChildOfGroup(m)) {
-            const slug = String(m?.slug || m?.market_slug || groupSlug)
-            out.push({ slug, conditionId: String(cid), tokens: m?.tokens, question: m?.question, end_date_iso: m?.end_date_iso, closed: m?.closed, archived: m?.archived })
+          const slug = String(m?.slug || m?.market_slug || groupSlug)
+
+          // Check if market belongs to this group/event
+          // Also check eventSlug field for __NEXT_DATA__ markets
+          const matchesGroup = looksChildOfGroup(m) || m?.eventSlug === eventSlug
+
+          if (matchesGroup && slug) {
+            out.push({
+              slug,
+              conditionId: cid ? String(cid) : '',
+              tokens: m?.tokens,
+              question: m?.question,
+              end_date_iso: m?.end_date_iso || m?.endDateIso,
+              closed: m?.closed,
+              archived: m?.archived
+            })
           }
         }
       }
     }
-    // De‑dupe by conditionId
+    // De‑dupe by conditionId or slug (some markets may not have conditionId)
     const seen = new Set<string>()
     const uniq: typeof out = []
-    for (const m of out) { if (!seen.has(m.conditionId)) { seen.add(m.conditionId); uniq.push(m) } }
+    for (const m of out) {
+      const key = m.conditionId || m.slug
+      if (!seen.has(key)) {
+        seen.add(key)
+        uniq.push(m)
+      }
+    }
     return uniq
   } catch (e) { try { logger.warn('getGroupSubMarkets failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
 }
@@ -456,6 +475,9 @@ async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
 // Extract sub‑market metadata (conditionId, slug, tokens) from an event page
 async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
   try {
+    // Extract target event slug from URL
+    const targetEventSlug = eventUrl.split('/event/')[1]?.split('/')[0]
+
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 7000)
     const resp = await fetch(eventUrl, {
@@ -476,7 +498,7 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
     if (!match || !match[1]) return []
     const nextData = JSON.parse(match[1])
     const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
-    logger.info({ queriesCount: queries.length, hasDehydratedState: !!nextData?.props?.pageProps?.dehydratedState }, 'getEventSubMarkets: parsed __NEXT_DATA__')
+    logger.info({ queriesCount: queries.length, hasDehydratedState: !!nextData?.props?.pageProps?.dehydratedState, targetEventSlug }, 'getEventSubMarkets: parsed __NEXT_DATA__')
     const out: Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
     let totalMarketsInQueries = 0
     for (const q of queries) {
@@ -490,8 +512,25 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
         for (const m of data) {
           const slug = m?.slug || m?.market_slug
           const cid = m?.condition_id || m?.conditionId
-          if (slug && cid) {
-            out.push({ slug: String(slug), conditionId: String(cid), tokens: m?.tokens, question: m?.question, end_date_iso: m?.end_date_iso, closed: m?.closed, archived: m?.archived })
+          const marketEventSlug = m?.eventSlug
+
+          // Filter: only include markets that belong to the target event
+          if (targetEventSlug && marketEventSlug !== targetEventSlug) {
+            continue
+          }
+
+          // __NEXT_DATA__ markets may not have conditionId but have eventSlug instead
+          // Accept markets with just slug (can resolve conditionId later)
+          if (slug) {
+            out.push({
+              slug: String(slug),
+              conditionId: cid ? String(cid) : '',
+              tokens: m?.tokens,
+              question: m?.question,
+              end_date_iso: m?.end_date_iso || m?.endDateIso,
+              closed: m?.closed,
+              archived: m?.archived
+            })
           }
         }
       } else if (data && (data.slug || data.market_slug) && (data.condition_id || data.conditionId)) {
@@ -500,10 +539,16 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
         out.push({ slug: String(slug), conditionId: String(cid), tokens: data.tokens, question: data.question, end_date_iso: data.end_date_iso, closed: data.closed, archived: data.archived })
       }
     }
-    // De‑dupe by conditionId
+    // De‑dupe by conditionId or slug (some markets may not have conditionId)
     const seen = new Set<string>()
     const uniq: typeof out = []
-    for (const m of out) { if (!seen.has(m.conditionId)) { seen.add(m.conditionId); uniq.push(m) } }
+    for (const m of out) {
+      const key = m.conditionId || m.slug
+      if (!seen.has(key)) {
+        seen.add(key)
+        uniq.push(m)
+      }
+    }
     logger.info({ totalMarketsInQueries, rawMarketsFound: out.length, uniqueMarkets: uniq.length }, 'getEventSubMarkets: processed queries')
     return uniq
   } catch (e) { try { logger.warn('getEventSubMarkets failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
@@ -2739,7 +2784,9 @@ export function registerCommands(bot: Telegraf) {
         slug: market.slug || market.market_slug,
         question: market.question?.slice(0, 80),
         hasTokens: !!market.tokens,
-        tokenCount: market.tokens?.length
+        tokenCount: market.tokens?.length,
+        events: market.events,
+        hasEvents: !!market.events
       }, 'skew: DEBUG resolved market object')
 
       let conditionId = market.condition_id || market.conditionId
@@ -2747,16 +2794,26 @@ export function registerCommands(bot: Telegraf) {
       let no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
       // If this looks like an event container (no YES/NO tokens or multi‑date series), expand to sub‑markets using the event page
       try {
-        // Prefer event URL derived from input if user pasted a market URL under an event
+        // Prefer event slug from market.events field if available (most reliable)
+        let eventSlug: string | undefined
+        if (market.events && Array.isArray(market.events) && market.events.length > 0) {
+          eventSlug = market.events[0].slug
+          logger.info({ eventSlugFromMarket: eventSlug, eventsCount: market.events.length }, 'skew: extracted event slug from market.events')
+        }
+
+        // Fallback: parse from URL
         const eventUrlMaybe = getEventUrlFromInput(input) || getPolymarketMarketUrl(market)
         const isGroupUrl = /^https?:\/\//i.test(input) && (()=>{ try { const u=new URL(input); const p=u.pathname.split('/').filter(Boolean); const i=p.findIndex(x=>x==='event'); return i>=0 && !!p[i+2] } catch { return false } })()
-        logger.info({ isGroupUrl, eventUrlMaybe, input }, 'skew: multi-market detection')
+
+        if (!eventSlug && eventUrlMaybe) {
+          eventSlug = eventUrlMaybe.split('/event/')[1]?.split('/')[0]
+        }
+
+        logger.info({ isGroupUrl, eventUrlMaybe, eventSlug, input }, 'skew: multi-market detection')
 
         // Try API-based approach first (more reliable than HTML scraping)
-        if (eventUrlMaybe) {
-          const eventSlug = eventUrlMaybe.split('/event/')[1]?.split('/')[0]
-          if (eventSlug) {
-            const childrenRaw = await getMarketsByEvent(eventSlug)
+        if (eventSlug) {
+          const childrenRaw = await getMarketsByEvent(eventSlug)
             if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
               const children: Array<{ slug: string; m: any; cid: string; y: string; n: string; endTs: number | null }> = []
               for (const child of childrenRaw) {
