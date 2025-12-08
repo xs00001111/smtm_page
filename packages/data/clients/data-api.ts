@@ -371,6 +371,34 @@ export class DataApiClient {
         marketPnL.set(marketKey, prev + (Number.isFinite(pnl) ? pnl : 0));
       }
 
+      // Optionally incorporate open positions that are effectively worthless due to resolved outcomes not yet reflected (Polymarket bug)
+      try {
+        const openPositions = await this.getUserPositions({ user, limit: Math.min(1000, Math.max(500, limit)) });
+        // Aggregate current value per market for open positions not already in marketPnL
+        const openByMarket = new Map<string, number>();
+        for (let i=0; i<openPositions.length; i++) {
+          const p: any = openPositions[i] as any;
+          const keyRaw = String(p.market || p.condition_id || p.conditionId || p.market_id || p.marketId || '').trim();
+          const marketKey = keyRaw || String(p.id || `open_${i}`);
+          if (marketPnL.has(marketKey)) continue; // skip markets that are already closed and accounted for
+          const v = parseFloat(String(p.value ?? '0'));
+          const prev = openByMarket.get(marketKey) || 0;
+          openByMarket.set(marketKey, prev + (Number.isFinite(v) ? v : 0));
+        }
+        // Heuristic: if total current value across open positions in a market < $5, treat as provisional loss for win rate
+        // This prevents 100% win rate when many now-worthless positions remain "open" due to API bugs
+        for (const [mkt, cur] of openByMarket.entries()) {
+          if (!marketPnL.has(mkt)) {
+            if (Number.isFinite(cur) && cur < 5) {
+              marketPnL.set(mkt, -1); // mark as a small negative to count as a loss
+            }
+          }
+        }
+        this.dbg('winrate.open_heuristic', { user, addedLosses: Array.from(openByMarket.entries()).filter(([,v])=>v<5).length })
+      } catch (e) {
+        this.dbg('winrate.open_heuristic.error', { user, err: (e as any)?.message })
+      }
+
       // Count markets with positive net PnL
       let wins = 0;
       for (const netPnL of marketPnL.values()) {
