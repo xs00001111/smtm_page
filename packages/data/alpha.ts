@@ -485,8 +485,15 @@ export async function computeSmartSkewFromHolders(
   log('skew.holders.prices', { yesPrice, noPrice, yesCount: yesH.length, noCount: noH.length })
   const isAddr = (w: string) => /^0x[a-fA-F0-9]{40}$/.test(w)
   // Filter out invalid/anonymous holder entries to avoid downstream API errors
-  const yesHF = yesH.filter(h => isAddr(h.wallet))
-  const noHF  = noH.filter(h => isAddr(h.wallet))
+  let yesHF = yesH.filter(h => isAddr(h.wallet))
+  let noHF  = noH.filter(h => isAddr(h.wallet))
+  // If address validation strips all holders but we still have data, fall back to using raw holder entries
+  // This handles cases where the API returns non-standard or masked addresses
+  if ((yesHF.length + noHF.length) === 0 && (yesH.length + noH.length) > 0) {
+    log('skew.holders.fallback_use_raw', { yesRaw: yesH.length, noRaw: noH.length })
+    yesHF = yesH
+    noHF = noH
+  }
   // Sort by USD and cap wallets to evaluate
   yesHF.sort((a,b)=>b.usd - a.usd)
   noHF.sort((a,b)=>b.usd - a.usd)
