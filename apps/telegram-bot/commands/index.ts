@@ -288,6 +288,17 @@ async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: strin
     let markets: any[] = []
     for (let offset = 0; offset < 500; offset += 100) {
       const batch = await gammaApi.getMarkets({ limit: 100, offset, order: 'liquidity', active: true, closed: false })
+
+      // Debug: log first market's keys to see what fields are available from API
+      if (offset === 0 && batch.length > 0) {
+        logger.info({
+          sampleKeys: Object.keys(batch[0] || {}),
+          hasEventsField: 'events' in batch[0],
+          eventsValue: batch[0].events,
+          question: batch[0].question?.slice(0, 60)
+        }, 'getMarketsByEvent: DEBUG API market structure')
+      }
+
       markets = markets.concat(batch)
       // If we found matches, we can stop early
       const matches = batch.filter(m =>
