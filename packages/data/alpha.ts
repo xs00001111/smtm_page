@@ -401,7 +401,14 @@ export async function computeSmartSkewFromHolders(
   } catch {}
   for (const row of holders || []) {
     const list = Array.isArray(row?.holders) ? row.holders : []
-    byToken.set(String(row?.token), list.map((h:any)=>({ address: String(h.address).toLowerCase(), balance: parseFloat(String(h.balance||'0')), value: h.value != null ? parseFloat(String(h.value)) : undefined })))
+    byToken.set(String(row?.token), list.map((h:any)=>{
+      const addr = String(h.address || '').toLowerCase()
+      const balRaw = h.balance
+      const valRaw = h.value
+      const bal = typeof balRaw === 'number' ? balRaw : Number(String(balRaw ?? '0').replace(/[,\s]/g, ''))
+      const val = valRaw != null ? Number(String(valRaw).replace(/[,\s]/g, '')) : undefined
+      return { address: addr, balance: Number.isFinite(bal) ? bal : 0, value: Number.isFinite(val as any) ? (val as number) : undefined }
+    }))
   }
   // If holders API returned nothing, log and exit later with zero-evidence result
   if (byToken.size === 0) {
@@ -595,12 +602,25 @@ export async function computeSmartSkewFromHolders(
   try { await resolveTop(noHF) } catch {}
   const yesEval = yesHF.slice(0, Math.min(maxWallets, yesHF.length))
   const noEval  = noHF.slice(0, Math.min(maxWallets, noHF.length))
+  const yesSumRaw = yesHF.reduce((a,b)=>a+b.usd,0)
+  const noSumRaw  = noHF.reduce((a,b)=>a+b.usd,0)
   log('skew.holders.sums_raw', {
-    yesUsd: yesHF.reduce((a,b)=>a+b.usd,0),
-    noUsd: noHF.reduce((a,b)=>a+b.usd,0),
+    yesUsd: yesSumRaw,
+    noUsd: noSumRaw,
     yesEvalCount: yesEval.length,
     noEvalCount: noEval.length,
   })
+  if ((yesSumRaw + noSumRaw) === 0) {
+    try {
+      log('skew.holders.debug_zero', {
+        yesPrice,
+        noPrice,
+        yesSample: yesHF.slice(0, 3),
+        noSample: noHF.slice(0, 3),
+        byTokenKeys: holderTokens.slice(0, 4)
+      })
+    } catch {}
+  }
 
   // Score wallets and compute PnL for examples
   const scoreCache = new Map<string, number>()
@@ -644,8 +664,7 @@ export async function computeSmartSkewFromHolders(
   })
 
   // Fallback 2: if whale pool is zero but we have meaningful holders, loosen criteria using top holders by USD
-  const yesSumRaw = yesHF.reduce((a,b)=>a+b.usd, 0)
-  const noSumRaw  = noHF.reduce((a,b)=>a+b.usd, 0)
+  // Reuse yesSumRaw/noSumRaw computed above
   if ((yesWhale + noWhale) === 0 && (yesSumRaw + noSumRaw) > 0) {
     // Treat top-N holders as whales to avoid false "no data" when wallets exist but score is low (e.g., new accounts)
     const topN = 3
