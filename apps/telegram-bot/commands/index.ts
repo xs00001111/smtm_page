@@ -671,9 +671,13 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
           // If not found, this might be an event page with multiple markets
           // Scrape the page to get the first market
           try {
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 7000)
             const resp = await fetch(trimmedInput, {
-              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0)' }
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0)' },
+              signal: controller.signal
             })
+            clearTimeout(timeout)
             if (resp.ok) {
               const html = await resp.text()
               const match = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/)
