@@ -259,8 +259,9 @@ async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: strin
       const testMarket = await gammaApi.getMarket('0xafc235557ace53ff0b0d2e93392314a7c3f3daab26a79050e985c11282f66df7')
       logger.info({
         question: testMarket.question,
-        slug: testMarket.slug,
+        slug: testMarket.slug || testMarket.market_slug,
         events: testMarket.events,
+        allKeys: Object.keys(testMarket).sort(),
         active: testMarket.active,
         closed: testMarket.closed,
         archived: testMarket.archived
