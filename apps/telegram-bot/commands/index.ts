@@ -2790,6 +2790,23 @@ export function registerCommands(bot: Telegraf) {
       }, 'skew: DEBUG resolved market object')
 
       let conditionId = market.condition_id || market.conditionId
+
+      // Fetch full market with tokens if missing
+      if (!market.tokens || market.tokens.length === 0) {
+        try {
+          if (conditionId) {
+            logger.info({ conditionId }, 'skew: fetching full market to get tokens')
+            const fullMarket = await gammaApi.getMarket(conditionId)
+            if (fullMarket?.tokens?.length) {
+              market = Object.assign({}, market, fullMarket)
+              logger.info({ tokenCount: fullMarket.tokens.length }, 'skew: successfully fetched tokens')
+            }
+          }
+        } catch (e) {
+          logger.warn({ err: (e as any)?.message }, 'skew: failed to fetch full market')
+        }
+      }
+
       let yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
       let no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
 
@@ -3000,18 +3017,10 @@ export function registerCommands(bot: Telegraf) {
           }
         }
       } catch {}
-      // Robust fallback: if tokens missing, try refetch by condition ID or slug
+      // Tokens should already be fetched earlier, but double-check
       if (!yes || !no) {
-        try {
-          if (conditionId) {
-            const ref = await gammaApi.getMarket(conditionId)
-            if (ref?.tokens?.length) {
-              market = Object.assign({}, market, ref)
-              yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
-              no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
-            }
-          }
-        } catch {}
+        yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+        no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
       }
       if (!yes || !no) {
         // Last attempt: if input is a URL with a market slug, resolve by slug directly
