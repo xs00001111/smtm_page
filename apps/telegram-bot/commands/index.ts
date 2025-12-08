@@ -258,8 +258,19 @@ async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: strin
     try {
       const searchResults = await gammaApi.searchMarkets(eventSlug.replace(/-/g, ' '), 50)
       logger.info({ searchResults: searchResults.length, questions: searchResults.map(m => m.question?.slice(0, 50)) }, 'getMarketsByEvent: search results')
-      if (searchResults.length > 0) {
-        return searchResults.map(m => ({
+
+      // Filter to only include markets that actually contain keywords from the event slug
+      // This prevents irrelevant results from broad searches
+      const keywords = eventSlug.split('-').filter(w => w.length > 2) // Skip short words like "in", "on"
+      const relevantResults = searchResults.filter(m => {
+        const question = (m.question || '').toLowerCase()
+        return keywords.some(keyword => question.includes(keyword.toLowerCase()))
+      })
+
+      logger.info({ relevant: relevantResults.length, total: searchResults.length, keywords }, 'getMarketsByEvent: filtered search results')
+
+      if (relevantResults.length > 0) {
+        return relevantResults.map(m => ({
           slug: m.slug || m.market_slug || '',
           conditionId: m.condition_id,
           tokens: m.tokens,
