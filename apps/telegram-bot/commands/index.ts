@@ -2125,8 +2125,57 @@ export function registerCommands(bot: Telegraf) {
     const query = args.join(' ')
     try {
       await ctx.reply('🔍 Loading market and holders...')
+
+      // Check for multi-date markets first
+      if (isEventUrlWithoutMarket(query)) {
+        const slugs = await getEventSubMarketSlugs(query)
+        if (slugs.length > 1) {
+          for (const slug of slugs) {
+            const m = await findMarket(slug)
+            if (m) await processNetForMarket(ctx, m)
+          }
+          return
+        }
+      }
+
       const market = await resolveMarketFromInput(query)
       if (!market) { await ctx.reply('❌ Market not found. Try a full URL, ID (0x...), or slug.'); return }
+
+      // Check if this is a group URL with multiple children
+      const eventUrlMaybe = getEventUrlFromInput(query) || getPolymarketMarketUrl(market)
+      const isGroupUrl = /^https?:\/\//i.test(query) && (()=>{ try { const u=new URL(query); const p=u.pathname.split('/').filter(Boolean); const i=p.findIndex(x=>x==='event'); return i>=0 && !!p[i+2] } catch { return false } })()
+
+      if (isGroupUrl) {
+        const childrenRaw = await getGroupSubMarkets(query)
+        if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
+          for (const child of childrenRaw) {
+            await processNetForMarket(ctx, child)
+          }
+          return
+        }
+      }
+
+      if (eventUrlMaybe) {
+        const childrenRaw = await getEventSubMarkets(eventUrlMaybe)
+        if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
+          for (const child of childrenRaw) {
+            await processNetForMarket(ctx, child)
+          }
+          return
+        }
+      }
+
+      // Single market - process normally
+      await processNetForMarket(ctx, market)
+    } catch (e) {
+      logger.error('net command failed', e)
+      await ctx.reply('❌ Failed to load net positions. Try again later.')
+    }
+  })
+
+  // Helper function to process net positions for a single market
+  async function processNetForMarket(ctx: any, market: any) {
+    try {
       const conditionId = market.condition_id || market.conditionId
       const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
       if (!holdersRes?.length) { await ctx.reply('❌ No holder data available for this market.'); return }
@@ -2175,10 +2224,10 @@ export function registerCommands(bot: Telegraf) {
       })
       await ctx.reply(msg)
     } catch (e) {
-      logger.error('net command failed', e)
-      await ctx.reply('❌ Failed to load net positions. Try again later.')
+      logger.error('processNetForMarket failed', e)
+      await ctx.reply('❌ Failed to load net positions for this market.')
     }
-  })
+  }
 
   // Overview: positions by side with pricing + orderbook summary (public data)
   bot.command('overview', async (ctx) => {
@@ -2244,6 +2293,79 @@ export function registerCommands(bot: Telegraf) {
         }
         // Strict mode: only accept URLs or condition IDs, no fuzzy search
         const market = await resolveMarketFromInput(query, false)
+        // Check if this is a group URL (event + market slug) with multi-date children
+        const eventUrlMaybe = getEventUrlFromInput(query) || (market ? getPolymarketMarketUrl(market) : null)
+        const isGroupUrl = /^https?:\/\//i.test(query) && (()=>{ try { const u=new URL(query); const p=u.pathname.split('/').filter(Boolean); const i=p.findIndex(x=>x==='event'); return i>=0 && !!p[i+2] } catch { return false } })()
+        if (isGroupUrl && market) {
+          try {
+            const childrenRaw = await getGroupSubMarkets(query)
+            if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
+              // Process each child market
+              for (const child of childrenRaw) {
+                try {
+                  const cid = child.conditionId
+                  const yes = (child.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                  const no  = (child.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                  if (!cid || !yes || !no) continue
+                  const res = await getSmartSkew(cid, yes, no)
+                  if (res) {
+                    const marketUrl = `https://polymarket.com/event/${query.split('/event/')[1]?.split('/')[0]}/${child.slug}`
+                    let card = formatSkewCard(child.question || child.slug, marketUrl, res, true)
+                    try {
+                      const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                      if (exs.length) {
+                        const insights = await analyzeSkewExamples(exs)
+                        const bits: string[] = []
+                        if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                        if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                        if (bits.length) card += `\n${bits.join(' • ')}`
+                      }
+                    } catch {}
+                    await ctx.reply(card, { parse_mode: 'HTML' })
+                  }
+                } catch {}
+              }
+              return
+            }
+          } catch (e) {
+            logger.warn('overview: group sub-markets failed', { err: (e as any)?.message })
+          }
+        }
+        // Check if event URL has multiple children
+        if (eventUrlMaybe && market) {
+          try {
+            const childrenRaw = await getEventSubMarkets(eventUrlMaybe)
+            if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
+              for (const child of childrenRaw) {
+                try {
+                  const cid = child.conditionId
+                  const yes = (child.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                  const no  = (child.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                  if (!cid || !yes || !no) continue
+                  const res = await getSmartSkew(cid, yes, no)
+                  if (res) {
+                    const marketUrl = `https://polymarket.com/event/${eventUrlMaybe.split('/event/')[1]}/${child.slug}`
+                    let card = formatSkewCard(child.question || child.slug, marketUrl, res, true)
+                    try {
+                      const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                      if (exs.length) {
+                        const insights = await analyzeSkewExamples(exs)
+                        const bits: string[] = []
+                        if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                        if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                        if (bits.length) card += `\n${bits.join(' • ')}`
+                      }
+                    } catch {}
+                    await ctx.reply(card, { parse_mode: 'HTML' })
+                  }
+                } catch {}
+              }
+              return
+            }
+          } catch (e) {
+            logger.warn('overview: event sub-markets expansion failed', { err: (e as any)?.message })
+          }
+        }
         if (!market) {
           logger.warn('overview: market not found', { query })
           await ctx.reply('❌ Market not found.\n\nPlease provide:\n• Full market URL, or\n• Condition ID (0x...)\n\nFor search, use /markets <query> instead.')
