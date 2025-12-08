@@ -255,6 +255,7 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
     const url = new URL(groupUrl)
     const parts = url.pathname.split('/').filter(Boolean)
     const idx = parts.findIndex(p => p === 'event')
+    const eventSlug = parts[idx+1] || ''
     const groupSlug = parts[idx+2] || ''
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 7000)
@@ -281,7 +282,9 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
       const ms = String(m?.market_slug || '')
       const s  = String(m?.slug || '')
       const parent = String(m?.parent_market_slug || m?.parentSlug || '')
-      return (ms && ms === groupSlug) || (parent && parent === groupSlug) || (s && s.startsWith(groupSlug))
+      // Check if child of groupSlug OR eventSlug (for multi-date events)
+      return (ms && ms === groupSlug) || (parent && parent === groupSlug) || (s && s.startsWith(groupSlug)) ||
+             (parent && parent === eventSlug) || (s && s.startsWith(eventSlug + '-'))
     }
     for (const q of queries) {
       const data = q?.state?.data
