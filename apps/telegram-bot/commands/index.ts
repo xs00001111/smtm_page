@@ -253,8 +253,23 @@ function getEventUrlFromInput(u: string): string | null {
 async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
   try {
     logger.info({ eventSlug }, 'getMarketsByEvent: fetching from API')
-    // Fetch a large batch of markets (API supports up to 100+)
-    const markets = await gammaApi.getMarkets({ limit: 100, active: true, closed: false })
+    // Fetch many markets - remove active/closed filters to get all markets including low-volume ones
+    // Try multiple pages if needed
+    let markets: any[] = []
+    for (let offset = 0; offset < 500; offset += 100) {
+      const batch = await gammaApi.getMarkets({ limit: 100, offset })
+      markets = markets.concat(batch)
+      // If we found matches, we can stop early
+      const matches = batch.filter(m =>
+        m.events && Array.isArray(m.events) && m.events.some((e: any) => e.slug === eventSlug)
+      )
+      if (matches.length > 0) {
+        logger.info({ offset, batchSize: batch.length, matches: matches.length }, 'getMarketsByEvent: found matches, stopping early')
+        break
+      }
+      // If we got less than 100, we've reached the end
+      if (batch.length < 100) break
+    }
 
     // Filter for markets that belong to this event
     const eventMarkets = markets.filter(m =>
