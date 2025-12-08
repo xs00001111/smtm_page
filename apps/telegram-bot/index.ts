@@ -57,22 +57,38 @@ async function start() {
     logger.info('Starting Telegram bot...');
 
     // Set bot commands for menu
-    await bot.telegram.setMyCommands([
-      { command: 'start', description: 'Start the bot and see welcome message' },
-      { command: 'help', description: 'Show help and available commands' },
+    // UX-optimized command order
+    const privateCommands = [
       { command: 'alpha', description: 'Freshest alpha (whale/skew/insider)' },
-      { command: 'stats', description: 'Show stats for an address or profile' },
-      { command: 'profile_card', description: 'Create a profile card (self or others)' },
-      { command: 'trade_card', description: 'Create a trade card' },
-      { command: 'markets', description: 'Browse trending, breaking, new, or search' },
+      { command: 'markets', description: 'Browse trending/breaking/new or search' },
       { command: 'price', description: 'Get market price' },
-      { command: 'net', description: 'Net positions by user for a market' },
-      { command: 'overview', description: 'Market sides, holders, pricing' },
-      { command: 'whales', description: 'Top traders, whales by market, or search' },
+      { command: 'whales', description: 'Leaderboard and search traders' },
       { command: 'follow', description: 'Follow market or wallet alerts' },
-      { command: 'unfollow', description: 'Stop following' },
-      { command: 'list', description: 'List your follows' },
-    ]);
+      { command: 'list', description: 'View your follows' },
+      { command: 'unfollow', description: 'Stop alerts' },
+      { command: 'overview', description: 'Market sides, holders, pricing' },
+      { command: 'net', description: 'Net positions by user (market)' },
+      { command: 'profile_card', description: 'Create a profile card' },
+      { command: 'trade_card', description: 'Create a trade card' },
+      { command: 'help', description: 'Help and examples' },
+    ];
+
+    const groupCommands = [
+      { command: 'alpha', description: 'Freshest alpha (whale/skew/insider)' },
+      { command: 'markets', description: 'Browse markets' },
+      { command: 'price', description: 'Get market price' },
+      { command: 'whales', description: 'Leaderboard and search traders' },
+      { command: 'follow', description: 'Follow market or wallet' },
+      { command: 'unfollow', description: 'Stop alerts' },
+      { command: 'list', description: 'View follows' },
+      { command: 'help', description: 'Help and examples' },
+    ];
+
+    // Default scope (fallback) + private chats
+    await bot.telegram.setMyCommands(privateCommands);
+    await bot.telegram.setMyCommands(privateCommands, { scope: { type: 'all_private_chats' } as any });
+    // Groups/chats: slimmer set
+    await bot.telegram.setMyCommands(groupCommands, { scope: { type: 'all_group_chats' } as any });
 
     // Restore stored data before deciding to start WS
     await loadLinks();
