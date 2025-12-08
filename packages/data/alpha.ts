@@ -511,6 +511,8 @@ export async function computeSmartSkewFromHolders(
   const pnlCache = new Map<string, number>()
   const evalWallets = Array.from(new Set([...yesEval, ...noEval].map(w=>w.wallet)))
   for (const w of evalWallets) {
+    // Skip non-address or undefined wallets for external API calls
+    if (!isAddr(w)) { scoreCache.set(w, 0); pnlCache.set(w, 0); continue }
     try {
       const stats = await getWalletWhaleStats(w, cfg)
       scoreCache.set(w, computeWhaleScore(stats, cfg))
@@ -570,7 +572,7 @@ export async function computeSmartSkewFromHolders(
   // Build top 3 examples for the skewed side by USD
   const sideH = direction === 'YES' ? yesEval : noEval
   sideH.sort((a,b)=>b.usd - a.usd)
-  const examples = sideH.slice(0, 3).map(w => ({ wallet: w.wallet, valueUsd: Math.round(w.usd), whaleScore: scoreCache.get(w.wallet) || 0, pnl: Math.round(pnlCache.get(w.wallet) || 0) }))
+  const examples = sideH.filter(h=>isAddr(h.wallet)).slice(0, 3).map(w => ({ wallet: w.wallet, valueUsd: Math.round(w.usd), whaleScore: scoreCache.get(w.wallet) || 0, pnl: Math.round(pnlCache.get(w.wallet) || 0) }))
 
   return {
     direction,
