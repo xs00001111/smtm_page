@@ -659,6 +659,18 @@ function formatDateYYYYMMDD(isoOrMillis: string | number): string {
   } catch { return '' }
 }
 
+// Build a canonical market URL from a parsed child entry
+function buildChildMarketUrl(child: any, defaultEventSlug?: string): string | null {
+  try {
+    const ev = (child as any)?.eventSlug || defaultEventSlug
+    const slug = (child as any)?.slug || (child as any)?.market_slug
+    if (ev && slug && ev !== slug) return `https://polymarket.com/event/${ev}/${slug}`
+    if (ev) return `https://polymarket.com/event/${ev}`
+    if (slug) return `https://polymarket.com/event/${slug}`
+    return null
+  } catch { return null }
+}
+
 // Escape HTML for Telegram HTML parse_mode
 function esc(s: string) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -3164,7 +3176,7 @@ export function registerCommands(bot: Telegraf) {
               await Promise.all(batch.map(async (ch) => {
                 try {
                   const res = await getSmartSkew(ch.cid, ch.y, ch.n)
-                  const url = getPolymarketMarketUrl(ch.m)
+                  const url = buildChildMarketUrl(ch.m, eventSlug)
                   if (!res) return
                   const dIso = (ch as any).m?.end_date_iso || (ch as any).endTs || null
                   const dateStr = dIso ? formatDateYYYYMMDD(dIso) : null
@@ -3240,9 +3252,13 @@ export function registerCommands(bot: Telegraf) {
               await Promise.all(batch.map(async (ch) => {
                 try {
                   const res = await getSmartSkew(ch.cid, ch.y, ch.n)
-                  const url = getPolymarketMarketUrl(ch.m)
+                  const url = buildChildMarketUrl(ch.m)
                   if (!res) return
-                  let card = formatSkewCard(ch.m.question || ch.slug, url, res, true)
+                  const dIso = (ch as any).m?.end_date_iso || (ch as any).endTs || null
+                  const dateStr = dIso ? formatDateYYYYMMDD(dIso) : null
+                  const baseTitle = ch.m.question || ch.slug
+                  const title = dateStr ? `${baseTitle} (${dateStr})` : baseTitle
+                  let card = formatSkewCard(title, url, res, true)
                   try {
                     const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
                     if (exs.length) {
