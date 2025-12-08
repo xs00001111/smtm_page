@@ -288,10 +288,11 @@ async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: strin
     } catch (e) {
       logger.warn({ err: (e as any)?.message }, 'getMarketsByEvent: search failed, trying list approach')
     }
-    // Fetch many markets - use liquidity sort to catch high-value but low-volume markets
+    // Fetch markets - reduced from 500 to 200 to avoid timeouts
+    // Use liquidity sort to catch high-value but low-volume markets
     // Filter for active markets only (no resolved/closed ones)
     let markets: any[] = []
-    for (let offset = 0; offset < 500; offset += 100) {
+    for (let offset = 0; offset < 200; offset += 100) {
       const batch = await gammaApi.getMarkets({ limit: 100, offset, order: 'liquidity', active: true, closed: false })
 
       // Debug: log full first market object to see complete data structure
@@ -501,6 +502,7 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
     logger.info({ queriesCount: queries.length, hasDehydratedState: !!nextData?.props?.pageProps?.dehydratedState, targetEventSlug }, 'getEventSubMarkets: parsed __NEXT_DATA__')
     const out: Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
     let totalMarketsInQueries = 0
+    let filteredOutCount = 0
     for (const q of queries) {
       const data = q?.state?.data
       if (Array.isArray(data)) {
@@ -514,8 +516,20 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
           const cid = m?.condition_id || m?.conditionId
           const marketEventSlug = m?.eventSlug
 
+          // Debug: log eventSlug values to understand filtering
+          if (out.length < 3 || (filteredOutCount < 3 && targetEventSlug && marketEventSlug !== targetEventSlug)) {
+            logger.info({
+              marketSlug: slug,
+              marketEventSlug,
+              targetEventSlug,
+              matches: marketEventSlug === targetEventSlug,
+              question: m?.question
+            }, 'getEventSubMarkets: DEBUG eventSlug comparison')
+          }
+
           // Filter: only include markets that belong to the target event
           if (targetEventSlug && marketEventSlug !== targetEventSlug) {
+            filteredOutCount++
             continue
           }
 
@@ -549,7 +563,13 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
         uniq.push(m)
       }
     }
-    logger.info({ totalMarketsInQueries, rawMarketsFound: out.length, uniqueMarkets: uniq.length }, 'getEventSubMarkets: processed queries')
+    logger.info({
+      totalMarketsInQueries,
+      filteredOutCount,
+      rawMarketsFound: out.length,
+      uniqueMarkets: uniq.length,
+      targetEventSlug
+    }, 'getEventSubMarkets: processed queries')
     return uniq
   } catch (e) { try { logger.warn('getEventSubMarkets failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
 }
@@ -2841,7 +2861,17 @@ export function registerCommands(bot: Telegraf) {
 
         // Try API-based approach first (more reliable than HTML scraping)
         if (eventSlug) {
-          const childrenRaw = await getMarketsByEvent(eventSlug)
+          // Add timeout to prevent hanging (max 15 seconds)
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('getMarketsByEvent timeout')), 15000)
+          )
+          const childrenRaw = await Promise.race([
+            getMarketsByEvent(eventSlug),
+            timeoutPromise
+          ]).catch(err => {
+            logger.warn({ err: err?.message }, 'skew: getMarketsByEvent failed or timed out')
+            return []
+          })
             if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
               const children: Array<{ slug: string; m: any; cid: string; y: string; n: string; endTs: number | null }> = []
               for (const child of childrenRaw) {
