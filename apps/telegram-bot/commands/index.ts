@@ -940,6 +940,7 @@ export function registerCommands(bot: Telegraf) {
                   await ctx.reply(card, { parse_mode: 'HTML' })
                 } catch {}
               }
+              }
               return
             }
           }
