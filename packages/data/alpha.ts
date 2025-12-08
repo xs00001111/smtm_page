@@ -419,8 +419,10 @@ export async function computeSmartSkewFromHolders(
   if (!Number.isFinite(noPrice as any)  || noPrice  == null) noPrice  = noSnapPrice
 
   const toUsd = (bal: number, v?: number, price?: number|null) => {
-    if (Number.isFinite(v as any)) return (v as any) as number
-    if (Number.isFinite(price||NaN)) return bal * (price as number)
+    // Prefer provided USD value only when it is positive and finite; otherwise fall back to price*balance
+    const valNum = typeof v === 'number' ? v : (v != null ? parseFloat(String(v)) : NaN)
+    if (Number.isFinite(valNum) && valNum > 0) return valNum
+    if (Number.isFinite(price || NaN)) return bal * (price as number)
     return 0
   }
 
