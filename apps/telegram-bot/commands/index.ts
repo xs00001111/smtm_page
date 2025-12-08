@@ -86,7 +86,8 @@ function formatSkewCard(title: string, marketUrl: string | null, res: any, detai
   else if (skew >= 0.55 || skew <= 0.45) strength = 'Lean'
   // Source hint: holdings vs trades (flow)
   const src = (res as any)?._source === 'trades' ? 'Recent trades (flow)' : 'Current holders (positions)'
-  let msg = `⚖️ <b>Smart Money Skew</b>\n\n` +
+  let msg = `✨ <b>${esc(title)}</b>\n\n` +
+            `⚖️ <b>Smart Money Skew</b>\n\n` +
             `${dirEmoji} ${res.direction || 'Neutral'} • Skew ${skewPct}% • Pool $${pool}\n` +
             `Confidence: ${confidence} • Source: ${src}`
   // Always add a compact context line (only when we have enough data)
@@ -438,6 +439,7 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
 // Extract all sub-market slugs from a Polymarket event page
 async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
   try {
+    logger.info({ eventUrl }, 'getEventSubMarketSlugs: start fetch')
     // Fetch with a hard timeout and browser-like headers to avoid hanging on bot protection
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 7000)
@@ -455,6 +457,7 @@ async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
     clearTimeout(timeout)
     if (!resp.ok) return []
     const html = await resp.text()
+    logger.info({ bytes: html.length }, 'getEventSubMarketSlugs: fetched HTML')
     const match = html.match(/<script[^>]*id=\"__NEXT_DATA__\"[^>]*>([^<]+)<\/script>/)
     if (!match || !match[1]) return []
     const nextData = JSON.parse(match[1])
@@ -469,13 +472,16 @@ async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
         }
       }
     }
-    return Array.from(slugs)
+    const out = Array.from(slugs)
+    logger.info({ count: out.length, sample: out.slice(0,5) }, 'getEventSubMarketSlugs: extracted slugs')
+    return out
   } catch (e) { try { logger.warn('getEventSubMarketSlugs failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
 }
 
 // Extract sub‑market metadata (conditionId, slug, tokens) from an event page
 async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
   try {
+    logger.info({ eventUrl }, 'getEventSubMarkets: start fetch')
     // Extract target event slug from URL
     const targetEventSlug = eventUrl.split('/event/')[1]?.split('/')[0]
 
@@ -495,6 +501,7 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
     clearTimeout(timeout)
     if (!resp.ok) return []
     const html = await resp.text()
+    logger.info({ bytes: html.length }, 'getEventSubMarkets: fetched HTML')
     const match = html.match(/<script[^>]*id=\"__NEXT_DATA__\"[^>]*>([^<]+)<\/script>/)
     if (!match || !match[1]) return []
     const nextData = JSON.parse(match[1])
@@ -598,20 +605,34 @@ function getPolymarketProfileUrl(username: string | null | undefined, address: s
  * @returns Formatted market URL or null if no slug available
  */
 function getPolymarketMarketUrl(market: any): string | null {
-  // Prefer events[0].slug from API (most reliable)
-  if (market.events && Array.isArray(market.events) && market.events.length > 0) {
-    const eventSlug = market.events[0].slug;
-    if (eventSlug) {
-      return `https://polymarket.com/event/${eventSlug}`;
-    }
+  // Prefer events[0].slug + market slug (full market URL)
+  const eventSlug = market?.events && Array.isArray(market.events) && market.events.length > 0
+    ? market.events[0].slug
+    : undefined
+  const marketSlug = market?.slug || market?.market_slug
+  if (eventSlug && marketSlug) {
+    return `https://polymarket.com/event/${eventSlug}/${marketSlug}`
   }
-
-  // Fallback to direct slug field
-  if (market.slug) {
-    return `https://polymarket.com/event/${market.slug}`;
+  // If no market slug, link to the event page
+  if (eventSlug) {
+    return `https://polymarket.com/event/${eventSlug}`
   }
+  // Last resort: some APIs expose only a slug that is already the market slug
+  if (marketSlug) {
+    return `https://polymarket.com/event/${marketSlug}`
+  }
+  return null
+}
 
-  return null;
+function formatDateYYYYMMDD(isoOrMillis: string | number): string {
+  try {
+    const d = new Date(typeof isoOrMillis === 'number' ? isoOrMillis : String(isoOrMillis))
+    if (Number.isNaN(d.getTime())) return ''
+    const y = d.getUTCFullYear()
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+    const da = String(d.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${da}`
+  } catch { return '' }
 }
 
 // Escape HTML for Telegram HTML parse_mode
@@ -783,13 +804,136 @@ export function registerCommands(bot: Telegraf) {
         await ctx.answerCbQuery('Calculating skew…')
         try {
           const m = await gammaApi.getMarket(cond)
+          // If this market belongs to an event with multiple dates on the same page,
+          // prefer parsing the group (event+market) page first. Fallback to event-wide search only if needed.
+          const eventSlug = Array.isArray(m?.events) && m.events.length ? m.events[0]?.slug : undefined
+          if (eventSlug) {
+            // Try group page first (most series are one page with date toggles)
+            let expanded = false
+            try {
+              const marketSlug = (m as any)?.slug || (m as any)?.market_slug
+              if (marketSlug) {
+                const groupUrl = `https://polymarket.com/event/${eventSlug}/${marketSlug}`
+                const groupChildren = await getGroupSubMarkets(groupUrl)
+                // Sort by end date ascending (soonest first)
+                const gc = Array.isArray(groupChildren)
+                  ? groupChildren
+                      .filter(c=>c?.conditionId)
+                      .map((c:any)=>({ ...c, _endTs: (()=>{ try { const v=(c as any).end_date_iso || (c as any).endDateIso; const t = v ? Date.parse(String(v)) : NaN; return Number.isFinite(t)?t:null } catch { return null } })() }))
+                      .sort((a:any,b:any)=>{
+                        const ax = a._endTs ?? Number.POSITIVE_INFINITY
+                        const bx = b._endTs ?? Number.POSITIVE_INFINITY
+                        return ax - bx
+                      })
+                      .slice(0, 8)
+                  : []
+                if (gc.length > 1) {
+                  for (const ch of gc) {
+                    try {
+                      const cid = ch.conditionId
+                      let y = (ch.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                      let n = (ch.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                      if (!y || !n) {
+                        try {
+                          const m2 = await gammaApi.getMarket(cid)
+                          y = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                          n = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                        } catch {}
+                      }
+                      if (!y || !n) continue
+                      const res = await getSmartSkew(cid, y, n)
+                      if (!res) continue
+                      const url = `https://polymarket.com/event/${eventSlug}/${ch.slug}`
+                      const dIso = (ch as any).end_date_iso || (ch as any).endDateIso
+                      const dateStr = dIso ? formatDateYYYYMMDD(dIso) : null
+                      const baseTitle = ch.question || ch.slug || (m?.question || 'Market')
+                      const title = dateStr ? `${baseTitle} (${dateStr})` : baseTitle
+                      let card = formatSkewCard(title, url, res, false)
+                      try {
+                        const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                        if (exs.length) {
+                          const insights = await analyzeSkewExamples(exs)
+                          const bits: string[] = []
+                          if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                          if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                          if (bits.length) card += `\n${bits.join(' • ')}`
+                        }
+                      } catch {}
+                      await ctx.reply(card, { parse_mode: 'HTML' })
+                    } catch {}
+                  }
+                  expanded = true
+                  return
+                }
+              }
+            } catch {}
+
+            // Fallback: event-wide API expansion (rare multi-event cases)
+            if (!expanded) {
+              const timeoutPromise = new Promise<never>((_, reject)=> setTimeout(()=>reject(new Error('getMarketsByEvent timeout')), 10000))
+              const childrenRaw = await Promise.race([
+                getMarketsByEvent(eventSlug),
+                timeoutPromise,
+              ]).catch(()=>[] as any[])
+              // Sort by end date ascending (soonest first)
+              const children = Array.isArray(childrenRaw)
+                ? childrenRaw
+                    .filter((c:any)=>c?.conditionId)
+                    .map((c:any)=>({ ...c, _endTs: ((()=>{ try { const v=(c as any).end_date_iso || (c as any).endDateIso; const t = v ? Date.parse(String(v)) : NaN; return Number.isFinite(t)?t:null } catch { return null } })() }))
+                    .sort((a:any,b:any)=>{
+                      const ax = a._endTs ?? Number.POSITIVE_INFINITY
+                      const bx = b._endTs ?? Number.POSITIVE_INFINITY
+                      return ax - bx
+                    })
+                    .slice(0, 6)
+                : []
+              if (children.length > 1) {
+                // Compute each child skew and reply separate cards
+                for (const ch of children) {
+                  try {
+                    const cid = ch.conditionId
+                  const yes = (ch.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                  const no  = (ch.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                  let y = yes, n = no
+                  if (!y || !n) {
+                    try {
+                      const m2 = await gammaApi.getMarket(cid)
+                      y = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                      n = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                    } catch {}
+                  }
+                  if (!y || !n) continue
+                  const res = await getSmartSkew(cid, y, n)
+                  if (!res) continue
+                  const url = `https://polymarket.com/event/${eventSlug}/${ch.slug}`
+                  const dIso = (ch as any).end_date_iso || (ch as any).endDateIso
+                  const dateStr = dIso ? formatDateYYYYMMDD(dIso) : null
+                  const baseTitle = ch.question || ch.slug || (m?.question || 'Market')
+                  const title = dateStr ? `${baseTitle} (${dateStr})` : baseTitle
+                  let card = formatSkewCard(title, url, res, false)
+                  try {
+                    const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                    if (exs.length) {
+                      const insights = await analyzeSkewExamples(exs)
+                      const bits: string[] = []
+                      if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                      if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                      if (bits.length) card += `\n${bits.join(' • ')}`
+                    }
+                  } catch {}
+                  await ctx.reply(card, { parse_mode: 'HTML' })
+                } catch {}
+              }
+              return
+            }
+          }
+          // Single-market fallback (original behavior)
           const url = getPolymarketMarketUrl(m)
           const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
           const no = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
           const res = await getSmartSkew(cond, yes, no)
           if (!res) { await ctx.reply('⚠️ Not enough data to assess skew.'); return }
           let card = formatSkewCard(m.question || 'Market', url, res, false)
-          // Add cautious insights based on examples when present
           try {
             const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
             if (exs.length) {
@@ -2760,7 +2904,12 @@ export function registerCommands(bot: Telegraf) {
       return
     }
     const input = args.join(' ').trim()
-    try {
+    // Hard timeout so this command never hangs silently
+    const COMMAND_TIMEOUT_MS = 20000
+    const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Command timeout')), COMMAND_TIMEOUT_MS))
+    logger.info({ userId: ctx.from?.id, chatId: ctx.chat?.id, input }, 'skew: command invoked')
+
+    const commandPromise = (async () => {
       await ctx.reply('⚖️ Calculating smart skew...')
       // Case A: Event URL without specific market -> compute for all sub‑markets
       if (isEventUrlWithoutMarket(input)) {
@@ -2896,7 +3045,11 @@ export function registerCommands(bot: Telegraf) {
                   const res = await getSmartSkew(ch.cid, ch.y, ch.n)
                   if (!res) continue
                   const url = `https://polymarket.com/event/${eventSlug}/${ch.slug}`
-                  let card = formatSkewCard(ch.m.question || ch.slug, url, res, true)
+                  const dIso = (ch as any).m?.end_date_iso || (ch as any).endTs || null
+                  const dateStr = dIso ? formatDateYYYYMMDD(dIso) : null
+                  const baseTitle = ch.m.question || ch.slug
+                  const title = dateStr ? `${baseTitle} (${dateStr})` : baseTitle
+                  let card = formatSkewCard(title, url, res, true)
                   try {
                     const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
                     if (exs.length) {
@@ -2958,7 +3111,11 @@ export function registerCommands(bot: Telegraf) {
                   const res = await getSmartSkew(ch.cid, ch.y, ch.n)
                   const url = getPolymarketMarketUrl(ch.m)
                   if (!res) return
-                  let card = formatSkewCard(ch.m.question || ch.slug, url, res, true)
+                  const dIso = (ch as any).m?.end_date_iso || (ch as any).endTs || null
+                  const dateStr = dIso ? formatDateYYYYMMDD(dIso) : null
+                  const baseTitle = ch.m.question || ch.slug
+                  const title = dateStr ? `${baseTitle} (${dateStr})` : baseTitle
+                  let card = formatSkewCard(title, url, res, true)
                   try {
                     const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
                     if (exs.length) {
@@ -3095,9 +3252,19 @@ export function registerCommands(bot: Telegraf) {
       const tok = condToToken(conditionId)
       const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
       await replySafe(ctx, card, kb)
+      return
+    })()
+
+    try {
+      await Promise.race([commandPromise, timeoutPromise])
     } catch (e:any) {
-      logger.error('skew command failed', { err: e?.message })
-      await ctx.reply('❌ Failed to compute skew. Try again later.')
+      if (e?.message === 'Command timeout') {
+        logger.warn('skew command timed out', { input })
+        await ctx.reply('⏱️ Skew calculation timed out. This event/market may be large or the API is slow. Try again, or use a specific market URL.')
+      } else {
+        logger.error('skew command failed', { err: e?.message, stack: e?.stack, input })
+        await ctx.reply('❌ Failed to compute skew. Try again later.')
+      }
     }
   })
 
