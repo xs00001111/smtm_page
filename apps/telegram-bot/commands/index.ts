@@ -923,7 +923,64 @@ export function registerCommands(bot: Telegraf) {
               }
             } catch {}
 
-            // Fallback: event-wide API expansion (rare multi-event cases)
+            // Fallback A: parse the event page itself to enumerate children (captures cross-event siblings shown on the same page)
+            if (!expanded) {
+              try {
+                const eventUrl = `https://polymarket.com/event/${eventSlug}`
+                const childrenRaw = await getEventSubMarkets(eventUrl)
+                const children = Array.isArray(childrenRaw) ? childrenRaw.filter(c=>c?.conditionId).slice(0, 8) : []
+                if (children.length > 1) {
+                  // Sort by end date ascending
+                  const sorted = children.map((c:any)=>{
+                    let ts: number | null = null
+                    try { const v=c.end_date_iso || (c as any).endDateIso; const t=v?Date.parse(String(v)):NaN; ts=Number.isFinite(t)?t:null } catch {}
+                    return { ...c, _endTs: ts }
+                  }).sort((a:any,b:any)=> (a._endTs ?? Number.POSITIVE_INFINITY) - (b._endTs ?? Number.POSITIVE_INFINITY))
+                  for (const ch of sorted) {
+                    try {
+                      const cid = ch.conditionId
+                      let y: string | undefined = undefined
+                      let n: string | undefined = undefined
+                      const toks: any[] = Array.isArray((ch as any).tokens) ? (ch as any).tokens as any[] : []
+                      if (toks.length) {
+                        y = toks.find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                        n = toks.find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                      }
+                      if (!y || !n) {
+                        try {
+                          const m2 = await gammaApi.getMarket(cid)
+                          y = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                          n = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                        } catch {}
+                      }
+                      if (!y || !n) continue
+                      const res = await getSmartSkew(cid, y, n)
+                      if (!res) continue
+                      const url = buildChildMarketUrl(ch, eventSlug)
+                      const dIso = (ch as any).end_date_iso || (ch as any).endDateIso
+                      const dateStr = dIso ? formatDateYYYYMMDD(dIso) : null
+                      const baseTitle = ch.question || ch.slug || (m?.question || 'Market')
+                      const title = dateStr ? `${baseTitle} (${dateStr})` : baseTitle
+                      let card = formatSkewCard(title, url, res, false)
+                      try {
+                        const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                        if (exs.length) {
+                          const insights = await analyzeSkewExamples(exs)
+                          const bits: string[] = []
+                          if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                          if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                          if (bits.length) card += `\n${bits.join(' • ')}`
+                        }
+                      } catch {}
+                      await ctx.reply(card, { parse_mode: 'HTML' })
+                    } catch {}
+                  }
+                  return
+                }
+              } catch {}
+            }
+
+            // Fallback B: event-wide API expansion (rare multi-event cases)
             if (!expanded) {
               const timeoutPromise = new Promise<never>((_, reject)=> setTimeout(()=>reject(new Error('getMarketsByEvent timeout')), 10000))
               const childrenRaw = await Promise.race([
