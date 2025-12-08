@@ -2731,6 +2731,17 @@ export function registerCommands(bot: Telegraf) {
       // Case B: Single market (URL/ID/slug) — if it is an event container with sub‑markets, compute for each sub‑market; otherwise compute once
       let market = await resolveMarketFromInput(input, false)
       if (!market) { await ctx.reply('❌ Market not found. Provide full URL or 0x<condition_id>.'); return }
+
+      // DEBUG: Log the resolved market object to see what fields are available
+      logger.info({
+        marketKeys: Object.keys(market),
+        conditionId: market.condition_id || market.conditionId,
+        slug: market.slug || market.market_slug,
+        question: market.question?.slice(0, 80),
+        hasTokens: !!market.tokens,
+        tokenCount: market.tokens?.length
+      }, 'skew: DEBUG resolved market object')
+
       let conditionId = market.condition_id || market.conditionId
       let yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
       let no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
