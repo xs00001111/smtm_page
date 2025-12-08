@@ -355,7 +355,7 @@ async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: strin
 }
 
 // Extract child markets from a group (event + market slug) page
-async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
+async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: string; conditionId: string; eventSlug?: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
   try {
     const url = new URL(groupUrl)
     const parts = url.pathname.split('/').filter(Boolean)
@@ -384,7 +384,7 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
     const nextData = JSON.parse(match[1])
     const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
     logger.info({ queriesCount: queries.length, hasDehydratedState: !!nextData?.props?.pageProps?.dehydratedState }, 'getGroupSubMarkets: parsed __NEXT_DATA__')
-    const out: Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
+    const out: Array<{ slug: string; conditionId: string; eventSlug?: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
     const looksChildOfGroup = (m:any): boolean => {
       const ms = String(m?.market_slug || '')
       const s  = String(m?.slug || '')
@@ -406,18 +406,47 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
 
           // Check if market belongs to this group/event
           // Also check eventSlug field for __NEXT_DATA__ markets
-          const matchesGroup = looksChildOfGroup(m) || m?.eventSlug === eventSlug
-
+          let matchesGroup = looksChildOfGroup(m) || m?.eventSlug === eventSlug
+          // If we aren't finding enough children, allow broader inclusion later
           if (matchesGroup && slug) {
             out.push({
               slug,
               conditionId: cid ? String(cid) : '',
+              eventSlug: m?.eventSlug,
               tokens: m?.tokens,
               question: m?.question,
               end_date_iso: m?.end_date_iso || m?.endDateIso,
               closed: m?.closed,
               archived: m?.archived
             })
+          }
+        }
+      }
+    }
+    // If too few children detected, broaden to any markets present on the page (series tabs can cross eventSlug)
+    if (out.length <= 1) {
+      for (const q of queries) {
+        const data = q?.state?.data
+        if (Array.isArray(data)) {
+          for (const m of data) {
+            try {
+              const cid = m?.condition_id || m?.conditionId
+              const slug = String(m?.slug || m?.market_slug || '')
+              if (!slug) continue
+              const key = (cid ? String(cid) : slug)
+              // Skip if already included
+              if (out.some(o => o.conditionId === key || o.slug === slug)) continue
+              out.push({
+                slug,
+                conditionId: cid ? String(cid) : '',
+                eventSlug: m?.eventSlug,
+                tokens: m?.tokens,
+                question: m?.question,
+                end_date_iso: m?.end_date_iso || m?.endDateIso,
+                closed: m?.closed,
+                archived: m?.archived
+              })
+            } catch {}
           }
         }
       }
@@ -479,7 +508,7 @@ async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
 }
 
 // Extract sub‑market metadata (conditionId, slug, tokens) from an event page
-async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
+async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: string; conditionId: string; eventSlug?: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
   try {
     logger.info({ eventUrl }, 'getEventSubMarkets: start fetch')
     // Extract target event slug from URL
@@ -507,7 +536,7 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
     const nextData = JSON.parse(match[1])
     const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
     logger.info({ queriesCount: queries.length, hasDehydratedState: !!nextData?.props?.pageProps?.dehydratedState, targetEventSlug }, 'getEventSubMarkets: parsed __NEXT_DATA__')
-    const out: Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
+    const out: Array<{ slug: string; conditionId: string; eventSlug?: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
     let totalMarketsInQueries = 0
     let filteredOutCount = 0
     for (const q of queries) {
@@ -534,18 +563,13 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
             }, 'getEventSubMarkets: DEBUG eventSlug comparison')
           }
 
-          // Filter: only include markets that belong to the target event
-          if (targetEventSlug && marketEventSlug !== targetEventSlug) {
-            filteredOutCount++
-            continue
-          }
-
           // __NEXT_DATA__ markets may not have conditionId but have eventSlug instead
           // Accept markets with just slug (can resolve conditionId later)
           if (slug) {
             out.push({
               slug: String(slug),
               conditionId: cid ? String(cid) : '',
+              eventSlug: marketEventSlug,
               tokens: m?.tokens,
               question: m?.question,
               end_date_iso: m?.end_date_iso || m?.endDateIso,
@@ -557,7 +581,7 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
       } else if (data && (data.slug || data.market_slug) && (data.condition_id || data.conditionId)) {
         const slug = data.slug || data.market_slug
         const cid = data.condition_id || data.conditionId
-        out.push({ slug: String(slug), conditionId: String(cid), tokens: data.tokens, question: data.question, end_date_iso: data.end_date_iso, closed: data.closed, archived: data.archived })
+        out.push({ slug: String(slug), conditionId: String(cid), eventSlug: (data as any)?.eventSlug, tokens: data.tokens, question: data.question, end_date_iso: data.end_date_iso, closed: data.closed, archived: data.archived })
       }
     }
     // De‑dupe by conditionId or slug (some markets may not have conditionId)
@@ -802,8 +826,16 @@ export function registerCommands(bot: Telegraf) {
         }
         if (!cond) { await ctx.answerCbQuery('Missing market id'); return }
         await ctx.answerCbQuery('Calculating skew…')
+        // Fetch market with explicit error handling to avoid parser confusion around try/catch nesting
+        let m: any
         try {
-          const m = await gammaApi.getMarket(cond)
+          m = await gammaApi.getMarket(cond)
+        } catch (e) {
+          logger.warn('skew: market fetch failed', { err: (e as any)?.message })
+          await ctx.reply('❌ Failed to load market. Try again later.')
+          return
+        }
+        try {
           // If this market belongs to an event with multiple dates on the same page,
           // prefer parsing the group (event+market) page first. Fallback to event-wide search only if needed.
           const eventSlug = Array.isArray(m?.events) && m.events.length ? m.events[0]?.slug : undefined
@@ -851,7 +883,10 @@ export function registerCommands(bot: Telegraf) {
                       if (!y || !n) continue
                       const res = await getSmartSkew(cid, y, n)
                       if (!res) continue
-                      const url = `https://polymarket.com/event/${eventSlug}/${ch.slug}`
+                      const ev = (ch as any).eventSlug || eventSlug
+                      const url = ev && ch.slug && ev !== ch.slug
+                        ? `https://polymarket.com/event/${ev}/${ch.slug}`
+                        : `https://polymarket.com/event/${ch.slug || ev}`
                       const dIso = (ch as any).end_date_iso || (ch as any).endDateIso
                       const dateStr = dIso ? formatDateYYYYMMDD(dIso) : null
                       const baseTitle = ch.question || ch.slug || (m?.question || 'Market')
@@ -921,7 +956,10 @@ export function registerCommands(bot: Telegraf) {
                   if (!y || !n) continue
                   const res = await getSmartSkew(cid, y, n)
                   if (!res) continue
-                  const url = `https://polymarket.com/event/${eventSlug}/${ch.slug}`
+                  const ev = (ch as any).eventSlug || eventSlug
+                  const url = ev && ch.slug && ev !== ch.slug
+                    ? `https://polymarket.com/event/${ev}/${ch.slug}`
+                    : `https://polymarket.com/event/${ch.slug || ev}`
                   const dIso = (ch as any).end_date_iso || (ch as any).endDateIso
                   const dateStr = dIso ? formatDateYYYYMMDD(dIso) : null
                   const baseTitle = ch.question || ch.slug || (m?.question || 'Market')
