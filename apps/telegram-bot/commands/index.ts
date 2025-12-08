@@ -235,6 +235,74 @@ function isEventUrlWithoutMarket(u: string): boolean {
   } catch { return false }
 }
 
+// Derive the parent event URL from an input (URL with optional market slug)
+function getEventUrlFromInput(u: string): string | null {
+  try {
+    const url = new URL(u)
+    const parts = url.pathname.split('/').filter(Boolean)
+    const idx = parts.findIndex(p => p === 'event')
+    if (idx >= 0 && parts[idx+1]) {
+      const eventSlug = parts[idx+1]
+      return `${url.origin}/event/${eventSlug}`
+    }
+    return null
+  } catch { return null }
+}
+
+// Extract child markets from a group (event + market slug) page
+async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
+  try {
+    const url = new URL(groupUrl)
+    const parts = url.pathname.split('/').filter(Boolean)
+    const idx = parts.findIndex(p => p === 'event')
+    const groupSlug = parts[idx+2] || ''
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 7000)
+    const resp = await fetch(groupUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Referer': 'https://polymarket.com/',
+      } as any,
+      signal: controller.signal as any,
+    } as any)
+    clearTimeout(timeout)
+    if (!resp.ok) return []
+    const html = await resp.text()
+    const match = html.match(/<script[^>]*id=\"__NEXT_DATA__\"[^>]*>([^<]+)<\/script>/)
+    if (!match || !match[1]) return []
+    const nextData = JSON.parse(match[1])
+    const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
+    const out: Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
+    const looksChildOfGroup = (m:any): boolean => {
+      const ms = String(m?.market_slug || '')
+      const s  = String(m?.slug || '')
+      const parent = String(m?.parent_market_slug || m?.parentSlug || '')
+      return (ms && ms === groupSlug) || (parent && parent === groupSlug) || (s && s.startsWith(groupSlug))
+    }
+    for (const q of queries) {
+      const data = q?.state?.data
+      if (Array.isArray(data)) {
+        for (const m of data) {
+          const cid = m?.condition_id || m?.conditionId
+          if (cid && looksChildOfGroup(m)) {
+            const slug = String(m?.slug || m?.market_slug || groupSlug)
+            out.push({ slug, conditionId: String(cid), tokens: m?.tokens, question: m?.question, end_date_iso: m?.end_date_iso, closed: m?.closed, archived: m?.archived })
+          }
+        }
+      }
+    }
+    // De‑dupe by conditionId
+    const seen = new Set<string>()
+    const uniq: typeof out = []
+    for (const m of out) { if (!seen.has(m.conditionId)) { seen.add(m.conditionId); uniq.push(m) } }
+    return uniq
+  } catch (e) { try { logger.warn('getGroupSubMarkets failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
+}
+
 // Extract all sub-market slugs from a Polymarket event page
 async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
   try {
@@ -2426,7 +2494,69 @@ export function registerCommands(bot: Telegraf) {
       let no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
       // If this looks like an event container (no YES/NO tokens or multi‑date series), expand to sub‑markets using the event page
       try {
-        const eventUrlMaybe = getPolymarketMarketUrl(market)
+        // Prefer event URL derived from input if user pasted a market URL under an event
+        const eventUrlMaybe = getEventUrlFromInput(input) || getPolymarketMarketUrl(market)
+        const isGroupUrl = /^https?:\/\//i.test(input) && (()=>{ try { const u=new URL(input); const p=u.pathname.split('/').filter(Boolean); const i=p.findIndex(x=>x==='event'); return i>=0 && !!p[i+2] } catch { return false } })()
+        if (isGroupUrl) {
+          // Group page (event + market slug): extract children from the same page
+          const childrenRaw = await getGroupSubMarkets(input)
+          if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
+            const children: Array<{ slug: string; m: any; cid: string; y: string; n: string; endTs: number | null }> = []
+            for (const child of childrenRaw) {
+              try {
+                const cid = child.conditionId
+                let y: string | undefined = undefined
+                let n: string | undefined = undefined
+                const toks: any[] = Array.isArray((child as any).tokens) ? (child as any).tokens as any[] : []
+                if (toks.length) {
+                  y = toks.find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                  n = toks.find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                }
+                if (!y || !n) {
+                  try {
+                    const m2 = await gammaApi.getMarket(cid)
+                    const yesT = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                    const noT  = (m2.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                    if (yesT && noT) { y = yesT; n = noT }
+                  } catch {}
+                }
+                const anyWinner = Array.isArray((child as any).tokens) && (child as any).tokens.some((t:any)=> t?.winner===true)
+                if (!cid || !y || !n || anyWinner || child.closed === true || child.archived === true) continue
+                let endTs: number | null = null
+                try { endTs = child.end_date_iso ? Date.parse(String(child.end_date_iso)) : null } catch { endTs = null }
+                children.push({ slug: child.slug, m: child, cid, y, n, endTs })
+              } catch {}
+            }
+            children.sort((a,b)=>{ const ax=a.endTs??Number.POSITIVE_INFINITY; const bx=b.endTs??Number.POSITIVE_INFINITY; return ax-bx })
+            const toSend = children.slice(0,10)
+            const batchSize = 3
+            for (let i = 0; i < toSend.length; i += batchSize) {
+              const batch = toSend.slice(i, i + batchSize)
+              await Promise.all(batch.map(async (ch) => {
+                try {
+                  const res = await getSmartSkew(ch.cid, ch.y, ch.n)
+                  const url = getPolymarketMarketUrl(ch.m)
+                  if (!res) return
+                  let card = formatSkewCard(ch.m.question || ch.slug, url, res, true)
+                  try {
+                    const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                    if (exs.length) {
+                      const insights = await analyzeSkewExamples(exs)
+                      const bits: string[] = []
+                      if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                      if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                      if (bits.length) card += `\n${bits.join(' • ')}`
+                    }
+                  } catch {}
+                  const tok = condToToken(ch.cid)
+                  const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+                  await replySafe(ctx, card, kb)
+                } catch {}
+              }))
+            }
+            return
+          }
+        }
         if (eventUrlMaybe) {
           // Prefer structured extraction with condition IDs to avoid slug → market lookups
           const childrenRaw = await getEventSubMarkets(eventUrlMaybe)
