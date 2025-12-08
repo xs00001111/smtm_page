@@ -253,11 +253,26 @@ function getEventUrlFromInput(u: string): string | null {
 async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
   try {
     logger.info({ eventSlug }, 'getMarketsByEvent: fetching from API')
+
+    // DEBUG: Try fetching a known Maduro market directly to see its structure
+    try {
+      const testMarket = await gammaApi.getMarket('0xafc235557ace53ff0b0d2e93392314a7c3f3daab26a79050e985c11282f66df7')
+      logger.info({
+        question: testMarket.question,
+        slug: testMarket.slug,
+        events: testMarket.events,
+        active: testMarket.active,
+        closed: testMarket.closed,
+        archived: testMarket.archived
+      }, 'getMarketsByEvent: DEBUG test market structure')
+    } catch (e) {
+      logger.warn({ err: (e as any)?.message }, 'getMarketsByEvent: DEBUG failed to fetch test market')
+    }
     // Fetch many markets - use liquidity sort to catch high-value but low-volume markets
-    // Try multiple pages if needed
+    // Filter for active markets only (no resolved/closed ones)
     let markets: any[] = []
     for (let offset = 0; offset < 500; offset += 100) {
-      const batch = await gammaApi.getMarkets({ limit: 100, offset, order: 'liquidity' })
+      const batch = await gammaApi.getMarkets({ limit: 100, offset, order: 'liquidity', active: true, closed: false })
       markets = markets.concat(batch)
       // If we found matches, we can stop early
       const matches = batch.filter(m =>
