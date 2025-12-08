@@ -257,6 +257,7 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
     const idx = parts.findIndex(p => p === 'event')
     const eventSlug = parts[idx+1] || ''
     const groupSlug = parts[idx+2] || ''
+    logger.info('getGroupSubMarkets: parsing URL', { eventSlug, groupSlug, parts })
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 7000)
     const resp = await fetch(groupUrl, {
@@ -2622,9 +2623,11 @@ export function registerCommands(bot: Telegraf) {
         // Prefer event URL derived from input if user pasted a market URL under an event
         const eventUrlMaybe = getEventUrlFromInput(input) || getPolymarketMarketUrl(market)
         const isGroupUrl = /^https?:\/\//i.test(input) && (()=>{ try { const u=new URL(input); const p=u.pathname.split('/').filter(Boolean); const i=p.findIndex(x=>x==='event'); return i>=0 && !!p[i+2] } catch { return false } })()
+        logger.info('skew: multi-market detection', { isGroupUrl, eventUrlMaybe, input })
         if (isGroupUrl) {
           // Group page (event + market slug): extract children from the same page
           const childrenRaw = await getGroupSubMarkets(input)
+          logger.info('skew: getGroupSubMarkets result', { count: childrenRaw?.length || 0, children: childrenRaw?.map(c => ({ slug: c.slug, cid: c.conditionId?.slice(0,10) })) })
           if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
             const children: Array<{ slug: string; m: any; cid: string; y: string; n: string; endTs: number | null }> = []
             for (const child of childrenRaw) {
