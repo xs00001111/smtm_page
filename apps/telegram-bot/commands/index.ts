@@ -2853,7 +2853,6 @@ export function registerCommands(bot: Telegraf) {
               return
             }
           }
-        }
 
         // Fallback to HTML scraping if API approach didn't work
         if (isGroupUrl) {
