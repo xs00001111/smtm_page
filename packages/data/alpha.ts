@@ -414,9 +414,18 @@ export async function computeSmartSkewFromHolders(
   let noPrice: number | null = null
   try { yesPrice = await clobApi.getCurrentPrice(yesTokenId) } catch {}
   try { noPrice = await clobApi.getCurrentPrice(noTokenId) } catch {}
+  // Always attempt to fetch Gamma snapshots to improve resilience (even when token IDs provided)
+  let snapYes: number | null = null, snapNo: number | null = null
+  try {
+    const gm = await gammaApi.getMarket(params.conditionId)
+    const tY = (gm.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')
+    const tN = (gm.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')
+    snapYes = tY?.price != null ? parseFloat(String(tY.price)) : null
+    snapNo  = tN?.price != null ? parseFloat(String(tN.price)) : null
+  } catch {}
   // Fallback to Gamma snapshot prices if CLOB mid-price is not available
-  if (!Number.isFinite(yesPrice as any) || yesPrice == null) yesPrice = yesSnapPrice
-  if (!Number.isFinite(noPrice as any)  || noPrice  == null) noPrice  = noSnapPrice
+  if (!Number.isFinite(yesPrice as any) || yesPrice == null) yesPrice = (yesSnapPrice ?? snapYes)
+  if (!Number.isFinite(noPrice as any)  || noPrice  == null) noPrice  = (noSnapPrice ?? snapNo)
   // If we have only one side's price, compute the complement for the other (YES + NO ≈ 1)
   if (Number.isFinite(yesPrice as any) && (!Number.isFinite(noPrice as any) || noPrice == null)) {
     const yp = yesPrice as number
@@ -430,9 +439,9 @@ export async function computeSmartSkewFromHolders(
     const sum = (yesPrice as number) + (noPrice as number)
     if (!(sum > 0.9 && sum < 1.1)) {
       // Use snapshots when available
-      if (Number.isFinite(yesSnapPrice as any) && Number.isFinite(noSnapPrice as any)) {
-        yesPrice = yesSnapPrice
-        noPrice  = noSnapPrice
+      if (Number.isFinite((yesSnapPrice ?? snapYes) as any) && Number.isFinite((noSnapPrice ?? snapNo) as any)) {
+        yesPrice = (yesSnapPrice ?? snapYes)
+        noPrice  = (noSnapPrice ?? snapNo)
         log('skew.holders.price_fix', { reason: 'sum_not_one', yesPrice, noPrice })
       } else if (Number.isFinite(yesPrice as any) && (yesPrice as number) > 0 && (yesPrice as number) < 1) {
         noPrice = parseFloat((1 - (yesPrice as number)).toFixed(4))
@@ -441,6 +450,17 @@ export async function computeSmartSkewFromHolders(
         yesPrice = parseFloat((1 - (noPrice as number)).toFixed(4))
         log('skew.holders.price_fix', { reason: 'complement_yes', yesPrice, noPrice })
       }
+    }
+    // Additional guard: if both prices are exactly 0.5 but snapshots are decisive, prefer snapshots
+    if ((yesPrice === 0.5 && noPrice === 0.5) && (Number.isFinite((snapYes as any)) || Number.isFinite((snapNo as any)))) {
+      if (Number.isFinite((snapYes as any)) && Number.isFinite((snapNo as any))) {
+        yesPrice = snapYes as number; noPrice = snapNo as number
+      } else if (Number.isFinite((snapYes as any))) {
+        yesPrice = snapYes as number; noPrice = parseFloat((1 - (yesPrice as number)).toFixed(4))
+      } else if (Number.isFinite((snapNo as any))) {
+        noPrice = snapNo as number; yesPrice = parseFloat((1 - (noPrice as number)).toFixed(4))
+      }
+      log('skew.holders.price_fix', { reason: 'both_half_snap_override', yesPrice, noPrice })
     }
   }
 
