@@ -417,6 +417,32 @@ export async function computeSmartSkewFromHolders(
   // Fallback to Gamma snapshot prices if CLOB mid-price is not available
   if (!Number.isFinite(yesPrice as any) || yesPrice == null) yesPrice = yesSnapPrice
   if (!Number.isFinite(noPrice as any)  || noPrice  == null) noPrice  = noSnapPrice
+  // If we have only one side's price, compute the complement for the other (YES + NO ≈ 1)
+  if (Number.isFinite(yesPrice as any) && (!Number.isFinite(noPrice as any) || noPrice == null)) {
+    const yp = yesPrice as number
+    if (yp > 0 && yp < 1) { noPrice = parseFloat((1 - yp).toFixed(4)) }
+  } else if (Number.isFinite(noPrice as any) && (!Number.isFinite(yesPrice as any) || yesPrice == null)) {
+    const np = noPrice as number
+    if (np > 0 && np < 1) { yesPrice = parseFloat((1 - np).toFixed(4)) }
+  }
+  // Sanity check: if both prices exist but don't sum to ~1 (e.g., both ~0.5 due to anomalous orderbook), try snapshot correction
+  if (Number.isFinite(yesPrice as any) && Number.isFinite(noPrice as any)) {
+    const sum = (yesPrice as number) + (noPrice as number)
+    if (!(sum > 0.9 && sum < 1.1)) {
+      // Use snapshots when available
+      if (Number.isFinite(yesSnapPrice as any) && Number.isFinite(noSnapPrice as any)) {
+        yesPrice = yesSnapPrice
+        noPrice  = noSnapPrice
+        log('skew.holders.price_fix', { reason: 'sum_not_one', yesPrice, noPrice })
+      } else if (Number.isFinite(yesPrice as any) && (yesPrice as number) > 0 && (yesPrice as number) < 1) {
+        noPrice = parseFloat((1 - (yesPrice as number)).toFixed(4))
+        log('skew.holders.price_fix', { reason: 'complement_no', yesPrice, noPrice })
+      } else if (Number.isFinite(noPrice as any) && (noPrice as number) > 0 && (noPrice as number) < 1) {
+        yesPrice = parseFloat((1 - (noPrice as number)).toFixed(4))
+        log('skew.holders.price_fix', { reason: 'complement_yes', yesPrice, noPrice })
+      }
+    }
+  }
 
   const toUsd = (bal: number, v?: number, price?: number|null) => {
     // Prefer provided USD value only when it is positive and finite; otherwise fall back to price*balance
