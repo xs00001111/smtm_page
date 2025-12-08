@@ -369,6 +369,10 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
     for (const q of queries) {
       const data = q?.state?.data
       if (Array.isArray(data)) {
+        // Debug: log first market's keys to see what fields are available
+        if (data.length > 0 && out.length === 0) {
+          logger.info({ sampleKeys: Object.keys(data[0] || {}), sampleData: data[0] }, 'getGroupSubMarkets: DEBUG sample market from __NEXT_DATA__')
+        }
         for (const m of data) {
           const cid = m?.condition_id || m?.conditionId
           if (cid && looksChildOfGroup(m)) {
@@ -454,6 +458,10 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
       const data = q?.state?.data
       if (Array.isArray(data)) {
         totalMarketsInQueries += data.length
+        // Debug: log first market's keys to see what fields are available
+        if (data.length > 0 && out.length === 0) {
+          logger.info({ sampleKeys: Object.keys(data[0] || {}), sampleData: data[0] }, 'getEventSubMarkets: DEBUG sample market from __NEXT_DATA__')
+        }
         for (const m of data) {
           const slug = m?.slug || m?.market_slug
           const cid = m?.condition_id || m?.conditionId
