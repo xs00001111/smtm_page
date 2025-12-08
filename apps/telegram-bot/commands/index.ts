@@ -249,6 +249,35 @@ function getEventUrlFromInput(u: string): string | null {
   } catch { return null }
 }
 
+// Get markets by event slug using Gamma API
+async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
+  try {
+    logger.info({ eventSlug }, 'getMarketsByEvent: fetching from API')
+    // Fetch a large batch of markets (API supports up to 100+)
+    const markets = await gammaApi.getMarkets({ limit: 100, active: true, closed: false })
+
+    // Filter for markets that belong to this event
+    const eventMarkets = markets.filter(m =>
+      m.events && Array.isArray(m.events) && m.events.some(e => e.slug === eventSlug)
+    )
+
+    logger.info({ total: markets.length, matching: eventMarkets.length }, 'getMarketsByEvent: filtered results')
+
+    return eventMarkets.map(m => ({
+      slug: m.slug || m.market_slug || '',
+      conditionId: m.condition_id,
+      tokens: m.tokens,
+      question: m.question,
+      end_date_iso: m.end_date_iso,
+      closed: m.closed,
+      archived: m.archived
+    }))
+  } catch (e) {
+    logger.warn({ err: (e as any)?.message || String(e) }, 'getMarketsByEvent failed')
+    return []
+  }
+}
+
 // Extract child markets from a group (event + market slug) page
 async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }>> {
   try {
@@ -2629,6 +2658,54 @@ export function registerCommands(bot: Telegraf) {
         const eventUrlMaybe = getEventUrlFromInput(input) || getPolymarketMarketUrl(market)
         const isGroupUrl = /^https?:\/\//i.test(input) && (()=>{ try { const u=new URL(input); const p=u.pathname.split('/').filter(Boolean); const i=p.findIndex(x=>x==='event'); return i>=0 && !!p[i+2] } catch { return false } })()
         logger.info({ isGroupUrl, eventUrlMaybe, input }, 'skew: multi-market detection')
+
+        // Try API-based approach first (more reliable than HTML scraping)
+        if (eventUrlMaybe) {
+          const eventSlug = eventUrlMaybe.split('/event/')[1]?.split('/')[0]
+          if (eventSlug) {
+            const childrenRaw = await getMarketsByEvent(eventSlug)
+            if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
+              const children: Array<{ slug: string; m: any; cid: string; y: string; n: string; endTs: number | null }> = []
+              for (const child of childrenRaw) {
+                try {
+                  const cid = child.conditionId
+                  const y = (child.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
+                  const n = (child.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+                  if (!cid || !y || !n) continue
+                  let endTs: number | null = null
+                  try { endTs = child.end_date_iso ? Date.parse(String(child.end_date_iso)) : null } catch { endTs = null }
+                  children.push({ slug: child.slug, m: child, cid, y, n, endTs })
+                } catch {}
+              }
+              children.sort((a,b)=>{ const ax=a.endTs??Number.POSITIVE_INFINITY; const bx=b.endTs??Number.POSITIVE_INFINITY; return ax-bx })
+              const toSend = children.slice(0,10)
+              for (const ch of toSend) {
+                try {
+                  const res = await getSmartSkew(ch.cid, ch.y, ch.n)
+                  if (!res) continue
+                  const url = `https://polymarket.com/event/${eventSlug}/${ch.slug}`
+                  let card = formatSkewCard(ch.m.question || ch.slug, url, res, true)
+                  try {
+                    const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                    if (exs.length) {
+                      const insights = await analyzeSkewExamples(exs)
+                      const bits: string[] = []
+                      if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                      if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                      if (bits.length) card += `\n${bits.join(' • ')}`
+                    }
+                  } catch {}
+                  const tok = condToToken(ch.cid)
+                  const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+                  await replySafe(ctx, card, kb)
+                } catch {}
+              }
+              return
+            }
+          }
+        }
+
+        // Fallback to HTML scraping if API approach didn't work
         if (isGroupUrl) {
           // Group page (event + market slug): extract children from the same page
           const childrenRaw = await getGroupSubMarkets(input)
