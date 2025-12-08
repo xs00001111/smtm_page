@@ -2872,7 +2872,7 @@ export function registerCommands(bot: Telegraf) {
             logger.warn({ err: err?.message }, 'skew: getMarketsByEvent failed or timed out')
             return []
           })
-            if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
+          if (Array.isArray(childrenRaw) && childrenRaw.length > 1) {
               const children: Array<{ slug: string; m: any; cid: string; y: string; n: string; endTs: number | null }> = []
               for (const child of childrenRaw) {
                 try {
