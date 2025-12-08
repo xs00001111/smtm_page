@@ -259,15 +259,20 @@ async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: strin
       const searchResults = await gammaApi.searchMarkets(eventSlug.replace(/-/g, ' '), 50)
       logger.info({ searchResults: searchResults.length, questions: searchResults.map(m => m.question?.slice(0, 50)) }, 'getMarketsByEvent: search results')
 
-      // Filter to only include markets that actually contain keywords from the event slug
-      // This prevents irrelevant results from broad searches
-      const keywords = eventSlug.split('-').filter(w => w.length > 2) // Skip short words like "in", "on"
+      // Filter to only include markets that actually contain the main keyword from the event slug
+      // This prevents irrelevant results from broad searches with common words like "out", "2025"
+      const allWords = eventSlug.split('-')
+      const stopWords = new Set(['in', 'on', 'at', 'by', 'of', 'the', 'a', 'an', 'out', 'for', 'to', 'from', 'and', 'or'])
+      const keywords = allWords.filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()))
+
+      // Require the FIRST meaningful keyword to match (usually the main topic)
+      const mainKeyword = keywords[0]
       const relevantResults = searchResults.filter(m => {
         const question = (m.question || '').toLowerCase()
-        return keywords.some(keyword => question.includes(keyword.toLowerCase()))
+        return mainKeyword && question.includes(mainKeyword.toLowerCase())
       })
 
-      logger.info({ relevant: relevantResults.length, total: searchResults.length, keywords }, 'getMarketsByEvent: filtered search results')
+      logger.info({ relevant: relevantResults.length, total: searchResults.length, mainKeyword, allKeywords: keywords }, 'getMarketsByEvent: filtered search results')
 
       if (relevantResults.length > 0) {
         return relevantResults.map(m => ({
