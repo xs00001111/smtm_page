@@ -254,20 +254,23 @@ async function getMarketsByEvent(eventSlug: string): Promise<Array<{ slug: strin
   try {
     logger.info({ eventSlug }, 'getMarketsByEvent: fetching from API')
 
-    // DEBUG: Try fetching a known Maduro market directly to see its structure
+    // Try searching by the event slug directly (works better than events field filtering)
     try {
-      const testMarket = await gammaApi.getMarket('0xafc235557ace53ff0b0d2e93392314a7c3f3daab26a79050e985c11282f66df7')
-      logger.info({
-        question: testMarket.question,
-        slug: testMarket.slug || testMarket.market_slug,
-        events: testMarket.events,
-        allKeys: Object.keys(testMarket).sort(),
-        active: testMarket.active,
-        closed: testMarket.closed,
-        archived: testMarket.archived
-      }, 'getMarketsByEvent: DEBUG test market structure')
+      const searchResults = await gammaApi.searchMarkets(eventSlug.replace(/-/g, ' '), 50)
+      logger.info({ searchResults: searchResults.length, questions: searchResults.map(m => m.question?.slice(0, 50)) }, 'getMarketsByEvent: search results')
+      if (searchResults.length > 0) {
+        return searchResults.map(m => ({
+          slug: m.slug || m.market_slug || '',
+          conditionId: m.condition_id,
+          tokens: m.tokens,
+          question: m.question,
+          end_date_iso: m.end_date_iso,
+          closed: m.closed,
+          archived: m.archived
+        }))
+      }
     } catch (e) {
-      logger.warn({ err: (e as any)?.message }, 'getMarketsByEvent: DEBUG failed to fetch test market')
+      logger.warn({ err: (e as any)?.message }, 'getMarketsByEvent: search failed, trying list approach')
     }
     // Fetch many markets - use liquidity sort to catch high-value but low-volume markets
     // Filter for active markets only (no resolved/closed ones)
