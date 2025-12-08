@@ -278,6 +278,7 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
     if (!match || !match[1]) return []
     const nextData = JSON.parse(match[1])
     const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
+    logger.info({ queriesCount: queries.length, hasDehydratedState: !!nextData?.props?.pageProps?.dehydratedState }, 'getGroupSubMarkets: parsed __NEXT_DATA__')
     const out: Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
     const looksChildOfGroup = (m:any): boolean => {
       const ms = String(m?.market_slug || '')
@@ -368,10 +369,13 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
     if (!match || !match[1]) return []
     const nextData = JSON.parse(match[1])
     const queries = nextData?.props?.pageProps?.dehydratedState?.queries || []
+    logger.info({ queriesCount: queries.length, hasDehydratedState: !!nextData?.props?.pageProps?.dehydratedState }, 'getEventSubMarkets: parsed __NEXT_DATA__')
     const out: Array<{ slug: string; conditionId: string; tokens?: any[]; question?: string; end_date_iso?: string; closed?: boolean; archived?: boolean }> = []
+    let totalMarketsInQueries = 0
     for (const q of queries) {
       const data = q?.state?.data
       if (Array.isArray(data)) {
+        totalMarketsInQueries += data.length
         for (const m of data) {
           const slug = m?.slug || m?.market_slug
           const cid = m?.condition_id || m?.conditionId
@@ -389,6 +393,7 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
     const seen = new Set<string>()
     const uniq: typeof out = []
     for (const m of out) { if (!seen.has(m.conditionId)) { seen.add(m.conditionId); uniq.push(m) } }
+    logger.info({ totalMarketsInQueries, rawMarketsFound: out.length, uniqueMarkets: uniq.length }, 'getEventSubMarkets: processed queries')
     return uniq
   } catch (e) { try { logger.warn('getEventSubMarkets failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
 }
