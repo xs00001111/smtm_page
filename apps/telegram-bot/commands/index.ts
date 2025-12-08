@@ -2792,6 +2792,17 @@ export function registerCommands(bot: Telegraf) {
       let conditionId = market.condition_id || market.conditionId
       let yes = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
       let no  = (market.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+
+      // Check if this is a multi-outcome market (more than 2 outcomes)
+      const tokens = market.tokens || []
+      const isMultiOutcome = tokens.length > 2
+      logger.info({
+        tokenCount: tokens.length,
+        outcomes: tokens.map((t: any) => t.outcome || t.name),
+        isMultiOutcome,
+        hasYesNo: !!yes && !!no
+      }, 'skew: token analysis for multi-outcome detection')
+
       // If this looks like an event container (no YES/NO tokens or multi‑date series), expand to sub‑markets using the event page
       try {
         // Prefer event slug from market.events field if available (most reliable)
