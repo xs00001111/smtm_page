@@ -819,7 +819,15 @@ export function registerCommands(bot: Telegraf) {
                 const gc = Array.isArray(groupChildren)
                   ? groupChildren
                       .filter(c=>c?.conditionId)
-                      .map((c:any)=>({ ...c, _endTs: (()=>{ try { const v=(c as any).end_date_iso || (c as any).endDateIso; const t = v ? Date.parse(String(v)) : NaN; return Number.isFinite(t)?t:null } catch { return null } })() }))
+                      .map((c:any)=>{
+                        let ts: number | null = null
+                        try {
+                          const v = (c as any).end_date_iso || (c as any).endDateIso
+                          const t = v ? Date.parse(String(v)) : NaN
+                          ts = Number.isFinite(t) ? t : null
+                        } catch {}
+                        return { ...c, _endTs: ts }
+                      })
                       .sort((a:any,b:any)=>{
                         const ax = a._endTs ?? Number.POSITIVE_INFINITY
                         const bx = b._endTs ?? Number.POSITIVE_INFINITY
@@ -879,7 +887,15 @@ export function registerCommands(bot: Telegraf) {
               const children = Array.isArray(childrenRaw)
                 ? childrenRaw
                     .filter((c:any)=>c?.conditionId)
-                    .map((c:any)=>({ ...c, _endTs: ((()=>{ try { const v=(c as any).end_date_iso || (c as any).endDateIso; const t = v ? Date.parse(String(v)) : NaN; return Number.isFinite(t)?t:null } catch { return null } })() }))
+                    .map((c:any)=>{
+                      let ts: number | null = null
+                      try {
+                        const v = (c as any).end_date_iso || (c as any).endDateIso
+                        const t = v ? Date.parse(String(v)) : NaN
+                        ts = Number.isFinite(t) ? t : null
+                      } catch {}
+                      return { ...c, _endTs: ts }
+                    })
                     .sort((a:any,b:any)=>{
                       const ax = a._endTs ?? Number.POSITIVE_INFINITY
                       const bx = b._endTs ?? Number.POSITIVE_INFINITY
