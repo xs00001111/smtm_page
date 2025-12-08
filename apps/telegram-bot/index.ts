@@ -56,7 +56,7 @@ async function start() {
   try {
     logger.info('Starting Telegram bot...');
 
-    // Set bot commands for menu
+    // Set bot commands for menu (non-fatal if Telegram API is slow/unreachable)
     // UX-optimized command order
     const privateCommands = [
       { command: 'alpha', description: 'Freshest alpha (whale/skew/insider)' },
@@ -84,11 +84,16 @@ async function start() {
       { command: 'help', description: 'Help and examples' },
     ];
 
-    // Default scope (fallback) + private chats
-    await bot.telegram.setMyCommands(privateCommands);
-    await bot.telegram.setMyCommands(privateCommands, { scope: { type: 'all_private_chats' } as any });
-    // Groups/chats: slimmer set
-    await bot.telegram.setMyCommands(groupCommands, { scope: { type: 'all_group_chats' } as any });
+    try {
+      // Default scope (fallback) + private chats
+      await bot.telegram.setMyCommands(privateCommands);
+      await bot.telegram.setMyCommands(privateCommands, { scope: { type: 'all_private_chats' } as any });
+      // Groups/chats: slimmer set
+      await bot.telegram.setMyCommands(groupCommands, { scope: { type: 'all_group_chats' } as any });
+      logger.info('Telegram command menu set');
+    } catch (e: any) {
+      logger.warn('setMyCommands failed; continuing without updating menu', { err: e?.message || String(e) });
+    }
 
     // Restore stored data before deciding to start WS
     await loadLinks();
