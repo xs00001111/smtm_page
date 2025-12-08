@@ -983,7 +983,7 @@ export function registerCommands(bot: Telegraf) {
         const when = new Date(a.ts).toISOString().replace('T',' ').slice(0, 19) + 'Z'
         msg += `\n🕒 ${when}`
         const nextOffset = offset + 1
-        const kb = { inline_keyboard: [[{ text: '👀 Give me 1 more', callback_data: `alpha:more:${nextOffset}${tokenIdsArg && tokenIdsArg.length?':'+tokenIdsArg.join(','):''}` }]] }
+        const kb = { inline_keyboard: [[{ text: 'More', callback_data: `alpha:more:${nextOffset}${tokenIdsArg && tokenIdsArg.length?':'+tokenIdsArg.join(','):''}` }]] }
         await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
         return
       }
@@ -1099,13 +1099,13 @@ export function registerCommands(bot: Telegraf) {
             const buttons: { text: string; callback_data: string }[] = []
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
-              buttons.push({ text: `🐳 Follow`, callback_data: `act:${tok}` })
+          buttons.push({ text: `Follow`, callback_data: `act:${tok}` })
             } catch {}
-            buttons.push({ text: `📊 Stats`, callback_data: `whale:stats:${entry.user_id}` })
+            buttons.push({ text: `Stats`, callback_data: `whale:stats:${entry.user_id}` })
 
             // Add "Give me 1 more" on same row if there are more traders
             if (remaining > 0) {
-              buttons.push({ text: `👀 Give me 1 more`, callback_data: `whales:showmore:${displayEnd}` })
+            buttons.push({ text: `More`, callback_data: `whales:showmore:${displayEnd}` })
             }
 
             keyboard.push(buttons)
@@ -1162,7 +1162,7 @@ export function registerCommands(bot: Telegraf) {
           const keyboard: { text: string; callback_data: string }[][] = []
           try {
             const tok = await actionFollowWhaleAll(userId)
-            keyboard.push([{ text: `Follow This Trader`, callback_data: `act:${tok}` }])
+            keyboard.push([{ text: `Follow`, callback_data: `act:${tok}` }])
           } catch {}
 
           await ctx.reply(msg, { reply_markup: { inline_keyboard: keyboard } as any })
@@ -1363,11 +1363,11 @@ export function registerCommands(bot: Telegraf) {
                 if (String(`act:${tok}`).length <= 64) {
                   followButton = { text: `Follow`, callback_data: `act:${tok}` }
                 }
-                const cbt = condToToken(cond)
-                const cb = `skw:${cbt}`
-                if (cbt && cb.length <= 64) {
-                  skewButton = { text: '⚖️ Smart Skew', callback_data: cb }
-                }
+            const cbt = condToToken(cond)
+            const cb = `skw:${cbt}`
+            if (cbt && cb.length <= 64) {
+              skewButton = { text: 'Skew', callback_data: cb }
+            }
               } catch {}
             } else {
               message += `   ➕ Follow: <code>${esc('/follow <copy market id from event>')}</code>\n\n`
@@ -1383,7 +1383,7 @@ export function registerCommands(bot: Telegraf) {
             buttonRow.push(skewButton)
           }
           if (remaining > 0) {
-            buttonRow.push({ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayEnd}` })
+        buttonRow.push({ text: `More`, callback_data: `markets:showmore:${segment}:${displayEnd}` })
           }
           if (buttonRow.length > 0) {
             keyboard.push(buttonRow)
@@ -2056,10 +2056,10 @@ export function registerCommands(bot: Telegraf) {
                     const short = addr.slice(0,6)+'...'+addr.slice(-4)
                     const profileUrl = getPolymarketProfileUrl(null, addr)
                     msg += `${i}. ${short}\n   🔗 ${profileUrl}\n\n`
-                    try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow ${i}`, callback_data: `act:${tok}` }]) } catch {}
+                    try { const tok = await actionFollowWhaleAll(addr); keyboard.push([{ text: `Follow`, callback_data: `act:${tok}` }]) } catch {}
                     addresses.push(addr)
                   }
-                  try { const tokAll = await actionFollowWhaleAllMany(addresses); const cb = `act:${tokAll}`; if (cb.length<=64) keyboard.push([{ text: 'Follow Top 10', callback_data: cb }]) } catch {}
+                  try { const tokAll = await actionFollowWhaleAllMany(addresses); const cb = `act:${tokAll}`; if (cb.length<=64) keyboard.push([{ text: 'Top10', callback_data: cb }]) } catch {}
                   await ctx.reply(msg, { reply_markup: { inline_keyboard: keyboard } as any })
                   return
                 }
@@ -2160,16 +2160,16 @@ export function registerCommands(bot: Telegraf) {
             try {
               const tok = await actionFollowWhaleAll(entry.user_id)
               const cb = `act:${tok}`
-              if (cb.length <= 64) buttons.push({ text: `🐳 Follow`, callback_data: cb })
+            if (cb.length <= 64) buttons.push({ text: `Follow`, callback_data: cb })
             } catch {}
-            buttons.push({ text: `📊 Stats`, callback_data: `whale:stats:${entry.user_id}` })
+            buttons.push({ text: `Stats`, callback_data: `whale:stats:${entry.user_id}` })
             keyboard.push(buttons)
           }
 
           // Add "Show More" button if there are more whales
           if (remaining > 0) {
             const nextOffset = displayCount
-            keyboard.push([{ text: `👀 Give me 1 more`, callback_data: `whales:showmore:${nextOffset}` }])
+            keyboard.push([{ text: `More`, callback_data: `whales:showmore:${nextOffset}` }])
           }
 
           msg += '💡 Tap 🐳 Follow to get alerts, or 📊 Stats for accurate PnL.'
@@ -2209,7 +2209,7 @@ export function registerCommands(bot: Telegraf) {
             message += `ID: ${addr}\n`
             message += `🔗 ${url}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
-            try { const tok = await actionFollowWhaleAll(addr); const cb = `act:${tok}`; if (cb.length<=64) keyboard.push([{ text: `Follow ${short}`, callback_data: cb }]) } catch {}
+            try { const tok = await actionFollowWhaleAll(addr); const cb = `act:${tok}`; if (cb.length<=64) keyboard.push([{ text: `Follow`, callback_data: cb }]) } catch {}
                 await replySafe(ctx, message, { inline_keyboard: keyboard })
             return
           }
@@ -2236,7 +2236,7 @@ export function registerCommands(bot: Telegraf) {
                 message = `🐳 Profile\n\n🐋 Whale Score: ${whaleScoreStr}\n` + message.split('\n').slice(2).join('\n')
                 const tok = await actionFollowWhaleAll(addr)
                 const cb = `act:${tok}`
-                if (cb.length<=64) keyboard.push([{ text: `Follow ${short}`, callback_data: cb }])
+                if (cb.length<=64) keyboard.push([{ text: `Follow`, callback_data: cb }])
               }
             } catch {}
             await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
@@ -2268,7 +2268,7 @@ export function registerCommands(bot: Telegraf) {
                   message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
                   message += `   Rank: #${whale.rank}\n`
                   message += `   🔗 ${profileUrl}\n\n`
-                  try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
+                  try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow`, callback_data: `act:${tok}` }]) } catch {}
                 }
                 await replySafe(ctx, message, { inline_keyboard: keyboard })
                 return
@@ -2328,7 +2328,7 @@ export function registerCommands(bot: Telegraf) {
               message += `   💰 PnL: ${pnl} | Vol: ${vol} • 🐋 Score: ${whaleScoreStr}\n`
               message += `   Rank: #${whale.rank}\n`
               message += `   🔗 ${profileUrl}\n\n`
-              try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
+              try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow`, callback_data: `act:${tok}` }]) } catch {}
             }
             message += '💡 Use /whales for global leaderboard or add a market id to scope.'
             await replySafe(ctx, message, { inline_keyboard: keyboard })
@@ -2344,7 +2344,7 @@ export function registerCommands(bot: Telegraf) {
             message += `ID: ${profileMatch.addr}\n`
             message += `🔗 ${profileUrl}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
-            try { const tok = await actionFollowWhaleAll(profileMatch.addr); keyboard.push([{ text: `Follow ${short}`, callback_data: `act:${tok}` }]) } catch {}
+            try { const tok = await actionFollowWhaleAll(profileMatch.addr); keyboard.push([{ text: `Follow`, callback_data: `act:${tok}` }]) } catch {}
             await ctx.reply(message, { reply_markup: keyboard.length ? { inline_keyboard: keyboard } as any : undefined as any })
             return
           }
@@ -2434,7 +2434,7 @@ export function registerCommands(bot: Telegraf) {
       msg += `\n💡 Follow market price: <code>${esc(`/follow ${market.condition_id}`)}</code>`
       try {
         const tokMarket = await actionFollowMarket(market.condition_id, market.question)
-        const kb = { inline_keyboard: [...keyboard, [{ text: 'Follow Market Price', callback_data: `act:${tokMarket}` }]] }
+        const kb = { inline_keyboard: [...keyboard, [{ text: 'Follow', callback_data: `act:${tokMarket}` }]] }
         await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
       } catch {
         await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
@@ -2851,7 +2851,7 @@ export function registerCommands(bot: Telegraf) {
                 if (bits.length) card += `\n${bits.join(' • ')}`
               }
             } catch {}
-            const kb = { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skew:${conditionId}` }]] }
+            const kb = { inline_keyboard: [[{ text: 'Refresh', callback_data: `skew:${conditionId}` }]] }
             await ctx.reply(card, { parse_mode: 'HTML', reply_markup: kb as any })
           } else {
             await ctx.reply('⚖️ Smart Money Skew: not enough data to assess for this market.', { disable_web_page_preview: true })
@@ -2940,7 +2940,7 @@ export function registerCommands(bot: Telegraf) {
             } catch {}
             // Refresh button
             const tok = condToToken(conditionId)
-            const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+            const kb = tok ? { inline_keyboard: [[{ text: 'Refresh', callback_data: `skw:${tok}` }]] } : undefined
             await replySafe(ctx, card, kb)
           } catch {}
         }
@@ -3061,7 +3061,7 @@ export function registerCommands(bot: Telegraf) {
                     }
                   } catch {}
                   const tok = condToToken(ch.cid)
-                  const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+                  const kb = tok ? { inline_keyboard: [[{ text: 'Refresh', callback_data: `skw:${tok}` }]] } : undefined
                   await replySafe(ctx, card, kb)
                 } catch {}
               }
@@ -3127,7 +3127,7 @@ export function registerCommands(bot: Telegraf) {
                     }
                   } catch {}
                   const tok = condToToken(ch.cid)
-                  const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+                  const kb = tok ? { inline_keyboard: [[{ text: 'Refresh', callback_data: `skw:${tok}` }]] } : undefined
                   await replySafe(ctx, card, kb)
                 } catch {}
               }))
@@ -3199,7 +3199,7 @@ export function registerCommands(bot: Telegraf) {
                     }
                   } catch {}
                   const tok = condToToken(ch.cid)
-                  const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+                  const kb = tok ? { inline_keyboard: [[{ text: 'Refresh', callback_data: `skw:${tok}` }]] } : undefined
                   await replySafe(ctx, card, kb)
                 } catch {}
               }))
@@ -3250,7 +3250,7 @@ export function registerCommands(bot: Telegraf) {
         }
       } catch {}
       const tok = condToToken(conditionId)
-      const kb = tok ? { inline_keyboard: [[{ text: '🔄 Refresh Skew', callback_data: `skw:${tok}` }]] } : undefined
+      const kb = tok ? { inline_keyboard: [[{ text: 'Refresh', callback_data: `skw:${tok}` }]] } : undefined
       await replySafe(ctx, card, kb)
       return
     })()
@@ -3567,7 +3567,7 @@ export function registerCommands(bot: Telegraf) {
                   message = `✨ <b>${esc(a.title || 'Alpha')}</b>\n\n${a.summary || ''}`
                 }
                 const url = getPolymarketMarketUrl(m); if (url) message += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
-                await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: '👀 Give me more', callback_data: 'alpha:more:trade' }]] } as any })
+                await ctx.reply(message, { parse_mode: 'HTML', reply_markup: { inline_keyboard: [[{ text: 'More', callback_data: 'alpha:more:trade' }]] } as any })
                 try { await markAlphaSeen({ alphaId: a.id, telegramUserId: userId, chatId: (ctx.chat?.id as any) }) } catch {}
                 return
               } catch {}
@@ -3682,7 +3682,7 @@ export function registerCommands(bot: Telegraf) {
                 msg += `\n🔎 ${catParts.join(' • ')}`
               }
             } catch {}
-            const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
+            const kb = { inline_keyboard: [[{ text: 'More', callback_data: `alpha:more:trade` }]] }
             await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
             // Persist this alpha to DB if enabled
             try {
@@ -3758,7 +3758,7 @@ export function registerCommands(bot: Telegraf) {
               }
             }
             if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
-            const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
+            const kb = { inline_keyboard: [[{ text: 'More', callback_data: `alpha:more:trade` }]] }
             await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
             // Persist smart-skew alpha and mark seen
             try {
@@ -3987,7 +3987,7 @@ export function registerCommands(bot: Telegraf) {
 
       const when = new Date(a.ts).toISOString().replace('T',' ').slice(0, 19) + 'Z'
       msg += `\n🕒 ${when}`
-      const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:1${tokenIds && tokenIds.length?':'+tokenIds.join(','):''}` }]] }
+      const kb = { inline_keyboard: [[{ text: 'More', callback_data: `alpha:more:1${tokenIds && tokenIds.length?':'+tokenIds.join(','):''}` }]] }
       // Edit the searching message if possible, otherwise send a new one
       try {
         await ctx.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, msg, { parse_mode: 'HTML', reply_markup: kb as any })
@@ -4101,7 +4101,7 @@ export function registerCommands(bot: Telegraf) {
             }
             if (catParts.length) { msg += `\n🔎 ${catParts.join(' • ')}` }
           } catch {}
-          const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:trade` }]] }
+          const kb = { inline_keyboard: [[{ text: 'More', callback_data: `alpha:more:trade` }]] }
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
           return
         } catch (e) {
@@ -4142,7 +4142,7 @@ export function registerCommands(bot: Telegraf) {
       const when = new Date(a.ts).toISOString().replace('T',' ').slice(0, 19) + 'Z'
       msg += `\n🕒 ${when}`
       const nextOffset = offset + 1
-      const kb = { inline_keyboard: [[{ text: '👀 Give me more', callback_data: `alpha:more:${nextOffset}${tokenIdsArg && tokenIdsArg.length?':'+tokenIdsArg.join(','):''}` }]] }
+      const kb = { inline_keyboard: [[{ text: 'More', callback_data: `alpha:more:${nextOffset}${tokenIdsArg && tokenIdsArg.length?':'+tokenIdsArg.join(','):''}` }]] }
       await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
     } catch (e) {
       logger.error('alpha:more failed', e)
@@ -4345,7 +4345,7 @@ export function registerCommands(bot: Telegraf) {
           msg += `${i}. 📈 ${r.market_name}\n   Market ID: ${mid}\n   ➖ Unfollow: /unfollow ${mid}\n\n`
           try {
             const tok = await actionUnfollowMarket({ tokenId: r.token_id || undefined, conditionId: r.market_condition_id || undefined, marketName: r.market_name })
-            keyboard.push([{ text: `Unfollow ${i}`, callback_data: `act:${tok}` }])
+            keyboard.push([{ text: `Unfollow`, callback_data: `act:${tok}` }])
           } catch {}
         } else if (r.type === 'whale_all') {
           // Hide default all-markets follows from the list to reduce noise
@@ -4358,7 +4358,7 @@ export function registerCommands(bot: Telegraf) {
           try {
             if (r.address_filter) {
               const tok = await actionUnfollowWhaleMarket({ address: r.address_filter, tokenId: r.token_id || undefined, conditionId: r.market_condition_id || undefined, marketName: r.market_name })
-              keyboard.push([{ text: `Unfollow ${i}`, callback_data: `act:${tok}` }])
+              keyboard.push([{ text: `Unfollow`, callback_data: `act:${tok}` }])
             }
           } catch {}
         }
@@ -4447,7 +4447,7 @@ export function registerCommands(bot: Telegraf) {
           if (url) message += `   🔗 ${url}\n`
           if (conditionId) {
             message += `   /price ${conditionId}\n`
-            try { const tok = await actionFollowMarket(conditionId, title); keyboard.push([{ text: `Follow ${i+1}`, callback_data: `act:${tok}` }]) } catch {}
+            try { const tok = await actionFollowMarket(conditionId, title); keyboard.push([{ text: `Follow`, callback_data: `act:${tok}` }]) } catch {}
           }
           message += '\n'
         }
@@ -4744,7 +4744,7 @@ export function registerCommands(bot: Telegraf) {
             const cbt = condToToken(cond)
             const cb = `skw:${cbt}`
             if (cbt && cb.length <= 64) {
-              skewButton = { text: '⚖️ Smart Skew', callback_data: cb }
+              skewButton = { text: 'Skew', callback_data: cb }
             }
           } catch {}
         }
@@ -4759,7 +4759,7 @@ export function registerCommands(bot: Telegraf) {
         buttonRow.push(skewButton)
       }
       if (remaining > 0) {
-        buttonRow.push({ text: `👀 Give me 1 more`, callback_data: `markets:showmore:${segment}:${displayCount}` })
+        buttonRow.push({ text: `More`, callback_data: `markets:showmore:${segment}:${displayCount}` })
       }
       if (buttonRow.length > 0) {
         keyboard.push(buttonRow)
