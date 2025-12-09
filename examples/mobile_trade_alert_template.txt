@@ -1,0 +1,17 @@
+/alpha
+Searching for alpha…
+—
+NEW TRADE
+Action: BUY $1,283 at 99.8¢
+Market: https://polymarket.com/event/bitcoin-above-100k-on-december-10
+Trader: gerghrh (new) — https://polymarket.com/profile/%40gerghrh?via=user%2Fgerghrh
+PnL: +$6
+Win rate: 75% (3/4)
+Portfolio: $1,282
+Trades (12h): 1
+Tags: Bitcoin, Weekly, Multi Strikes, Crypto
+
+# Notes
+# - Use “NEW TRADE” (not Insider) for small size (~$1.3k).
+# - Avoid emojis for mobile readability; bold/labels handled by plain words.
+# - Prefer clear line breaks over single-line formatting for phones.
