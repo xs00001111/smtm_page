@@ -5582,6 +5582,133 @@ export function registerCommands(bot: Telegraf) {
     }
   })
 
+  // Track market movers - analyze who's driving big price movements
+  bot.command('track', async (ctx) => {
+    const args = ctx.message.text.split(/\s+/).slice(1)
+    if (args.length === 0) {
+      await ctx.reply(
+        'Usage: /track <market_url>\n\n' +
+        'Examples:\n' +
+        '• /track https://polymarket.com/event/trump-declassifies-ufo-files-in-2025\n' +
+        '• /track 0x<condition_id>\n\n' +
+        'Analyzes recent price movements and identifies who\'s driving them.'
+      )
+      return
+    }
+
+    try {
+      await ctx.reply('🔍 Analyzing market movers...')
+
+      // Parse market URL or condition ID
+      const input = args.join(' ').trim()
+      let conditionId = input
+
+      // Extract condition ID from URL
+      if (input.startsWith('http')) {
+        try {
+          const url = new URL(input)
+          const pathParts = url.pathname.split('/').filter(Boolean)
+
+          // Try to get market from event page
+          if (pathParts.includes('event')) {
+            const eventSlug = pathParts[pathParts.indexOf('event') + 1]
+            if (eventSlug) {
+              // Get first market from event
+              const markets = await getMarketsByEvent(eventSlug).catch(() => [])
+              if (markets.length > 0) {
+                conditionId = markets[0].condition_id || markets[0].conditionId
+              }
+            }
+          }
+
+          // Direct market URL with ?tid= parameter
+          const tidParam = url.searchParams.get('tid')
+          if (tidParam && /^0x[a-fA-F0-9]{64}$/.test(tidParam)) {
+            conditionId = tidParam
+          }
+        } catch {}
+      }
+
+      // Validate condition ID format
+      if (!/^0x[a-fA-F0-9]{64}$/.test(conditionId)) {
+        await ctx.reply('❌ Invalid market URL or condition ID. Please provide a valid Polymarket URL or condition ID.')
+        return
+      }
+
+      // Analyze market movers
+      const { analyzeMarketMove } = await import('@smtm/data')
+      const analysis = await analyzeMarketMove(conditionId, {
+        lookbackHours: 2,
+        minTradeVolume: 1000,
+        whaleThreshold: 65,
+      })
+
+      // Format response
+      const esc = (s: string) => s.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] || c))
+
+      let msg = `✨ <b>Market Move Analysis</b>\n\n`
+      msg += `📊 <b>${esc(analysis.market.question)}</b>\n\n`
+
+      // Price movement
+      const { priceMove } = analysis
+      const dirEmoji = priceMove.direction === 'UP' ? '🟢' : priceMove.direction === 'DOWN' ? '🔴' : '⚪'
+      const change = priceMove.change1h || priceMove.change24h
+      if (change) {
+        const chg = change.percent > 0 ? `+${change.percent.toFixed(1)}%` : `${change.percent.toFixed(1)}%`
+        const period = priceMove.change1h ? '1h' : '24h'
+        msg += `${dirEmoji} Price: ${(priceMove.currentPrice * 100).toFixed(1)}¢ (${chg} in ${period})\n\n`
+      }
+
+      // Volume
+      const volStr = `$${Math.round(analysis.volume.recent2h / 1000)}k`
+      const spikeEmoji = analysis.volume.spike ? ' 🔥' : ''
+      msg += `💰 Volume (2h): ${volStr}${spikeEmoji}\n\n`
+
+      // Top movers
+      if (analysis.topMovers.length > 0) {
+        msg += `🐋 <b>Top Movers:</b>\n`
+        for (let i = 0; i < Math.min(5, analysis.topMovers.length); i++) {
+          const m = analysis.topMovers[i]
+          const short = `${m.userId.slice(0, 6)}…${m.userId.slice(-4)}`
+          const name = m.displayName ? `${m.displayName} (${short})` : short
+          const volStr = `$${Math.round(m.volume / 1000)}k`
+          const sideEmoji = m.side === 'BUY' ? '🟢' : '🔴'
+          const newBadge = m.isNew ? ' 🆕' : ''
+          msg += `${i + 1}. ${sideEmoji} ${volStr} ${m.side} • ${esc(name)}${newBadge}\n`
+          msg += `   Whale Score: ${m.whaleScore} • Win: ${m.winRate}%\n`
+        }
+        msg += `\n`
+      }
+
+      // Smart money signal
+      const { smartMoney } = analysis
+      msg += `💡 <b>Smart Money Signal:</b>\n`
+      msg += `   • ${smartMoney.whaleVolumePercent}% of volume from whales (${smartMoney.topWhales} traders)\n`
+      const dirIcon = smartMoney.direction === 'BULLISH' ? '🟢' : smartMoney.direction === 'BEARISH' ? '🔴' : '⚪'
+      msg += `   • Direction: ${dirIcon} ${smartMoney.direction}\n`
+      if (smartMoney.buyToSellRatio !== 1) {
+        msg += `   • Buy/Sell ratio: ${smartMoney.buyToSellRatio.toFixed(1)}:1\n`
+      }
+
+      // Signals/Alerts
+      if (analysis.signals.length > 0) {
+        msg += `\n`
+        for (const signal of analysis.signals) {
+          msg += `${signal.message}\n`
+        }
+      }
+
+      // Market link
+      const marketUrl = `https://polymarket.com/event/${analysis.market.question.toLowerCase().replace(/[^a-z0-9]+/g, '-')}?tid=${conditionId}`
+      msg += `\n🔗 <a href="${esc(marketUrl)}">View Market</a>`
+
+      await ctx.reply(msg, { parse_mode: 'HTML' })
+    } catch (e) {
+      logger.error('track command failed', e)
+      await ctx.reply('❌ Failed to analyze market. Please try again or check if the market URL is valid.')
+    }
+  })
+
   // (removed) legacy card_* alias commands
 
   logger.info('Commands registered');

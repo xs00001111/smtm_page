@@ -12,3 +12,4 @@ export * from './whales';
 export * from './whale-descriptions';
 export * from './alpha';
 export * from './trades';
+export * from './market-movers';
