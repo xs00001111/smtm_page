@@ -221,9 +221,9 @@ async function formatWhalePercentileLineForUser(userId: string): Promise<string>
   const parts: string[] = []
   const size7 = LB_CACHES['7d']?.size || LB_LIMIT
   const size30 = LB_CACHES['30d']?.size || LB_LIMIT
-  if (p7 != null) parts.push(`Top ${rankFromPercentile(p7, size7)} of ${TOTAL_USERS} (7d)`)
-  if (p30 != null) parts.push(`Top ${rankFromPercentile(p30, size30)} of ${TOTAL_USERS} (30d)`)
-  return parts.length ? `Leaderboard: ${parts.join(' • ')}` : ''
+  if (p7 != null) parts.push(`Top ${rankFromPercentile(p7, size7)} (7d)`)
+  if (p30 != null) parts.push(`Top ${rankFromPercentile(p30, size30)} (30d)`)
+  return parts.length ? `Leaderboard: ${parts.join(' • ')} of ${TOTAL_USERS}` : ''
 }
 async function formatWhalePercentileLinesFull(userId: string): Promise<string> {
   const p7 = await getWhalePercentile(userId, '7d')
@@ -233,11 +233,11 @@ async function formatWhalePercentileLinesFull(userId: string): Promise<string> {
   const size7 = LB_CACHES['7d']?.size || LB_LIMIT
   const size30 = LB_CACHES['30d']?.size || LB_LIMIT
   const sizeAll = LB_CACHES['all']?.size || LB_LIMIT
-  if (p7 != null) parts.push(`Top ${rankFromPercentile(p7, size7)} of ${TOTAL_USERS} (7d)`)
-  if (p30 != null) parts.push(`Top ${rankFromPercentile(p30, size30)} of ${TOTAL_USERS} (30d)`)
+  if (p7 != null) parts.push(`Top ${rankFromPercentile(p7, size7)} (7d)`)
+  if (p30 != null) parts.push(`Top ${rankFromPercentile(p30, size30)} (30d)`)
   // Only show all-time in richer contexts
-  if (pall != null) parts.push(`Top ${rankFromPercentile(pall, sizeAll)} of ${TOTAL_USERS} (all)`) // used in profile context
-  return parts.length ? `Leaderboard: ${parts.join(' • ')}` : ''
+  if (pall != null) parts.push(`Top ${rankFromPercentile(pall, sizeAll)} (all)`) // used in profile context
+  return parts.length ? `Leaderboard: ${parts.join(' • ')} of ${TOTAL_USERS}` : ''
 }
 
 // Safe sender with layered fallbacks and verbose diagnostics
