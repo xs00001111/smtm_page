@@ -190,6 +190,39 @@ function formatWhaleScoreLine(score: any): string {
   return `Whale Score: ${Math.round(n)} (${whaleScoreBand(n)})`
 }
 
+// Whale percentile helpers (vs weekly leaderboard)
+type LBEntry = { user_id: string }
+const LB_CACHE_TTL = 45 * 60 * 1000
+let LB_CACHE: { ts: number; map: Map<string, number>; size: number } | null = null
+function percentileFromIndex(i: number, total: number): number {
+  return Math.round(((total - i) / Math.max(1, total)) * 100)
+}
+async function getWhalePercentile(userId: string): Promise<number | null> {
+  const id = String(userId || '').toLowerCase()
+  if (!/^0x[a-fA-F0-9]{40}$/.test(id)) return null
+  const now = Date.now()
+  try {
+    if (!LB_CACHE || (now - LB_CACHE.ts) > LB_CACHE_TTL) {
+      const lb = await dataApi.getLeaderboard({ limit: 200 }).catch(()=>[]) as any[]
+      const size = Array.isArray(lb) ? lb.length : 0
+      const map = new Map<string, number>()
+      if (size) {
+        lb.forEach((e: any, i: number) => {
+          const uid = String(e?.user_id || '').toLowerCase()
+          if (uid) map.set(uid, percentileFromIndex(i, size))
+        })
+      }
+      LB_CACHE = { ts: now, map, size }
+    }
+    const pct = LB_CACHE.map.get(id)
+    return pct != null ? pct : null
+  } catch { return null }
+}
+async function formatWhalePercentileLineForUser(userId: string): Promise<string> {
+  const pct = await getWhalePercentile(userId)
+  return pct != null ? `Whale Percentile: ${pct}% (weekly)` : ''
+}
+
 // Safe sender with layered fallbacks and verbose diagnostics
 async function replySafe(ctx: any, message: string, keyboard?: any): Promise<void> {
   const kb = keyboard ? { reply_markup: keyboard } : undefined
@@ -1110,7 +1143,7 @@ export function registerCommands(bot: Telegraf) {
         if (a.kind === 'whale') {
           const rec = a.data?.recommendation ? ` (${a.data.recommendation})` : ''
           msg += `Whale Alpha: <b>${a.alpha}</b>${rec}\n`
-          if (a.data?.whaleScore != null) msg += `${formatWhaleScoreLine(a.data.whaleScore)}\n`
+          try { if (a.wallet) { const pctLine = await formatWhalePercentileLineForUser(a.wallet); if (pctLine) msg += pctLine + '\n' } } catch {}
           if (a.data?.weightedNotionalUsd != null) msg += `Value: $${Number(a.data.weightedNotionalUsd).toLocaleString()}\n`
           if (wallet) msg += `Wallet: <code>${wallet}</code>\n`
         } else if (a.kind === 'smart_skew') {
@@ -1228,7 +1261,10 @@ export function registerCommands(bot: Telegraf) {
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr}\n`
-            msg += `   ${formatWhaleScoreLine(Number(whaleScoreStr))}\n`
+            try {
+              const pctLine = await formatWhalePercentileLineForUser(entry.user_id)
+              if (pctLine) msg += `   ${pctLine}\n`
+            } catch {}
             if (whaleDescription) {
               msg += `   \n   ${whaleDescription}\n`
             }
@@ -2288,7 +2324,10 @@ export function registerCommands(bot: Telegraf) {
             msg += `${i}. ${name} (${short})\n`
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr}\n`
-            msg += `   ${formatWhaleScoreLine(Number(whaleScoreStr))}\n`
+            try {
+              const pctLine = await formatWhalePercentileLineForUser(entry.user_id)
+              if (pctLine) msg += `   ${pctLine}\n`
+            } catch {}
             if (whaleDescription) {
               msg += `   \n   ${whaleDescription}\n`
             }
@@ -2345,7 +2384,10 @@ export function registerCommands(bot: Telegraf) {
               whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
             } catch {}
             let message = `🐳 Trader Found\n\n`
-            message += `${formatWhaleScoreLine(Number(whaleScoreStr))}\n`
+            try {
+              const pctLine = await formatWhalePercentileLineForUser(userId)
+              if (pctLine) message += pctLine + '\n'
+            } catch {}
             message += `ID: ${addr}\n`
             message += `🔗 ${url}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
@@ -2373,7 +2415,10 @@ export function registerCommands(bot: Telegraf) {
                   const stats = await getWalletWhaleStats(addr, { windowMs: 6*60*60*1000, maxEvents: 500 })
                   whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
                 } catch {}
-                message = `🐳 Profile\n\n${formatWhaleScoreLine(Number(whaleScoreStr))}\n` + message.split('\n').slice(2).join('\n')
+                try {
+                  const pctLine = await formatWhalePercentileLineForUser(userId)
+                  message = `🐳 Profile\n\n${pctLine ? pctLine + '\n' : ''}` + message.split('\n').slice(2).join('\n')
+                } catch {}
                 const tok = await actionFollowWhaleAll(addr)
                 const cb = `act:${tok}`
                 if (cb.length<=64) keyboard.push([{ text: `Follow`, callback_data: cb }])
@@ -2466,7 +2511,10 @@ export function registerCommands(bot: Telegraf) {
                 whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
               } catch {}
               message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
-              message += `   ${formatWhaleScoreLine(Number(whaleScoreStr))}\n`
+              try {
+                const pctLine = await formatWhalePercentileLineForUser(whale.user_id)
+                if (pctLine) message += `   ${pctLine}\n`
+              } catch {}
               message += `   Rank: #${whale.rank}\n`
               message += `   🔗 ${profileUrl}\n\n`
               try { const tok = await actionFollowWhaleAll(whale.user_id); keyboard.push([{ text: `Follow`, callback_data: `act:${tok}` }]) } catch {}
@@ -2509,7 +2557,10 @@ export function registerCommands(bot: Telegraf) {
             message += `1. ${name} (${short})\n`
             message += `   ID: ${whale.user_id}\n`
             message += `   💰 PnL: ${pnl} | Vol: ${vol}\n`
-            message += `   ${formatWhaleScoreLine(Number(whaleScoreStr))}\n`
+            try {
+              const pctLine = await formatWhalePercentileLineForUser(whale.user_id)
+              if (pctLine) message += `   ${pctLine}\n`
+            } catch {}
             message += `   Rank: #${whale.rank}\n`
             message += `   🔗 ${profileUrl}\n\n`
             const keyboard: { text: string; callback_data: string }[][] = []
@@ -2561,7 +2612,10 @@ export function registerCommands(bot: Telegraf) {
           whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
         } catch {}
         msg += `${i+1}. ${short}  — balance: ${Math.round(bal)}\n`
-        msg += `   ${formatWhaleScoreLine(Number(whaleScoreStr))}\n`
+        try {
+          const pctLine = await formatWhalePercentileLineForUser(addr)
+          if (pctLine) msg += `   ${pctLine}\n`
+        } catch {}
         msg += `   ID: ${addr}\n`
         msg += `   🔗 ${profileUrl}\n`
         msg += `   ${'<code>'+esc(`/follow ${addr}`)+'</code>'}\n`
@@ -3653,8 +3707,8 @@ export function registerCommands(bot: Telegraf) {
                       const winStr = `${Math.round(winr.winRate)}% (${winr.wins}/${winr.total})`
                       const valNum = parseFloat(String((val as any).value || '0'))
                       const valStr = `$${Math.round(valNum).toLocaleString()}`
-                      const whaleScore = (d.whale_score != null ? d.whale_score : d.whaleScore)
-                      const whaleLine = whaleScore != null ? `\n${formatWhaleScoreLine(Number(whaleScore))}` : ''
+                      let whaleLine = ''
+                      try { const pLine = await formatWhalePercentileLineForUser(addr); if (pLine) whaleLine = `\n${pLine}` } catch {}
                       // Trades in last 12h (best-effort)
                       let trades12h = 0
                       try {
@@ -4064,8 +4118,10 @@ export function registerCommands(bot: Telegraf) {
           const alpha = await buildWhaleAlphaForTrade({ wallet: (t.wallet||'').toLowerCase(), sizeShares: t.size, price: t.price, tokenId: t.tokenId })
           const short = t.wallet ? t.wallet.slice(0,6)+'...'+t.wallet.slice(-4) : 'unknown'
           let msg = `✨ <b>Latest Trade</b>\n\n`
-          const wsLine = alpha.whaleScore!=null ? `${formatWhaleScoreLine(alpha.whaleScore)}` : ''
-          msg += `${wsLine ? wsLine + '\\n' : ''}Alpha: ${alpha.alpha} (${alpha.recommendation})\n`
+          let wsLine = ''
+          try { if (t.wallet) { const pl = await formatWhalePercentileLineForUser(t.wallet); if (pl) wsLine = pl } } catch {}
+          msg += `${wsLine ? wsLine + '\n' : ''}Alpha: ${alpha.alpha} (${alpha.recommendation})
+`
           msg += `Value: $${Math.round(t.notional).toLocaleString()}\n`
           msg += `Wallet: <code>${short}</code>`
           await ctx.reply(msg, { parse_mode: 'HTML' })
@@ -4118,7 +4174,10 @@ export function registerCommands(bot: Telegraf) {
       if (a.kind === 'whale') {
         const rec = a.data?.recommendation ? ` (${a.data.recommendation})` : ''
         msg += `Whale Alpha: <b>${a.alpha}</b>${rec}\n`
-        if (a.data?.whaleScore != null) msg += `${formatWhaleScoreLine(a.data.whaleScore)}\n`
+        if (addr) {
+          const pctLine = await formatWhalePercentileLineForUser(addr)
+          if (pctLine) msg += pctLine + '\n'
+        }
         if (a.data?.weightedNotionalUsd != null) msg += `Value: $${Number(a.data.weightedNotionalUsd).toLocaleString()}\n`
         if (wallet) {
           const profileUrl = getPolymarketProfileUrl(null, a.wallet!)
@@ -4220,7 +4279,8 @@ export function registerCommands(bot: Telegraf) {
             const winStr = `${Math.round(winr.winRate)}% (${winr.wins}/${winr.total})`
             const valNum = parseFloat(String((val as any).value || '0'))
             const valStr = `$${Math.round(valNum).toLocaleString()}`
-            const whaleLine = (best as any).whaleScore != null ? `\n${formatWhaleScoreLine(Number((best as any).whaleScore))}` : ''
+            let whaleLine = ''
+            try { if (addr) { const pLine = await formatWhalePercentileLineForUser(addr); if (pLine) whaleLine = `\n${pLine}` } } catch {}
             let totalPositions = (val as any).positions_count || 0
             if (!totalPositions) totalPositions = (openPos?.length || 0) + (closedPos?.length || 0)
             let firstTs = Infinity
@@ -4277,7 +4337,7 @@ export function registerCommands(bot: Telegraf) {
       if (a.kind === 'whale') {
         const rec = a.data?.recommendation ? ` (${a.data.recommendation})` : ''
         msg += `Whale Alpha: <b>${a.alpha}</b>${rec}\n`
-        if (a.data?.whaleScore != null) msg += `${formatWhaleScoreLine(a.data.whaleScore)}\n`
+        try { if (a.wallet) { const pctLine = await formatWhalePercentileLineForUser(a.wallet); if (pctLine) msg += pctLine + '\n' } } catch {}
         if (a.data?.weightedNotionalUsd != null) msg += `Value: $${Number(a.data.weightedNotionalUsd).toLocaleString()}\n`
         if (wallet) msg += `Wallet: <code>${wallet}</code>\n`
       } else if (a.kind === 'smart_skew') {
