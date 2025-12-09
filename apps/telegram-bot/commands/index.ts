@@ -192,9 +192,12 @@ function formatWhaleScoreLine(score: any): string {
 
 // Whale percentile helpers (vs leaderboard by range)
 const LB_CACHE_TTL = 45 * 60 * 1000
+const LB_LIMIT = 500 // Track top 500 traders
+const TOTAL_USERS = '1.5M' // Total Polymarket users for context
 type LBCache = { ts: number; map: Map<string, number>; size: number }
 const LB_CACHES: Record<string, LBCache | null> = { '7d': null, '30d': null, 'all': null }
 function percentileFromIndex(i: number, total: number): number { return Math.round(((total - i) / Math.max(1, total)) * 100) }
+function rankFromPercentile(pct: number, total: number): number { return Math.round(total + 1 - (pct * total / 100)) }
 async function getWhalePercentile(userId: string, range: '7d'|'30d'|'all' = '7d'): Promise<number | null> {
   const id = String(userId || '').toLowerCase()
   if (!/^0x[a-fA-F0-9]{40}$/.test(id)) return null
@@ -202,7 +205,7 @@ async function getWhalePercentile(userId: string, range: '7d'|'30d'|'all' = '7d'
   try {
     const cached = LB_CACHES[range]
     if (!cached || (now - cached.ts) > LB_CACHE_TTL) {
-      const lb = await dataApi.getLeaderboard({ limit: 200, range }).catch(()=>[]) as any[]
+      const lb = await dataApi.getLeaderboard({ limit: LB_LIMIT, range }).catch(()=>[]) as any[]
       const size = Array.isArray(lb) ? lb.length : 0
       const map = new Map<string, number>()
       if (size) lb.forEach((e: any, i: number) => { const uid = String(e?.user_id || '').toLowerCase(); if (uid) map.set(uid, percentileFromIndex(i, size)) })
@@ -216,20 +219,25 @@ async function formatWhalePercentileLineForUser(userId: string): Promise<string>
   const p7 = await getWhalePercentile(userId, '7d')
   const p30 = await getWhalePercentile(userId, '30d')
   const parts: string[] = []
-  if (p7 != null) parts.push(`Top ${p7}% (7d)`)
-  if (p30 != null) parts.push(`Top ${p30}% (30d)`)
-  return parts.length ? `Whale Percentile: ${parts.join(' • ')}` : ''
+  const size7 = LB_CACHES['7d']?.size || LB_LIMIT
+  const size30 = LB_CACHES['30d']?.size || LB_LIMIT
+  if (p7 != null) parts.push(`Top ${rankFromPercentile(p7, size7)} of ${TOTAL_USERS} (7d)`)
+  if (p30 != null) parts.push(`Top ${rankFromPercentile(p30, size30)} of ${TOTAL_USERS} (30d)`)
+  return parts.length ? `Leaderboard: ${parts.join(' • ')}` : ''
 }
 async function formatWhalePercentileLinesFull(userId: string): Promise<string> {
   const p7 = await getWhalePercentile(userId, '7d')
   const p30 = await getWhalePercentile(userId, '30d')
   const pall = await getWhalePercentile(userId, 'all')
   const parts: string[] = []
-  if (p7 != null) parts.push(`Top ${p7}% (7d)`)
-  if (p30 != null) parts.push(`Top ${p30}% (30d)`)
+  const size7 = LB_CACHES['7d']?.size || LB_LIMIT
+  const size30 = LB_CACHES['30d']?.size || LB_LIMIT
+  const sizeAll = LB_CACHES['all']?.size || LB_LIMIT
+  if (p7 != null) parts.push(`Top ${rankFromPercentile(p7, size7)} of ${TOTAL_USERS} (7d)`)
+  if (p30 != null) parts.push(`Top ${rankFromPercentile(p30, size30)} of ${TOTAL_USERS} (30d)`)
   // Only show all-time in richer contexts
-  if (pall != null) parts.push(`Top ${pall}% (all)`) // used in profile context
-  return parts.length ? `Whale Percentiles: ${parts.join(' • ')}` : ''
+  if (pall != null) parts.push(`Top ${rankFromPercentile(pall, sizeAll)} of ${TOTAL_USERS} (all)`) // used in profile context
+  return parts.length ? `Leaderboard: ${parts.join(' • ')}` : ''
 }
 
 // Safe sender with layered fallbacks and verbose diagnostics
@@ -3884,8 +3892,8 @@ export function registerCommands(bot: Telegraf) {
               if (showInsiderBadge) {
                 msg += `\n🕵️ Potential Insider`
               } else {
+                // Show leaderboard rank if available
                 if (whalePctLine) msg += `\n${whalePctLine}`
-                if (whaleScore > 0) msg += `\nWhale Score: ${Math.round(whaleScore)}%`
               }
               msg += `\n📈 PnL: ${pnlStr} • 🏆 Win: ${winStr}`
               msg += `\n💼 Portfolio: ${valStr}`
@@ -4527,8 +4535,8 @@ export function registerCommands(bot: Telegraf) {
                 if (showInsiderBadge) {
                   card += `\n🕵️ Potential Insider`
                 } else {
+                  // Show leaderboard rank if available
                   if (whalePctLine) card += `\n${whalePctLine}`
-                  if (whaleScore != null && Number(whaleScore) > 0) card += `\nWhale Score: ${Math.round(Number(whaleScore))}%`
                 }
                 card += `\n📈 PnL: ${pnlStr} • 🏆 Win: ${winStr}`
                 card += `\n💼 Portfolio: ${valStr}`
