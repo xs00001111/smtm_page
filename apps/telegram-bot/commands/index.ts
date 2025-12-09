@@ -190,37 +190,42 @@ function formatWhaleScoreLine(score: any): string {
   return `Whale Score: ${Math.round(n)} (${whaleScoreBand(n)})`
 }
 
-// Whale percentile helpers (vs weekly leaderboard)
-type LBEntry = { user_id: string }
+// Whale percentile helpers (vs leaderboard by range)
 const LB_CACHE_TTL = 45 * 60 * 1000
-let LB_CACHE: { ts: number; map: Map<string, number>; size: number } | null = null
-function percentileFromIndex(i: number, total: number): number {
-  return Math.round(((total - i) / Math.max(1, total)) * 100)
-}
-async function getWhalePercentile(userId: string): Promise<number | null> {
+type LBCache = { ts: number; map: Map<string, number>; size: number }
+const LB_CACHES: Record<string, LBCache | null> = { '7d': null, '30d': null, 'all': null }
+function percentileFromIndex(i: number, total: number): number { return Math.round(((total - i) / Math.max(1, total)) * 100) }
+async function getWhalePercentile(userId: string, range: '7d'|'30d'|'all' = '7d'): Promise<number | null> {
   const id = String(userId || '').toLowerCase()
   if (!/^0x[a-fA-F0-9]{40}$/.test(id)) return null
   const now = Date.now()
   try {
-    if (!LB_CACHE || (now - LB_CACHE.ts) > LB_CACHE_TTL) {
-      const lb = await dataApi.getLeaderboard({ limit: 200 }).catch(()=>[]) as any[]
+    const cached = LB_CACHES[range]
+    if (!cached || (now - cached.ts) > LB_CACHE_TTL) {
+      const lb = await dataApi.getLeaderboard({ limit: 200, range }).catch(()=>[]) as any[]
       const size = Array.isArray(lb) ? lb.length : 0
       const map = new Map<string, number>()
-      if (size) {
-        lb.forEach((e: any, i: number) => {
-          const uid = String(e?.user_id || '').toLowerCase()
-          if (uid) map.set(uid, percentileFromIndex(i, size))
-        })
-      }
-      LB_CACHE = { ts: now, map, size }
+      if (size) lb.forEach((e: any, i: number) => { const uid = String(e?.user_id || '').toLowerCase(); if (uid) map.set(uid, percentileFromIndex(i, size)) })
+      LB_CACHES[range] = { ts: now, map, size }
     }
-    const pct = LB_CACHE.map.get(id)
+    const pct = LB_CACHES[range]?.map.get(id)
     return pct != null ? pct : null
   } catch { return null }
 }
 async function formatWhalePercentileLineForUser(userId: string): Promise<string> {
-  const pct = await getWhalePercentile(userId)
-  return pct != null ? `Whale Percentile: ${pct}% (weekly)` : ''
+  const pct = await getWhalePercentile(userId, '7d')
+  return pct != null ? `Whale Percentile: ${pct}% (7d)` : ''
+}
+async function formatWhalePercentileLinesFull(userId: string): Promise<string> {
+  const p7 = await getWhalePercentile(userId, '7d')
+  const p30 = await getWhalePercentile(userId, '30d')
+  const pall = await getWhalePercentile(userId, 'all')
+  const parts: string[] = []
+  if (p7 != null) parts.push(`${p7}% (7d)`)
+  if (p30 != null) parts.push(`${p30}% (30d)`)
+  // Only show all-time in richer contexts
+  if (pall != null) parts.push(`${pall}% (all)`) // used in profile context
+  return parts.length ? `Whale Percentiles: ${parts.join(' • ')}` : ''
 }
 
 // Safe sender with layered fallbacks and verbose diagnostics
@@ -1262,8 +1267,8 @@ export function registerCommands(bot: Telegraf) {
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr}\n`
             try {
-              const pctLine = await formatWhalePercentileLineForUser(entry.user_id)
-              if (pctLine) msg += `   ${pctLine}\n`
+              const pct = await formatWhalePercentileLinesFull(entry.user_id)
+              if (pct) msg += `   ${pct}\n`
             } catch {}
             if (whaleDescription) {
               msg += `   \n   ${whaleDescription}\n`
@@ -2325,8 +2330,8 @@ export function registerCommands(bot: Telegraf) {
             msg += `   💰 PnL: ${pnl} (Ranked) | Vol: ${vol}\n`
             msg += `   🎯 Win Rate: ${winRateStr}\n`
             try {
-              const pctLine = await formatWhalePercentileLineForUser(entry.user_id)
-              if (pctLine) msg += `   ${pctLine}\n`
+              const pct = await formatWhalePercentileLinesFull(entry.user_id)
+              if (pct) msg += `   ${pct}\n`
             } catch {}
             if (whaleDescription) {
               msg += `   \n   ${whaleDescription}\n`
@@ -2385,8 +2390,8 @@ export function registerCommands(bot: Telegraf) {
             } catch {}
             let message = `🐳 Trader Found\n\n`
             try {
-              const pctLine = await formatWhalePercentileLineForUser(userId)
-              if (pctLine) message += pctLine + '\n'
+              const pct = await formatWhalePercentileLinesFull(userId)
+              if (pct) message += pct + '\n'
             } catch {}
             message += `ID: ${addr}\n`
             message += `🔗 ${url}\n\n`
@@ -2416,8 +2421,8 @@ export function registerCommands(bot: Telegraf) {
                   whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
                 } catch {}
                 try {
-                  const pctLine = await formatWhalePercentileLineForUser(userId)
-                  message = `🐳 Profile\n\n${pctLine ? pctLine + '\n' : ''}` + message.split('\n').slice(2).join('\n')
+                  const pct = await formatWhalePercentileLinesFull(userId)
+                  message = `🐳 Profile\n\n${pct ? pct + '\n' : ''}` + message.split('\n').slice(2).join('\n')
                 } catch {}
                 const tok = await actionFollowWhaleAll(addr)
                 const cb = `act:${tok}`

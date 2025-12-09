@@ -183,16 +183,17 @@ export class DataApiClient {
   async getLeaderboard(params?: LeaderboardParams): Promise<LeaderboardEntry[]> {
     const limit = params?.limit || 50;
     const offset = params?.offset || 0;
+    const range = params?.range;
     // Attempt 1: axios
     try {
-      dataDbg('leaderboard.api.axios', { limit, offset });
-      const { data } = await this.client.get<LeaderboardEntry[]>('/leaderboard', { params: { limit, offset } });
+      dataDbg('leaderboard.api.axios', { limit, offset, range });
+      const { data } = await this.client.get<LeaderboardEntry[]>('/leaderboard', { params: { limit, offset, range } });
       dataDbg('leaderboard.api.axios.ok', { count: Array.isArray(data) ? data.length : 0 });
       return data;
     } catch (err1: any) {
       // Attempt 2: fetch with explicit headers
       try {
-        const url = `${this.baseURL}/leaderboard?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`;
+        const url = `${this.baseURL}/leaderboard?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}${range?`&range=${encodeURIComponent(range)}`:''}`;
         dataDbg('leaderboard.api.fetch', { url });
         const res = await fetch(url, {
           headers: {

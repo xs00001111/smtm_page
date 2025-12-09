@@ -181,6 +181,9 @@ export interface LeaderboardEntry {
 export interface LeaderboardParams {
   limit?: number;
   offset?: number;
+  // Optional time window hint; best-effort
+  // Examples: '7d' | '30d' | 'all'
+  range?: string;
 }
 
 export interface PricesHistoryParams {
