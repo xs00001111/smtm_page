@@ -213,18 +213,22 @@ async function getWhalePercentile(userId: string, range: '7d'|'30d'|'all' = '7d'
   } catch { return null }
 }
 async function formatWhalePercentileLineForUser(userId: string): Promise<string> {
-  const pct = await getWhalePercentile(userId, '7d')
-  return pct != null ? `Whale Percentile: ${pct}% (7d)` : ''
+  const p7 = await getWhalePercentile(userId, '7d')
+  const p30 = await getWhalePercentile(userId, '30d')
+  const parts: string[] = []
+  if (p7 != null) parts.push(`Top ${p7}% (7d)`)
+  if (p30 != null) parts.push(`Top ${p30}% (30d)`)
+  return parts.length ? `Whale Percentile: ${parts.join(' • ')}` : ''
 }
 async function formatWhalePercentileLinesFull(userId: string): Promise<string> {
   const p7 = await getWhalePercentile(userId, '7d')
   const p30 = await getWhalePercentile(userId, '30d')
   const pall = await getWhalePercentile(userId, 'all')
   const parts: string[] = []
-  if (p7 != null) parts.push(`${p7}% (7d)`)
-  if (p30 != null) parts.push(`${p30}% (30d)`)
+  if (p7 != null) parts.push(`Top ${p7}% (7d)`)
+  if (p30 != null) parts.push(`Top ${p30}% (30d)`)
   // Only show all-time in richer contexts
-  if (pall != null) parts.push(`${pall}% (all)`) // used in profile context
+  if (pall != null) parts.push(`Top ${pall}% (all)`) // used in profile context
   return parts.length ? `Whale Percentiles: ${parts.join(' • ')}` : ''
 }
 
