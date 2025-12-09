@@ -25,6 +25,8 @@ const envSchema = z.object({
   ALPHA_COOLDOWN_INSIDER_SECONDS: z.string().default('240'),
   TELEGRAM_SUBSCRIPTIONS_FILE: z.string().default('apps/telegram-bot/data/subscriptions.csv'),
   TELEGRAM_LINKS_FILE: z.string().default('apps/telegram-bot/data/links.csv'),
+  // Messaging style for bots (Telegram/Discord)
+  TELEGRAM_USE_EMOJIS: z.string().default('false'),
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_ANON_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
@@ -66,6 +68,7 @@ export const env = envSchema.parse({
   ALPHA_COOLDOWN_INSIDER_SECONDS: process.env.ALPHA_COOLDOWN_INSIDER_SECONDS || '240',
   TELEGRAM_SUBSCRIPTIONS_FILE: process.env.TELEGRAM_SUBSCRIPTIONS_FILE || 'apps/telegram-bot/data/subscriptions.csv',
   TELEGRAM_LINKS_FILE: process.env.TELEGRAM_LINKS_FILE || 'apps/telegram-bot/data/links.csv',
+  TELEGRAM_USE_EMOJIS: process.env.TELEGRAM_USE_EMOJIS || 'false',
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,

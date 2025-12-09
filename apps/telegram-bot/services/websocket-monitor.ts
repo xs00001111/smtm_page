@@ -628,13 +628,14 @@ export class WebSocketMonitorService {
     newPrice: number,
     changePercent: number
   ): Promise<void> {
-    const direction = newPrice > oldPrice ? '📈' : '📉';
-    const emoji = newPrice > oldPrice ? '🚀' : '⚠️';
+    const useEmojis = (process.env.TELEGRAM_USE_EMOJIS || 'false') === 'true';
+    const direction = newPrice > oldPrice ? (useEmojis ? '📈' : 'UP') : (useEmojis ? '📉' : 'DOWN');
+    const header = useEmojis ? '🚀 Price Alert' : 'PRICE ALERT';
 
     const message =
-      `${emoji} **Price Alert**\n\n` +
+      `${header}\n\n` +
       `${subscription.marketName}\n\n` +
-      `${direction} **${formatPrice(newPrice)}**\n` +
+      `${direction} ${useEmojis ? '**' : ''}${formatPrice(newPrice)}${useEmojis ? '**' : ''}\n` +
       `Previous: ${formatPrice(oldPrice)}\n` +
       `Change: ${changePercent.toFixed(2)}%`;
 
@@ -663,14 +664,15 @@ export class WebSocketMonitorService {
     trade: any,
     tradeValue: number
   ): Promise<void> {
+    const useEmojis = (process.env.TELEGRAM_USE_EMOJIS || 'false') === 'true';
     const maker = trade.maker_address || trade.maker || 'Unknown';
-    const side = trade.side || (trade.type === 'buy' ? 'BUY' : 'SELL');
-    const emoji = side === 'BUY' ? '💰' : '💸';
+    const side = (trade.side || (trade.type === 'buy' ? 'BUY' : 'SELL')).toUpperCase();
+    const header = useEmojis ? '🐋 **Whale Trade Alert**' : '**WHALE TRADE ALERT**';
 
     const message =
-      `🐋 **Whale Trade Alert**\n\n` +
+      `${header}\n\n` +
       `${subscription.marketName}\n\n` +
-      `${emoji} **${side}** ${formatVolume(tradeValue)}\n` +
+      `Action: **${side}** ${formatVolume(tradeValue)}\n` +
       `Price: ${formatPrice(parseFloat(trade.price || '0'))}\n` +
       `Trader: \`${formatAddress(maker, 6)}\``;
 
@@ -700,9 +702,9 @@ export class WebSocketMonitorService {
     tradeValue: number,
     tokenId: string
   ): Promise<void> {
+    const useEmojis = (process.env.TELEGRAM_USE_EMOJIS || 'false') === 'true';
     const maker = trade.maker_address || trade.maker || 'Unknown';
-    const side = trade.side || (trade.type === 'buy' ? 'BUY' : 'SELL');
-    const emoji = side === 'BUY' ? '💰' : '💸';
+    const side = (trade.side || (trade.type === 'buy' ? 'BUY' : 'SELL')).toUpperCase();
     const shortAddr = formatAddress(maker, 6);
 
     // Try to get market name from our subscriptions or fetch it
@@ -719,11 +721,12 @@ export class WebSocketMonitorService {
       }
     }
 
+    const header = useEmojis ? '🐋 **Copy Trade Alert**' : '**COPY TRADE ALERT**';
     const message =
-      `🐋 **Copy Trade Alert**\n\n` +
+      `${header}\n\n` +
       `Whale: \`${shortAddr}\`\n` +
       `Market: ${marketName}\n\n` +
-      `${emoji} **${side}** ${formatVolume(tradeValue)}\n` +
+      `Action: **${side}** ${formatVolume(tradeValue)}\n` +
       `Price: ${formatPrice(parseFloat(trade.price || '0'))}`;
 
     try {

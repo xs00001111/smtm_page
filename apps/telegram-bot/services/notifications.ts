@@ -11,19 +11,16 @@ export class NotificationService {
 
   async sendCard(userId: number, card: Card) {
     try {
-      let message = `📊 ${card.title}\n\n`;
+      const useEmojis = (process.env.TELEGRAM_USE_EMOJIS || 'false') === 'true';
+      let message = useEmojis ? `📊 ${card.title}\n\n` : `${card.title}\n\n`;
 
       card.lines.forEach((line) => {
         message += `${line}\n`;
       });
 
-      if (card.footer) {
-        message += `\n${card.footer}`;
-      }
+      if (card.footer) message += `\n${card.footer}`;
 
-      if (card.url) {
-        message += `\n\n🔗 ${card.url}`;
-      }
+      if (card.url) message += useEmojis ? `\n\n🔗 ${card.url}` : `\n\nLink: ${card.url}`;
 
       await this.bot.telegram.sendMessage(userId, message);
       logger.info('Sent card notification', { userId, title: card.title });
@@ -52,7 +49,8 @@ export class NotificationService {
   }
 
   async sendError(userId: number, error: string) {
-    const message = `❌ Error: ${error}`;
+    const useEmojis = (process.env.TELEGRAM_USE_EMOJIS || 'false') === 'true';
+    const message = useEmojis ? `❌ Error: ${error}` : `Error: ${error}`;
     await this.sendMessage(userId, message);
   }
 

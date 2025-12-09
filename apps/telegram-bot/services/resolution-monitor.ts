@@ -96,9 +96,11 @@ export function startResolutionMonitor(ws: WebSocketMonitorService) {
 
           for (const r of rows) {
             try {
+              const useEmojis = (process.env.TELEGRAM_USE_EMOJIS || 'false') === 'true'
+              const header = useEmojis ? '✅ Market Resolved' : 'MARKET RESOLVED'
               await (ws as any).bot.telegram.sendMessage(
                 r.user_id,
-                `✅ Market Resolved\n\n${question}\n\nWinning outcome: ${winner}\n\nAlerts for this market are now turned off.`
+                `${header}\n\n${question}\n\nWinning outcome: ${winner}\n\nAlerts for this market are now turned off.`
               )
             } catch (e) {
               logger.warn('Failed to notify resolution', { user: r.user_id, conditionId, err: (e as any)?.message })
