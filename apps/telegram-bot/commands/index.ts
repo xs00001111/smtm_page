@@ -218,26 +218,27 @@ async function getWhalePercentile(userId: string, range: '7d'|'30d'|'all' = '7d'
 async function formatWhalePercentileLineForUser(userId: string): Promise<string> {
   const p7 = await getWhalePercentile(userId, '7d')
   const p30 = await getWhalePercentile(userId, '30d')
-  const parts: string[] = []
   const size7 = LB_CACHES['7d']?.size || LB_LIMIT
   const size30 = LB_CACHES['30d']?.size || LB_LIMIT
-  if (p7 != null) parts.push(`Top ${rankFromPercentile(p7, size7)} (7d)`)
-  if (p30 != null) parts.push(`Top ${rankFromPercentile(p30, size30)} (30d)`)
-  return parts.length ? `Leaderboard: ${parts.join(' • ')} of ${TOTAL_USERS}` : ''
+  const lines: string[] = []
+  lines.push('Leaderboard:')
+  if (p7 != null) lines.push(`- 7d: #${rankFromPercentile(p7, size7)} of ${TOTAL_USERS}`)
+  if (p30 != null) lines.push(`- 30d: #${rankFromPercentile(p30, size30)} of ${TOTAL_USERS}`)
+  return lines.length > 1 ? lines.join('\n') : ''
 }
 async function formatWhalePercentileLinesFull(userId: string): Promise<string> {
   const p7 = await getWhalePercentile(userId, '7d')
   const p30 = await getWhalePercentile(userId, '30d')
   const pall = await getWhalePercentile(userId, 'all')
-  const parts: string[] = []
   const size7 = LB_CACHES['7d']?.size || LB_LIMIT
   const size30 = LB_CACHES['30d']?.size || LB_LIMIT
   const sizeAll = LB_CACHES['all']?.size || LB_LIMIT
-  if (p7 != null) parts.push(`Top ${rankFromPercentile(p7, size7)} (7d)`)
-  if (p30 != null) parts.push(`Top ${rankFromPercentile(p30, size30)} (30d)`)
-  // Only show all-time in richer contexts
-  if (pall != null) parts.push(`Top ${rankFromPercentile(pall, sizeAll)} (all)`) // used in profile context
-  return parts.length ? `Leaderboard: ${parts.join(' • ')} of ${TOTAL_USERS}` : ''
+  const lines: string[] = []
+  lines.push('Leaderboard:')
+  if (p7 != null) lines.push(`- 7d: #${rankFromPercentile(p7, size7)} of ${TOTAL_USERS}`)
+  if (p30 != null) lines.push(`- 30d: #${rankFromPercentile(p30, size30)} of ${TOTAL_USERS}`)
+  if (pall != null) lines.push(`- All: #${rankFromPercentile(pall, sizeAll)} of ${TOTAL_USERS}`)
+  return lines.length > 1 ? lines.join('\n') : ''
 }
 
 // Safe sender with layered fallbacks and verbose diagnostics
@@ -1280,7 +1281,10 @@ export function registerCommands(bot: Telegraf) {
             msg += `   🎯 Win Rate: ${winRateStr}\n`
             try {
               const pct = await formatWhalePercentileLinesFull(entry.user_id)
-              if (pct) msg += `   ${pct}\n`
+              if (pct) {
+                // Indent each line for mobile readability
+                msg += pct.split('\n').map((l, idx)=> idx===0 ? `   ${l}` : `   ${l}`).join('\n') + '\n'
+              }
             } catch {}
             if (whaleDescription) {
               msg += `   \n   ${whaleDescription}\n`
