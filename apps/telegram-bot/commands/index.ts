@@ -3840,7 +3840,8 @@ export function registerCommands(bot: Telegraf) {
               const winStr = `${Math.round(winr.winRate)}% (${winr.wins}/${winr.total})`
               const valNum = parseFloat(String((val as any).value || '0'))
               const valStr = `$${Math.round(valNum).toLocaleString()}`
-              const whaleStr = (best as any).whaleScore != null ? ` • 🐋 ${Math.round((best as any).whaleScore)}` : ''
+              let whalePctLine = ''
+              try { const pl = await formatWhalePercentileLineForUser(addr); if (pl) whalePctLine = pl } catch {}
               // Trades in last 12h (best-effort)
               let trades12h = 0
               try {
@@ -3869,11 +3870,19 @@ export function registerCommands(bot: Telegraf) {
               const whaleScore = (best as any).whaleScore || 0
               const highReturn = (pnlAgg.totalPnL >= 20000 && winr.winRate >= 55)
               const insiderish = (notional >= 20000) && (isNewWallet || whaleScore >= 80)
+              // For new wallets with potential insider flag and low whale score, show insider badge instead of metrics
+              const showInsiderBadge = isNewWallet && insiderish && whaleScore < 40
               const catParts: string[] = []
               if (highReturn) catParts.push('📈 High Return')
-              if (insiderish) catParts.push('🕵️ Potential Insider')
+              if (insiderish && !showInsiderBadge) catParts.push('🕵️ Potential Insider')
               // Compose message
-              msg += `\n👤 Trader: <a href=\"${esc(profileUrl)}\">${esc(name)}</a>${whaleStr}${newBadge}`
+              msg += `\n👤 Trader: <a href=\"${esc(profileUrl)}\">${esc(name)}</a>${newBadge}`
+              if (showInsiderBadge) {
+                msg += `\n🕵️ Potential Insider`
+              } else {
+                if (whalePctLine) msg += `\n${whalePctLine}`
+                if (whaleScore > 0) msg += `\nWhale Score: ${Math.round(whaleScore)}%`
+              }
               msg += `\n📈 PnL: ${pnlStr} • 🏆 Win: ${winStr}`
               msg += `\n💼 Portfolio: ${valStr}`
               if (trades12h) msg += `\n🧾 Trades (12h): ${trades12h}`
@@ -3959,7 +3968,7 @@ export function registerCommands(bot: Telegraf) {
               for (const ex of (bestSkew as any).examples) {
                 const short = ex.wallet.slice(0,6)+"…"+ex.wallet.slice(-4)
                 const pnlStr = `${ex.pnl >= 0 ? '+' : '-'}$${Math.abs(Math.round(ex.pnl)).toLocaleString()}`
-                msg += `• <code>${short}</code> — $${Math.round(ex.valueUsd).toLocaleString()} • 🐋 ${Math.round(ex.whaleScore)} • PnL ${pnlStr}\n`
+                msg += `• <code>${short}</code> — $${Math.round(ex.valueUsd).toLocaleString()} • WS ${Math.round(ex.whaleScore)} • PnL ${pnlStr}\n`
               }
             }
             if (url) msg += `\n🔗 <a href=\"${esc(url)}\">Market</a>`
@@ -4469,7 +4478,8 @@ export function registerCommands(bot: Telegraf) {
                 const valNum = parseFloat(String((val as any).value || '0'))
                 const valStr = `$${Math.round(valNum).toLocaleString()}`
                 const whaleScore = (d.whale_score != null ? d.whale_score : d.whaleScore)
-                const whaleStr = whaleScore != null ? ` • 🐋 ${Math.round(Number(whaleScore))}` : ''
+                let whalePctLine = ''
+                try { const pLine = await formatWhalePercentileLineForUser(addr); if (pLine) whalePctLine = pLine } catch {}
                 // Trades in last 12h (best-effort)
                 let trades12h = 0
                 try {
@@ -4497,9 +4507,11 @@ export function registerCommands(bot: Telegraf) {
                 const notionalNum = Math.round(Number(notional || 0))
                 const highReturn = (pnlAgg.totalPnL >= 20000 && winr.winRate >= 55)
                 const insiderish = (notionalNum >= 20000) && (isNewWallet || (Number(whaleScore) >= 80))
+                // For new wallets with potential insider flag and low whale score, show insider badge instead of metrics
+                const showInsiderBadge = isNewWallet && insiderish && Number(whaleScore || 0) < 40
                 const catParts: string[] = []
                 if (highReturn) catParts.push('📈 High Return')
-                if (insiderish) catParts.push('🕵️ Potential Insider')
+                if (insiderish && !showInsiderBadge) catParts.push('🕵️ Potential Insider')
                 // Tags: use market data fetched above
                 let tagsLine = ''
                 if (Array.isArray(m?.tags) && m.tags.length) {
@@ -4507,7 +4519,13 @@ export function registerCommands(bot: Telegraf) {
                   tagsLine = `\n🏷️ Tags: ${esc(tags)}`
                 }
                 // Append trader section
-                card += `\n\n👤 Trader: <a href=\"${esc(profileUrl)}\">${esc(name)}</a>${whaleStr}${newBadge}`
+                card += `\n\n👤 Trader: <a href=\"${esc(profileUrl)}\">${esc(name)}</a>${newBadge}`
+                if (showInsiderBadge) {
+                  card += `\n🕵️ Potential Insider`
+                } else {
+                  if (whalePctLine) card += `\n${whalePctLine}`
+                  if (whaleScore != null && Number(whaleScore) > 0) card += `\nWhale Score: ${Math.round(Number(whaleScore))}%`
+                }
                 card += `\n📈 PnL: ${pnlStr} • 🏆 Win: ${winStr}`
                 card += `\n💼 Portfolio: ${valStr}`
                 if (trades12h) card += `\n🧾 Trades (12h): ${trades12h}`
