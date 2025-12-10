@@ -1206,7 +1206,189 @@ export function registerCommands(bot: Telegraf) {
             ctx.update.callback_query.data = `skw:${condToToken(cond)}`
             return await next()
           }
-          // TODO: Add handlers for overview, price, net
+
+          if (option === 'overview') {
+            try {
+              const market = await gammaApi.getMarket(cond)
+              const conditionId = market.condition_id || market.conditionId
+
+              // If tokens are missing, try re-fetching
+              if (!market.tokens || market.tokens.length === 0) {
+                const refetchedMarket = await gammaApi.getMarket(conditionId)
+                if (refetchedMarket?.tokens?.length > 0) {
+                  Object.assign(market, refetchedMarket)
+                }
+              }
+
+              const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
+              if (!holdersRes?.length) {
+                await ctx.reply('❌ No holder data available for this market.')
+                return
+              }
+
+              const yesToken = (market.tokens || []).find(t => (t.outcome || '').toLowerCase() === 'yes')
+              if (!yesToken) {
+                await ctx.reply('❌ This market has no tradeable outcomes.')
+                return
+              }
+
+              // Get orderbook
+              let book: any = null
+              let midpoint: number | null = null
+              let spread: number | null = null
+              try {
+                book = await clobApi.getOrderbook(yesToken.token_id)
+                const bestBid = book.bids?.length ? parseFloat(book.bids[0].price) : null
+                const bestAsk = book.asks?.length ? parseFloat(book.asks[0].price) : null
+                if (bestBid != null && bestAsk != null) {
+                  midpoint = (bestBid + bestAsk) / 2
+                  spread = bestAsk - bestBid
+                }
+              } catch (err) {
+                logger.error('overview: orderbook fetch failed', { error: err })
+              }
+
+              // Build orderbook overview message
+              let msg = `📊 Orderbook Overview <b>(YES)</b>\n\n${market.question}\n\n`
+              if (spread != null && midpoint != null) {
+                msg += `Spread: ${(spread * 100).toFixed(1)}¢, Midpoint: ${(midpoint * 100).toFixed(1)}¢\n\n`
+              }
+
+              if (book && (book.bids?.length || book.asks?.length)) {
+                msg += `<code>Price    Size     Total</code>\n`
+                msg += `<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>\n`
+
+                // Show top 4 asks (reversed order)
+                const asks = (book.asks || []).slice(0, 4).reverse()
+                for (const ask of asks) {
+                  const price = (parseFloat(ask.price) * 100).toFixed(1)
+                  const size = Math.round(parseFloat(ask.size))
+                  const total = Math.round(parseFloat(ask.price) * parseFloat(ask.size))
+                  msg += `<code>${price.padStart(4)}¢  ${String(size).padStart(6)}   $${total}</code>\n`
+                }
+
+                msg += `<code>━━━━━━━━━━━━━━━━━━━━━━━━</code>\n`
+
+                // Show top 4 bids
+                const bids = (book.bids || []).slice(0, 4)
+                for (const bid of bids) {
+                  const price = (parseFloat(bid.price) * 100).toFixed(1)
+                  const size = Math.round(parseFloat(bid.size))
+                  const total = Math.round(parseFloat(bid.price) * parseFloat(bid.size))
+                  msg += `<code>${price.padStart(4)}¢  ${String(size).padStart(6)}   $${total}</code>\n`
+                }
+              } else {
+                msg += `No orderbook data available.\n`
+              }
+
+              await ctx.reply(msg, { parse_mode: 'HTML' })
+
+              // Smart Money Skew block
+              try {
+                const res = await getSmartSkew(
+                  conditionId,
+                  (market.tokens || []).find((t: any) => String(t.outcome || '').toLowerCase() === 'yes')?.token_id,
+                  (market.tokens || []).find((t: any) => String(t.outcome || '').toLowerCase() === 'no')?.token_id,
+                )
+                const marketUrl = getPolymarketMarketUrl(market)
+                if (res) {
+                  let card = formatSkewCard(market.question || 'Market', marketUrl, res, true)
+                  try {
+                    const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
+                    if (exs.length) {
+                      const insights = await analyzeSkewExamples(exs)
+                      const bits: string[] = []
+                      if (insights.hiReturn > 0) bits.push(`High‑return whales: ${insights.hiReturn}`)
+                      if (insights.newBig > 0) bits.push(`New big bets: ${insights.newBig} • ⚠️ Possible insider? (informational)`)
+                      if (bits.length) card += `\n${bits.join(' • ')}`
+                    }
+                  } catch { }
+                  await ctx.reply(card, { parse_mode: 'HTML' })
+                }
+              } catch (e) {
+                logger.warn('overview: skew fetch failed', { err: (e as any)?.message })
+              }
+            } catch (e) {
+              logger.error('overview: failed', { err: (e as any)?.message })
+              await ctx.reply('❌ Failed to load market overview.')
+            }
+            return
+          }
+
+          if (option === 'price') {
+            try {
+              const market = await gammaApi.getMarket(cond)
+              const conditionId = market.condition_id || market.conditionId
+
+              // If tokens are missing, try re-fetching
+              if (!market.tokens || market.tokens.length === 0) {
+                const refetchedMarket = await gammaApi.getMarket(conditionId)
+                if (refetchedMarket?.tokens?.length > 0) {
+                  Object.assign(market, refetchedMarket)
+                }
+              }
+
+              const question = market.question || 'Unknown market'
+
+              // Parse outcome prices
+              let outcomes: { outcome: string; price: number }[] = []
+              if (Array.isArray(market.tokens) && market.tokens.length > 0) {
+                outcomes = market.tokens.map((t: any) => ({
+                  outcome: t.outcome || 'Unknown',
+                  price: parseFloat(t.price || '0')
+                }))
+              }
+
+              if (outcomes.length === 0) {
+                await ctx.reply('⚠️ This market doesn\'t have price data yet.')
+                return
+              }
+
+              // Format volume and liquidity
+              const volNum = typeof market.volume === 'number' ? market.volume : parseFloat(market.volume || '0')
+              const volume = isNaN(volNum) ? 'N/A' : `$${(volNum / 1_000_000).toFixed(2)}M`
+
+              const liqNum = typeof market.liquidity === 'number' ? market.liquidity : parseFloat(market.liquidity || '0')
+              const liquidity = isNaN(liqNum) ? 'N/A' : `$${(liqNum / 1_000_000).toFixed(2)}M`
+
+              // Format end date
+              const endDateIso = market.end_date_iso || market.endDateIso || market.endDate || market.end_date
+              const endDate = endDateIso ? new Date(endDateIso).toLocaleDateString() : 'N/A'
+
+              // Build message
+              let message = `📊 ${question}\n\n`
+
+              // Prices
+              message += '💰 Current Prices:\n'
+              outcomes.forEach(({ outcome, price }) => {
+                const pricePercent = (price * 100).toFixed(1)
+                const bar = '▰'.repeat(Math.floor(price * 10)) + '▱'.repeat(10 - Math.floor(price * 10))
+                message += `   ${outcome}: ${pricePercent}% ${bar}\n`
+              })
+
+              message += `\n📈 Volume: ${volume}\n`
+              message += `🧊 Liquidity: ${liquidity}\n`
+              message += `📅 Ends: ${endDate}\n\n`
+
+              // Add market URL
+              const marketUrl = getPolymarketMarketUrl(market)
+              if (marketUrl) {
+                message += `🔗 Trade: ${marketUrl}\n`
+              }
+
+              if (conditionId) {
+                message += `\n💡 Follow price alerts:\n/follow ${conditionId}`
+              }
+
+              await ctx.reply(message)
+            } catch (e) {
+              logger.error('price: failed', { err: (e as any)?.message })
+              await ctx.reply('❌ Unable to load market data.')
+            }
+            return
+          }
+
+          // Net handler - coming soon
           await ctx.answerCbQuery(`${option} coming soon!`)
           return
         }
