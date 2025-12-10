@@ -1799,6 +1799,7 @@ export function registerCommands(bot: Telegraf) {
           const keyboard: { text: string; callback_data: string }[][] = []
 
           let followButton: { text: string; callback_data: string } | null = null
+          let cond: string | null = null  // Declare outside loop so it's accessible after
           for (let i = offset; i < displayEnd; i++) {
             const market = markets[i]
             const idx = i + 1
@@ -1846,7 +1847,7 @@ export function registerCommands(bot: Telegraf) {
             }
 
             // Get condition id
-            let cond: string | null = market?.conditionId || market?.condition_id || null
+            cond = market?.conditionId || market?.condition_id || null
             if (!cond) {
               try {
                 const via = market?.market_slug || market?.slug || title
@@ -5303,9 +5304,8 @@ export function registerCommands(bot: Telegraf) {
         }
       }
 
-      // Add buttons in two rows:
-      // Row 1: Follow + 1 More
-      // Row 2: Overview + Skew + Price
+      // Add buttons: Follow + 1 More
+      // Analysis buttons (Overview, Skew, Price) are only shown in "showmore" pagination
       const buttonRow: { text: string; callback_data: string }[] = []
       if (followButton) {
         buttonRow.push(followButton)
@@ -5315,15 +5315,6 @@ export function registerCommands(bot: Telegraf) {
       }
       if (buttonRow.length > 0) {
         keyboard.push(buttonRow)
-      }
-
-      // Add analysis buttons row
-      if (cond) {
-        const analysisRow: { text: string; callback_data: string }[] = []
-        analysisRow.push({ text: 'Overview', callback_data: `detopt:overview:${cond}` })
-        analysisRow.push({ text: 'Skew', callback_data: `detopt:skew:${cond}` })
-        analysisRow.push({ text: 'Price', callback_data: `detopt:price:${cond}` })
-        keyboard.push(analysisRow)
       }
 
       // Footer removed for brevity
