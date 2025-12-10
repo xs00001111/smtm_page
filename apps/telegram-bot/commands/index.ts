@@ -5225,6 +5225,7 @@ export function registerCommands(bot: Telegraf) {
       const displayMarkets = markets.slice(0, displayCount)
 
       let followButton: { text: string; callback_data: string } | null = null
+      let lastCond: string | null = null  // Track condition ID for single-market display
       let idx = 0
       for (const market of displayMarkets as any[]) {
         idx += 1
@@ -5279,6 +5280,7 @@ export function registerCommands(bot: Telegraf) {
             cond = await gammaApi.findConditionId(String(via))
           } catch {}
         }
+        lastCond = cond  // Track for analysis buttons
 
         // Build market URL from API data (prefer events[0].slug)
         const url = getPolymarketMarketUrl(market)
@@ -5304,8 +5306,7 @@ export function registerCommands(bot: Telegraf) {
         }
       }
 
-      // Add buttons: Follow + 1 More
-      // Analysis buttons (Overview, Skew, Price) are only shown in "showmore" pagination
+      // Add buttons in two rows when showing single market, otherwise just Follow + 1 More
       const buttonRow: { text: string; callback_data: string }[] = []
       if (followButton) {
         buttonRow.push(followButton)
@@ -5315,6 +5316,15 @@ export function registerCommands(bot: Telegraf) {
       }
       if (buttonRow.length > 0) {
         keyboard.push(buttonRow)
+      }
+
+      // Add analysis buttons row when displaying single market
+      if (displayCount === 1 && lastCond) {
+        const analysisRow: { text: string; callback_data: string }[] = []
+        analysisRow.push({ text: 'Overview', callback_data: `detopt:overview:${lastCond}` })
+        analysisRow.push({ text: 'Skew', callback_data: `detopt:skew:${lastCond}` })
+        analysisRow.push({ text: 'Price', callback_data: `detopt:price:${lastCond}` })
+        keyboard.push(analysisRow)
       }
 
       // Footer removed for brevity
