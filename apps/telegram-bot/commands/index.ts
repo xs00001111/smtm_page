@@ -5134,7 +5134,7 @@ export function registerCommands(bot: Telegraf) {
         buttonRow.push(skewButton)
       }
       if (remaining > 0) {
-        buttonRow.push({ text: `More`, callback_data: `markets:showmore:${segment}:${displayCount}` })
+        buttonRow.push({ text: `1 More`, callback_data: `markets:showmore:${segment}:${displayCount}` })
       }
       if (buttonRow.length > 0) {
         keyboard.push(buttonRow)
