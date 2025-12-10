@@ -6,7 +6,7 @@
 import { dataApi } from './clients/data-api';
 import { clobApi } from './clients/clob-api';
 import { gammaApi } from './clients/gamma-api';
-import { getWalletWhaleStats, computeWhaleScore } from './whales';
+import { getWalletWhaleStats, computeWhaleScore } from './alpha';
 
 export interface MarketMoveAnalysis {
   market: {
