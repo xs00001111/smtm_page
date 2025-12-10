@@ -34,10 +34,10 @@ export default function HomePage() {
               Prediction Market Intelligence
             </div>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
-              See where the smart money bets before the news breaks.
+              Follow smart money. Trade first.
             </h1>
             <p className="mt-6 sm:mt-7 text-base sm:text-lg text-white/80 max-w-[50ch] leading-relaxed">
-              Real-time alerts on Polymarket's biggest trades, price movements, and top performers. Track what informed traders are betting real money on—before it becomes obvious.
+              Instant alerts on big trades and fast‑moving markets from Polymarket.
             </p>
             <div className="mt-10 sm:mt-12 flex flex-col sm:flex-row gap-4 sm:gap-6 items-center">
               <a
