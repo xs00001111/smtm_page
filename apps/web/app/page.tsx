@@ -17,7 +17,7 @@ export default function HomePage() {
 
       <main className="relative min-h-screen mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         {/* Hero */}
-        <section id="hero" className="relative min-h-[70vh] md:min-h-[80vh] flex items-center">
+        <section id="hero" className="relative min-h-[70vh] md:min-h-[80vh] flex items-center justify-center">
           <TradingGrid />
           {/* Full-bleed glow overlay (spans entire viewport width) */}
           <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.12),transparent_60%)]" />
@@ -25,7 +25,7 @@ export default function HomePage() {
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-screen">
             <MarketTickerBar />
           </div>
-          <div className="relative z-10 text-center w-full flex flex-col items-center pt-24">
+          <div className="relative z-10 w-full max-w-3xl mx-auto flex flex-col items-center text-center pt-16 sm:pt-20 md:pt-24">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-2 mb-6">
               <span className="h-2 w-2 rounded-full bg-[#00E5FF] animate-pulse" />
               <span className="text-xs sm:text-sm tracking-wide text-[#00E5FF] font-medium">NOW LIVE — Telegram Bot Available</span>

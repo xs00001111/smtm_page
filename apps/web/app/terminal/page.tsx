@@ -122,6 +122,33 @@ export default function TerminalPage() {
               {/* Mock Chart Area */}
               <div className="relative h-80 bg-gradient-to-b from-teal/5 to-transparent rounded-lg border border-white/5">
                 <svg className="w-full h-full" viewBox="0 0 800 320" preserveAspectRatio="none">
+                  <defs>
+                    {/* Smooth strokes and subtle glow toward the right (resolution) */}
+                    <linearGradient id="yesGrad" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.6" />
+                      <stop offset="80%" stopColor="#00E5FF" stopOpacity="0.9" />
+                      <stop offset="100%" stopColor="#B6FF00" stopOpacity="1" />
+                    </linearGradient>
+                    <linearGradient id="noGrad" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#EF4444" stopOpacity="0.6" />
+                      <stop offset="80%" stopColor="#EF4444" stopOpacity="0.9" />
+                      <stop offset="100%" stopColor="#FFA3A3" stopOpacity="1" />
+                    </linearGradient>
+                    <filter id="yesGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="2.2" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                    <filter id="noGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="2.2" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
                   {/* Grid lines */}
                   {[0, 25, 50, 75, 100].map((y) => (
                     <line
@@ -137,20 +164,24 @@ export default function TerminalPage() {
 
                   {/* YES line (teal) - trending up */}
                   <path
-                    d="M 0 200 L 100 195 L 200 185 L 300 175 L 400 165 L 500 155 L 600 140 L 700 125 L 800 105"
+                    d="M 0 200 C 60 197, 140 190, 200 185 C 260 178, 340 170, 400 165 C 460 158, 540 148, 600 140 C 660 132, 740 116, 800 105"
                     fill="none"
-                    stroke="#00E5FF"
+                    stroke="url(#yesGrad)"
                     strokeWidth="3"
-                    opacity="0.9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#yesGlow)"
                   />
 
                   {/* NO line (red) - trending down */}
                   <path
-                    d="M 0 120 L 100 125 L 200 135 L 300 145 L 400 155 L 500 165 L 600 180 L 700 195 L 800 215"
+                    d="M 0 120 C 60 123, 140 130, 200 135 C 260 142, 340 150, 400 155 C 460 162, 540 172, 600 180 C 660 188, 740 205, 800 215"
                     fill="none"
-                    stroke="#EF4444"
+                    stroke="url(#noGrad)"
                     strokeWidth="3"
-                    opacity="0.9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#noGlow)"
                   />
 
                   {/* Volume bars at bottom */}
