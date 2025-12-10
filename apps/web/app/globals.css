@@ -10,6 +10,9 @@ html, body {
   height: 100%;
   background: #0C0C0C;
   color: #FFFFFF;
+  /* Prevent horizontal scrolling on all devices */
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
 }
 
 /* Light modal override for legacy dark utility classes */
