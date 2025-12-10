@@ -1552,8 +1552,9 @@ export function registerCommands(bot: Telegraf) {
               if (badge) message += `   ${badge}\n`
             }
             if (url) { message += `   🔗 ${esc(url)}\n` }
+            // Create Follow and Skew buttons for bottom action bar
             if (cond) {
-              message += `   ➕ Follow: <code>/follow ${esc(cond)}</code>\n\n`
+              message += '\n'
               try {
                 const tok = await actionFollowMarket(cond, market.question || 'Market')
                 if (String(`act:${tok}`).length <= 64) {
@@ -1566,7 +1567,7 @@ export function registerCommands(bot: Telegraf) {
             }
               } catch {}
             } else {
-              message += `   ➕ Follow: <code>${esc('/follow <copy market id from event>')}</code>\n\n`
+              message += '\n'
             }
           }
 
@@ -4974,13 +4975,8 @@ export function registerCommands(bot: Telegraf) {
           const badge = cached ? formatSkewBadge(cached.result) : null
           if (badge) message += `   ${badge}\n`
         }
-        if (url) { message += `   🔗 ${esc(url)}\n` }
-        if (cond) {
-          message += `   ➕ Follow: <code>/follow ${esc(cond)}</code>\n\n`
-        } else {
-          message += `   ➕ Follow: <code>${esc('/follow <copy market id from event>')}</code>\n\n`
-        }
-        // Store follow button for later (to combine with "Give me 1 more" on same row)
+        if (url) { message += `   🔗 ${esc(url)}\n\n` }
+        // Create Follow and Skew buttons for bottom action bar
         if (cond) {
           try {
             const tok = await actionFollowMarket(cond, market.question || 'Market')
