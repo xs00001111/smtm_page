@@ -120,11 +120,83 @@ export default function TerminalPage() {
                 </div>
               </div>
               {/* Mock Chart Area */}
-              <div className="relative h-80 bg-gradient-to-b from-teal/5 to-transparent rounded-lg border border-white/5 flex items-center justify-center">
-                <div className="text-white/40">
-                  <Activity size={48} className="mx-auto mb-2" />
-                  <p className="text-sm">Chart visualization coming soon</p>
+              <div className="relative h-80 bg-gradient-to-b from-teal/5 to-transparent rounded-lg border border-white/5">
+                <svg className="w-full h-full" viewBox="0 0 800 320" preserveAspectRatio="none">
+                  {/* Grid lines */}
+                  {[0, 25, 50, 75, 100].map((y) => (
+                    <line
+                      key={y}
+                      x1="0"
+                      y1={320 - (y * 3.2)}
+                      x2="800"
+                      y2={320 - (y * 3.2)}
+                      stroke="rgba(255,255,255,0.05)"
+                      strokeWidth="1"
+                    />
+                  ))}
+
+                  {/* YES line (teal) - trending up */}
+                  <path
+                    d="M 0 200 L 100 195 L 200 185 L 300 175 L 400 165 L 500 155 L 600 140 L 700 125 L 800 105"
+                    fill="none"
+                    stroke="#00E5FF"
+                    strokeWidth="3"
+                    opacity="0.9"
+                  />
+
+                  {/* NO line (red) - trending down */}
+                  <path
+                    d="M 0 120 L 100 125 L 200 135 L 300 145 L 400 155 L 500 165 L 600 180 L 700 195 L 800 215"
+                    fill="none"
+                    stroke="#EF4444"
+                    strokeWidth="3"
+                    opacity="0.9"
+                  />
+
+                  {/* Volume bars at bottom */}
+                  {[50, 120, 200, 280, 350, 420, 500, 580, 650, 720].map((x, i) => (
+                    <rect
+                      key={i}
+                      x={x}
+                      y={320 - (Math.random() * 30 + 10)}
+                      width="40"
+                      height={Math.random() * 30 + 10}
+                      fill="rgba(0,229,255,0.2)"
+                    />
+                  ))}
+
+                  {/* Current price marker for YES */}
+                  <circle cx="800" cy="105" r="6" fill="#00E5FF" />
+                  <circle cx="800" cy="105" r="4" fill="#0C0C0C" />
+
+                  {/* Current price marker for NO */}
+                  <circle cx="800" cy="215" r="6" fill="#EF4444" />
+                  <circle cx="800" cy="215" r="4" fill="#0C0C0C" />
+                </svg>
+
+                {/* Price labels on the right */}
+                <div className="absolute right-4 top-[30%] flex items-center gap-2 bg-[#0C0C0C] px-2 py-1 rounded border border-teal/30">
+                  <div className="w-2 h-2 rounded-full bg-teal"></div>
+                  <span className="text-sm font-semibold text-teal">YES 67%</span>
                 </div>
+                <div className="absolute right-4 bottom-[30%] flex items-center gap-2 bg-[#0C0C0C] px-2 py-1 rounded border border-red-400/30">
+                  <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                  <span className="text-sm font-semibold text-red-400">NO 33%</span>
+                </div>
+
+                {/* Y-axis labels */}
+                <div className="absolute right-2 top-0 text-xs text-white/40">100%</div>
+                <div className="absolute right-2 top-1/4 text-xs text-white/40">75%</div>
+                <div className="absolute right-2 top-1/2 text-xs text-white/40">50%</div>
+                <div className="absolute right-2 top-3/4 text-xs text-white/40">25%</div>
+                <div className="absolute right-2 bottom-0 text-xs text-white/40">0%</div>
+
+                {/* X-axis labels */}
+                <div className="absolute bottom-2 left-4 text-xs text-white/40">Dec 4</div>
+                <div className="absolute bottom-2 left-1/4 text-xs text-white/40">Dec 5</div>
+                <div className="absolute bottom-2 left-1/2 text-xs text-white/40">Dec 6</div>
+                <div className="absolute bottom-2 right-1/4 text-xs text-white/40">Dec 7</div>
+                <div className="absolute bottom-2 right-20 text-xs text-white/40">Dec 8</div>
               </div>
             </div>
 
