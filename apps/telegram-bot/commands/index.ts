@@ -916,6 +916,16 @@ export function registerCommands(bot: Telegraf) {
           // If this market belongs to an event with multiple dates on the same page,
           // prefer parsing the group (event+market) page first. Fallback to event-wide search only if needed.
           const eventSlug = Array.isArray(m?.events) && m.events.length ? m.events[0]?.slug : undefined
+
+          logger.info('skew: checking for group market', {
+            conditionId: cond,
+            hasEvents: !!m?.events,
+            eventsLength: m?.events?.length || 0,
+            eventSlug,
+            marketSlug: m?.slug || m?.market_slug,
+            question: m?.question?.slice(0, 60)
+          })
+
           if (eventSlug) {
             // Try group page first (most series are one page with date toggles)
             let expanded = false
@@ -923,7 +933,9 @@ export function registerCommands(bot: Telegraf) {
               const marketSlug = (m as any)?.slug || (m as any)?.market_slug
               if (marketSlug) {
                 const groupUrl = `https://polymarket.com/event/${eventSlug}/${marketSlug}`
+                logger.info('skew: trying group expansion', { groupUrl })
                 const groupChildren = await getGroupSubMarkets(groupUrl)
+                logger.info('skew: group children fetched', { count: groupChildren?.length || 0 })
                 // Sort by end date ascending (soonest first)
                 const gc = Array.isArray(groupChildren)
                   ? groupChildren
