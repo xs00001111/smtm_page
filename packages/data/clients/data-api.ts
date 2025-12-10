@@ -388,7 +388,7 @@ export class DataApiClient {
         }
         // Heuristic: if total current value across open positions in a market < $5, treat as provisional loss for win rate
         // This prevents 100% win rate when many now-worthless positions remain "open" due to API bugs
-        for (const [mkt, cur] of openByMarket.entries()) {
+        for (const [mkt, cur] of Array.from(openByMarket.entries())) {
           if (!marketPnL.has(mkt)) {
             if (Number.isFinite(cur) && cur < 5) {
               marketPnL.set(mkt, -1); // mark as a small negative to count as a loss
@@ -402,7 +402,7 @@ export class DataApiClient {
 
       // Count markets with positive net PnL
       let wins = 0;
-      for (const netPnL of marketPnL.values()) {
+      for (const netPnL of Array.from(marketPnL.values())) {
         if (netPnL > 0) {
           wins++;
         }
