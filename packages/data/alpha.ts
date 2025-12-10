@@ -398,11 +398,28 @@ export async function computeSmartSkewFromHolders(
   const byToken = new Map<string, Array<{ address: string; balance: number; value?: number }>>()
   try {
     holders = await dataApi.getTopHolders({ market: params.conditionId, limit: 200, minBalance: 1 })
-  } catch {}
+    log('skew.holders.api_response', { count: holders.length, sample: holders.slice(0, 1) })
+  } catch (e) {
+    log('skew.holders.api_error', { error: String((e as any)?.message || e) })
+  }
   for (const row of holders || []) {
     const list = Array.isArray(row?.holders) ? row.holders : []
+    // Log first holder to see actual field names
+    if (list.length > 0) {
+      log('skew.holders.row_sample', { token: row?.token, firstHolder: list[0], holderKeys: Object.keys(list[0] || {}) })
+    }
     byToken.set(String(row?.token), list.map((h:any)=>{
-      const addr = String(h.address || '').toLowerCase()
+      // Try multiple possible field names for address
+      const addr = String(
+        h.address ||
+        h.wallet ||
+        h.user ||
+        h.user_address ||
+        h.userAddress ||
+        h.proxyWallet ||
+        h.proxy_wallet ||
+        ''
+      ).toLowerCase()
       const balRaw = h.balance
       const valRaw = h.value
       const bal = typeof balRaw === 'number' ? balRaw : Number(String(balRaw ?? '0').replace(/[,\s]/g, ''))
