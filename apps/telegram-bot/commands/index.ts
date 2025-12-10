@@ -1140,6 +1140,117 @@ export function registerCommands(bot: Telegraf) {
         }
         return
       }
+
+      // Details menu handler
+      if (data.startsWith('det:') || data.startsWith('detback:') || data.startsWith('detopt:')) {
+        // Handle back button - restore market card
+        if (data.startsWith('detback:')) {
+          const cond = data.split(':')[1]
+          if (!cond) { await ctx.answerCbQuery('Missing market id'); return }
+          await ctx.answerCbQuery('Loading market...')
+
+          try {
+            const m = await gammaApi.getMarket(cond)
+            const url = getPolymarketMarketUrl(m)
+            const price = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.price
+            const vol = m.volume || m.volume_24hr
+            const liq = m.liquidity
+
+            let message = `${esc(m.question || 'Market')}\n\n`
+            if (price != null) message += `   📊 Price: ${(parseFloat(String(price)) * 100).toFixed(1)}%\n`
+            if (vol) message += `   💰 Volume: $${formatLargeNum(parseFloat(String(vol)))}\n`
+            if (liq) message += `   🧊 Liquidity: $${formatLargeNum(parseFloat(String(liq)))}\n`
+            if (url) message += `   🔗 ${esc(url)}\n\n`
+
+            // Recreate buttons
+            const keyboard: any[] = []
+            const buttonRow: any[] = []
+
+            try {
+              const tok = await actionFollowMarket(cond, m.question || 'Market')
+              if (String(`act:${tok}`).length <= 64) {
+                buttonRow.push({ text: `Follow`, callback_data: `act:${tok}` })
+              }
+            } catch {}
+
+            const cbt = condToToken(cond)
+            if (cbt && String(`det:${cbt}`).length <= 64) {
+              buttonRow.push({ text: 'Details', callback_data: `det:${cbt}` })
+            }
+
+            if (buttonRow.length > 0) keyboard.push(buttonRow)
+
+            await ctx.editMessageText(message, {
+              parse_mode: 'HTML',
+              reply_markup: { inline_keyboard: keyboard }
+            })
+          } catch (e) {
+            logger.warn('detback: failed', { err: (e as any)?.message })
+            await ctx.answerCbQuery('Failed to load market')
+          }
+          return
+        }
+
+        // Handle submenu option (skew, overview, price, net)
+        if (data.startsWith('detopt:')) {
+          const parts = data.split(':')
+          const option = parts[1]  // skew, overview, price, net
+          const cond = parts[2]
+
+          if (!cond) { await ctx.answerCbQuery('Missing market id'); return }
+          await ctx.answerCbQuery(`Loading ${option}...`)
+
+          // Execute the appropriate command based on option
+          if (option === 'skew') {
+            // Redirect to skew handler
+            ctx.update.callback_query.data = `skw:${condToToken(cond)}`
+            return await next()
+          }
+          // TODO: Add handlers for overview, price, net
+          await ctx.answerCbQuery(`${option} coming soon!`)
+          return
+        }
+
+        // Show details menu
+        const raw = data.split(':')[1]
+        let cond = raw
+        if (data.startsWith('det:')) {
+          const dec = tokenToCond(raw)
+          if (dec) cond = dec
+        }
+        if (!cond) { await ctx.answerCbQuery('Missing market id'); return }
+        await ctx.answerCbQuery('Opening details...')
+
+        try {
+          const m = await gammaApi.getMarket(cond)
+          const message = `📊 ${esc(m.question || 'Market')}\n\nChoose analysis:`
+
+          // Create 2x2 grid menu + back button
+          const keyboard = [
+            [
+              { text: '📈 Skew', callback_data: `detopt:skew:${cond}` },
+              { text: '📋 Overview', callback_data: `detopt:overview:${cond}` }
+            ],
+            [
+              { text: '💹 Price', callback_data: `detopt:price:${cond}` },
+              { text: '🔢 Net', callback_data: `detopt:net:${cond}` }
+            ],
+            [
+              { text: '← Back', callback_data: `detback:${cond}` }
+            ]
+          ]
+
+          await ctx.editMessageText(message, {
+            parse_mode: 'HTML',
+            reply_markup: { inline_keyboard: keyboard }
+          })
+        } catch (e) {
+          logger.warn('det: failed', { err: (e as any)?.message })
+          await ctx.answerCbQuery('Failed to load details')
+        }
+        return
+      }
+
       // Alpha pagination
       if (data.startsWith('alpha:more:')) {
         const parts = data.split(':')
@@ -1561,9 +1672,9 @@ export function registerCommands(bot: Telegraf) {
                   followButton = { text: `Follow`, callback_data: `act:${tok}` }
                 }
             const cbt = condToToken(cond)
-            const cb = `skw:${cbt}`
+            const cb = `det:${cbt}`
             if (cbt && cb.length <= 64) {
-              skewButton = { text: 'Skew', callback_data: cb }
+              skewButton = { text: 'Details', callback_data: cb }
             }
               } catch {}
             } else {
@@ -1580,7 +1691,7 @@ export function registerCommands(bot: Telegraf) {
             buttonRow.push(skewButton)
           }
           if (remaining > 0) {
-        buttonRow.push({ text: `More`, callback_data: `markets:showmore:${segment}:${displayEnd}` })
+        buttonRow.push({ text: `1 More`, callback_data: `markets:showmore:${segment}:${displayEnd}` })
           }
           if (buttonRow.length > 0) {
             keyboard.push(buttonRow)
@@ -4984,9 +5095,9 @@ export function registerCommands(bot: Telegraf) {
               followButton = { text: `Follow`, callback_data: `act:${tok}` }
             }
             const cbt = condToToken(cond)
-            const cb = `skw:${cbt}`
+            const cb = `det:${cbt}`
             if (cbt && cb.length <= 64) {
-              skewButton = { text: 'Skew', callback_data: cb }
+              skewButton = { text: 'Details', callback_data: cb }
             }
           } catch {}
         }
