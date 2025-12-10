@@ -1617,7 +1617,6 @@ export function registerCommands(bot: Telegraf) {
           const keyboard: { text: string; callback_data: string }[][] = []
 
           let followButton: { text: string; callback_data: string } | null = null
-          let skewButton: { text: string; callback_data: string } | null = null
           for (let i = offset; i < displayEnd; i++) {
             const market = markets[i]
             const idx = i + 1
@@ -1693,30 +1692,33 @@ export function registerCommands(bot: Telegraf) {
                 if (String(`act:${tok}`).length <= 64) {
                   followButton = { text: `Follow`, callback_data: `act:${tok}` }
                 }
-            const cbt = condToToken(cond)
-            const cb = `det:${cbt}`
-            if (cbt && cb.length <= 64) {
-              skewButton = { text: 'Details', callback_data: cb }
-            }
               } catch {}
             } else {
               message += '\n'
             }
           }
 
-          // Add buttons on same row: Follow + Smart Skew + "Give me 1 more"
+          // Add buttons in two rows:
+          // Row 1: Follow + 1 More
+          // Row 2: Overview + Skew + Price
           const buttonRow: { text: string; callback_data: string }[] = []
           if (followButton) {
             buttonRow.push(followButton)
           }
-          if (skewButton) {
-            buttonRow.push(skewButton)
-          }
           if (remaining > 0) {
-        buttonRow.push({ text: `1 More`, callback_data: `markets:showmore:${segment}:${displayEnd}` })
+            buttonRow.push({ text: `1 More`, callback_data: `markets:showmore:${segment}:${displayEnd}` })
           }
           if (buttonRow.length > 0) {
             keyboard.push(buttonRow)
+          }
+
+          // Add analysis buttons row
+          if (cond) {
+            const analysisRow: { text: string; callback_data: string }[] = []
+            analysisRow.push({ text: 'Overview', callback_data: `detopt:overview:${cond}` })
+            analysisRow.push({ text: 'Skew', callback_data: `detopt:skew:${cond}` })
+            analysisRow.push({ text: 'Price', callback_data: `detopt:price:${cond}` })
+            keyboard.push(analysisRow)
           }
 
           message += '💡 Tap Follow to get alerts for any of these markets.'
@@ -5040,7 +5042,6 @@ export function registerCommands(bot: Telegraf) {
       const displayMarkets = markets.slice(0, displayCount)
 
       let followButton: { text: string; callback_data: string } | null = null
-      let skewButton: { text: string; callback_data: string } | null = null
       let idx = 0
       for (const market of displayMarkets as any[]) {
         idx += 1
@@ -5109,35 +5110,38 @@ export function registerCommands(bot: Telegraf) {
           if (badge) message += `   ${badge}\n`
         }
         if (url) { message += `   🔗 ${esc(url)}\n\n` }
-        // Create Follow and Skew buttons for bottom action bar
+        // Create Follow button for bottom action bar
         if (cond) {
           try {
             const tok = await actionFollowMarket(cond, market.question || 'Market')
             if (String(`act:${tok}`).length <= 64) {
               followButton = { text: `Follow`, callback_data: `act:${tok}` }
             }
-            const cbt = condToToken(cond)
-            const cb = `det:${cbt}`
-            if (cbt && cb.length <= 64) {
-              skewButton = { text: 'Details', callback_data: cb }
-            }
           } catch {}
         }
       }
 
-      // Add buttons on same row: Follow + Smart Skew + "Give me 1 more"
+      // Add buttons in two rows:
+      // Row 1: Follow + 1 More
+      // Row 2: Overview + Skew + Price
       const buttonRow: { text: string; callback_data: string }[] = []
       if (followButton) {
         buttonRow.push(followButton)
-      }
-      if (skewButton) {
-        buttonRow.push(skewButton)
       }
       if (remaining > 0) {
         buttonRow.push({ text: `1 More`, callback_data: `markets:showmore:${segment}:${displayCount}` })
       }
       if (buttonRow.length > 0) {
         keyboard.push(buttonRow)
+      }
+
+      // Add analysis buttons row
+      if (cond) {
+        const analysisRow: { text: string; callback_data: string }[] = []
+        analysisRow.push({ text: 'Overview', callback_data: `detopt:overview:${cond}` })
+        analysisRow.push({ text: 'Skew', callback_data: `detopt:skew:${cond}` })
+        analysisRow.push({ text: 'Price', callback_data: `detopt:price:${cond}` })
+        keyboard.push(analysisRow)
       }
 
       // Footer removed for brevity
