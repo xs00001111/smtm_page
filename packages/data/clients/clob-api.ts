@@ -228,14 +228,34 @@ export class ClobApiClient {
     try {
       const orderbook = await this.getOrderbook(assetId);
 
-      if (!orderbook.bids?.length || !orderbook.asks?.length) {
+      const hasBids = orderbook.bids?.length > 0;
+      const hasAsks = orderbook.asks?.length > 0;
+
+      // No liquidity at all
+      if (!hasBids && !hasAsks) {
         return null;
       }
 
-      const bestBid = parseFloat(orderbook.bids[0].price);
-      const bestAsk = parseFloat(orderbook.asks[0].price);
+      // Both sides available - use mid-price
+      if (hasBids && hasAsks) {
+        const bestBid = parseFloat(orderbook.bids[0].price);
+        const bestAsk = parseFloat(orderbook.asks[0].price);
+        return (bestBid + bestAsk) / 2;
+      }
 
-      return (bestBid + bestAsk) / 2;
+      // One-sided orderbook - use available side
+      // This is common for extreme-probability markets
+      if (hasAsks) {
+        // Only asks available - use best ask as price estimate
+        return parseFloat(orderbook.asks[0].price);
+      }
+
+      if (hasBids) {
+        // Only bids available - use best bid as price estimate
+        return parseFloat(orderbook.bids[0].price);
+      }
+
+      return null;
     } catch (error) {
       console.error('Failed to get current price:', error);
       return null;
