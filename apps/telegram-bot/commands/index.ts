@@ -1214,15 +1214,28 @@ export function registerCommands(bot: Telegraf) {
         // Show details menu
         const raw = data.split(':')[1]
         let cond = raw
+
+        logger.info('det: processing', { raw, data })
+
         if (data.startsWith('det:')) {
           const dec = tokenToCond(raw)
+          logger.info('det: decoded', { raw, decoded: dec })
           if (dec) cond = dec
         }
-        if (!cond) { await ctx.answerCbQuery('Missing market id'); return }
+
+        if (!cond) {
+          logger.warn('det: missing cond', { raw, data })
+          await ctx.answerCbQuery('Missing market id')
+          return
+        }
+
         await ctx.answerCbQuery('Opening details...')
 
         try {
+          logger.info('det: fetching market', { cond })
           const m = await gammaApi.getMarket(cond)
+          logger.info('det: market fetched', { question: m.question })
+
           const message = `📊 ${esc(m.question || 'Market')}\n\nChoose analysis:`
 
           // Create 2x2 grid menu + back button
@@ -1240,12 +1253,21 @@ export function registerCommands(bot: Telegraf) {
             ]
           ]
 
+          logger.info('det: editing message', { messageLength: message.length })
           await ctx.editMessageText(message, {
             parse_mode: 'HTML',
             reply_markup: { inline_keyboard: keyboard }
           })
+          logger.info('det: success')
         } catch (e) {
-          logger.warn('det: failed', { err: (e as any)?.message })
+          logger.warn('det: failed', {
+            err: (e as any)?.message,
+            stack: (e as any)?.stack,
+            name: (e as any)?.name,
+            cond,
+            raw,
+            data
+          })
           await ctx.answerCbQuery('Failed to load details')
         }
         return
