@@ -1195,15 +1195,20 @@ export function registerCommands(bot: Telegraf) {
         if (data.startsWith('detopt:')) {
           const parts = data.split(':')
           const option = parts[1]  // skew, overview, price, net
-          const cond = parts[2]
+          const token = parts[2]
 
-          if (!cond) { await ctx.answerCbQuery('Missing market id'); return }
+          if (!token) { await ctx.answerCbQuery('Missing market id'); return }
+
+          // Decode token to condition ID
+          const cond = tokenToCond(token)
+          if (!cond) { await ctx.answerCbQuery('Invalid market id'); return }
+
           await ctx.answerCbQuery(`Loading ${option}...`)
 
           // Execute the appropriate command based on option
           if (option === 'skew') {
-            // Redirect to skew handler
-            ctx.update.callback_query.data = `skw:${condToToken(cond)}`
+            // Redirect to skew handler (already expects token format)
+            ctx.update.callback_query.data = `skw:${token}`
             return await next()
           }
 
@@ -1898,10 +1903,13 @@ export function registerCommands(bot: Telegraf) {
           // Add analysis buttons row
           if (cond) {
             const analysisRow: { text: string; callback_data: string }[] = []
-            analysisRow.push({ text: 'Overview', callback_data: `detopt:overview:${cond}` })
-            analysisRow.push({ text: 'Skew', callback_data: `detopt:skew:${cond}` })
-            analysisRow.push({ text: 'Price', callback_data: `detopt:price:${cond}` })
-            keyboard.push(analysisRow)
+            const cbt = condToToken(cond)
+            if (cbt) {
+              analysisRow.push({ text: 'Overview', callback_data: `detopt:overview:${cbt}` })
+              analysisRow.push({ text: 'Skew', callback_data: `detopt:skew:${cbt}` })
+              analysisRow.push({ text: 'Price', callback_data: `detopt:price:${cbt}` })
+              keyboard.push(analysisRow)
+            }
           }
 
           message += '💡 Tap Follow to get alerts for any of these markets.'
@@ -5321,10 +5329,13 @@ export function registerCommands(bot: Telegraf) {
       // Add analysis buttons row when displaying single market
       if (displayCount === 1 && lastCond) {
         const analysisRow: { text: string; callback_data: string }[] = []
-        analysisRow.push({ text: 'Overview', callback_data: `detopt:overview:${lastCond}` })
-        analysisRow.push({ text: 'Skew', callback_data: `detopt:skew:${lastCond}` })
-        analysisRow.push({ text: 'Price', callback_data: `detopt:price:${lastCond}` })
-        keyboard.push(analysisRow)
+        const cbt = condToToken(lastCond)
+        if (cbt) {
+          analysisRow.push({ text: 'Overview', callback_data: `detopt:overview:${cbt}` })
+          analysisRow.push({ text: 'Skew', callback_data: `detopt:skew:${cbt}` })
+          analysisRow.push({ text: 'Price', callback_data: `detopt:price:${cbt}` })
+          keyboard.push(analysisRow)
+        }
       }
 
       // Footer removed for brevity
