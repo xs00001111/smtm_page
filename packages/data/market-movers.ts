@@ -83,7 +83,7 @@ export async function analyzeMarketMove(
     const pc1d = await clobApi.getPriceChange(yesToken.token_id, '1d');
     change1h = {
       percent: pc1d.changePercent,
-      absolute: pc1d.changeAbsolute,
+      absolute: pc1d.change,
     };
   } catch {}
 
@@ -91,7 +91,7 @@ export async function analyzeMarketMove(
     const pc24h = await clobApi.getPriceChange(yesToken.token_id, '1d');
     change24h = {
       percent: pc24h.changePercent,
-      absolute: pc24h.changeAbsolute,
+      absolute: pc24h.change,
     };
   } catch {}
 
