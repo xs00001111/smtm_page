@@ -892,6 +892,10 @@ export function registerCommands(bot: Telegraf) {
     try {
       const data = (ctx.callbackQuery as any)?.data as string | undefined
       if (!data) return await next()
+
+      // Log all callback queries for debugging
+      logger.info('callback_query received', { data: data?.slice(0, 100) })
+
       // Smart Skew (markets)
       if (data.startsWith('skew:') || data.startsWith('skw:')) {
         const raw = data.split(':')[1]
@@ -1209,16 +1213,29 @@ export function registerCommands(bot: Telegraf) {
           const option = parts[1]  // skew, overview, price, net
           const token = parts[2]
 
-          if (!token) { await ctx.answerCbQuery('Missing market id'); return }
+          logger.info('detopt: handling', { option, token, data })
+
+          if (!token) {
+            logger.warn('detopt: missing token', { data })
+            await ctx.answerCbQuery('Missing market id')
+            return
+          }
 
           // Decode token to condition ID
           const cond = tokenToCond(token)
-          if (!cond) { await ctx.answerCbQuery('Invalid market id'); return }
+          logger.info('detopt: decoded token', { token, cond })
+
+          if (!cond) {
+            logger.error('detopt: invalid token', { token })
+            await ctx.answerCbQuery('Invalid market id')
+            return
+          }
 
           await ctx.answerCbQuery(`Loading ${option}...`)
 
           // Execute the appropriate command based on option
           if (option === 'skew') {
+            logger.info('detopt: redirecting to skew handler', { token, cond })
             // Redirect to skew handler (already expects token format)
             ctx.update.callback_query.data = `skw:${token}`
             return await next()
