@@ -420,8 +420,9 @@ export async function computeSmartSkewFromHolders(
         h.proxy_wallet ||
         ''
       ).toLowerCase()
-      const balRaw = h.balance
-      const valRaw = h.value
+      // Try multiple possible field names for balance/amount
+      const balRaw = h.balance || h.amount || h.size || h.shares
+      const valRaw = h.value || h.valueUsd || h.value_usd
       const bal = typeof balRaw === 'number' ? balRaw : Number(String(balRaw ?? '0').replace(/[,\s]/g, ''))
       const val = valRaw != null ? Number(String(valRaw).replace(/[,\s]/g, '')) : undefined
       return { address: addr, balance: Number.isFinite(bal) ? bal : 0, value: Number.isFinite(val as any) ? (val as number) : undefined }
