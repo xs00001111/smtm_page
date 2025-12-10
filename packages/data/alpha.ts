@@ -236,7 +236,8 @@ export async function computeSmartSkewAlpha(
   cfg?: (SmartSkewConfig & WhaleScoreConfig & WhaleStatsOptions) & { onLog?: (msg: string, ctx?: any) => void }
 ): Promise<SmartSkewResult> {
   const log = cfg?.onLog || (() => {})
-  const whaleScoreThreshold = cfg?.whaleScoreThreshold ?? 65
+  // Lower threshold from 65 to 50 for more sensitive whale detection
+  const whaleScoreThreshold = cfg?.whaleScoreThreshold ?? 50
   const windowMs = cfg?.windowMs ?? 30 * 60 * 1000
   const minSmartPoolUsd = cfg?.minSmartPoolUsd ?? 3000
   const maxWallets = cfg?.maxWallets ?? 50
@@ -1238,7 +1239,8 @@ export async function computeInsiderAlpha(params: {
   timing?: TimingContext
 }, cfg?: InsiderConfig & WhaleScoreConfig & WhaleStatsOptions): Promise<InsiderResult> {
   const insiderTrigger = 75
-  const whaleScoreThreshold = cfg?.whaleScoreThreshold ?? 65
+  // Lower threshold from 65 to 50 for more sensitive whale detection
+  const whaleScoreThreshold = cfg?.whaleScoreThreshold ?? 50
   const clusterTightMs = cfg?.clusterTightMs ?? 2000
   const clusterLargeUsd = cfg?.clusterLargeUsd ?? 20000
 
