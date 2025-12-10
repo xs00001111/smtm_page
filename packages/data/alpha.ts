@@ -660,8 +660,18 @@ export async function computeSmartSkewFromHolders(
       let baseScore = computeWhaleScore(stats, cfg)
 
       // Boost score based on current position size (helps in extreme markets where USD is small)
+      // Tiered boost ensures large positions always qualify as whales
       const posUsd = positionCache.get(w) || 0
-      const positionBoost = Math.min(20, (posUsd / 1000) * 5) // +5 score per $1k, max +20
+      let positionBoost = 0
+      if (posUsd >= 100000) positionBoost = 50        // $100k+ → guaranteed whale
+      else if (posUsd >= 50000) positionBoost = 45    // $50k+ → very likely whale
+      else if (posUsd >= 20000) positionBoost = 40    // $20k+ → serious holder
+      else if (posUsd >= 10000) positionBoost = 35    // $10k+ → significant
+      else if (posUsd >= 5000) positionBoost = 30     // $5k+ → notable
+      else if (posUsd >= 2000) positionBoost = 20     // $2k+ → moderate
+      else if (posUsd >= 1000) positionBoost = 10     // $1k+ → small
+      else positionBoost = Math.round(posUsd / 100)   // <$1k → minimal
+
       const finalScore = Math.min(100, Math.round(baseScore + positionBoost))
 
       scoreCache.set(w, finalScore)
