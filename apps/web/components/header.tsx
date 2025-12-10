@@ -3,7 +3,7 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#0C0C0C]/70 backdrop-blur">
       <div className="mx-auto max-w-6xl px-6 h-14 flex items-center">
         <a href="/" className="inline-flex items-center gap-2 font-display font-extrabold tracking-tight">
-          <img src="/logo-mark.svg" alt="SMTM" className="h-6 w-6" loading="lazy" />
+          <img src="/logo-mark.png" alt="SMTM" className="h-8 w-8" loading="lazy" />
           <span>SMTM</span>
         </a>
         <nav className="ml-auto hidden md:flex items-center gap-2 text-sm">

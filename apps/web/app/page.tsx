@@ -31,13 +31,13 @@ export default function HomePage() {
               <span className="text-xs sm:text-sm tracking-wide text-[#00E5FF] font-medium">NOW LIVE — Telegram Bot Available</span>
             </div>
             <div className="text-xs sm:text-sm tracking-[0.2em] text-white/70 uppercase mb-3 sm:mb-4">
-              Show Me The Money
+              Prediction Market Intelligence
             </div>
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
-              Track markets. Follow whales. Never miss a move.
+              See where the smart money bets before the news breaks.
             </h1>
             <p className="mt-6 sm:mt-7 text-base sm:text-lg text-white/80 max-w-[50ch] leading-relaxed">
-              Real-time alerts for prediction markets, whale trades, and price changes. Research tools to find the smartest traders and hottest markets.
+              Real-time alerts on Polymarket's biggest trades, price movements, and top performers. Track what informed traders are betting real money on—before it becomes obvious.
             </p>
             <div className="mt-10 sm:mt-12 flex flex-col sm:flex-row gap-4 sm:gap-6 items-center">
               <a
@@ -61,18 +61,18 @@ export default function HomePage() {
             <div className="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-4 sm:gap-5 text-sm text-white/80">
               <span className="inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-1.5">
                 <Bell size={14} className="text-[#00E5FF]" />
-                Real-time alerts
+                Instant trade alerts
               </span>
               <span className="inline-flex items-center gap-2 rounded-full border border-[#B6FF00]/30 bg-[#B6FF00]/10 px-4 py-1.5">
                 <Search size={14} className="text-[#B6FF00]" />
-                Whale tracking
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5">
-                💰 Free to use
+                Follow top traders
               </span>
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5">
                 <span className="h-2 w-2 rounded-full bg-teal animate-pulse" />
-                Active community
+                Connected to Polymarket
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5">
+                💰 Free forever
               </span>
             </div>
           </div>
