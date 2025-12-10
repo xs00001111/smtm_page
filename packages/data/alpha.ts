@@ -365,8 +365,9 @@ export async function computeSmartSkewFromHolders(
   cfg?: (SmartSkewConfig & WhaleScoreConfig & WhaleStatsOptions) & { onLog?: (msg: string, ctx?: any) => void }
 ): Promise<SmartSkewResult & { examples?: Array<{ wallet: string; valueUsd: number; whaleScore: number; pnl: number }> }> {
   const log = cfg?.onLog || (() => {})
-  const whaleScoreThreshold = cfg?.whaleScoreThreshold ?? 65
-  const minSmartPoolUsd = cfg?.minSmartPoolUsd ?? 3000
+  // Lower threshold for holder-based skew (45 vs 65) since extreme markets have small USD positions
+  const whaleScoreThreshold = cfg?.whaleScoreThreshold ?? 45
+  const minSmartPoolUsd = cfg?.minSmartPoolUsd ?? 1000
   const maxWallets = cfg?.maxWallets ?? 50
   log('skew.holders.start', { cond: params.conditionId, maxWallets, minSmartPoolUsd })
 
@@ -643,13 +644,26 @@ export async function computeSmartSkewFromHolders(
   // Score wallets and compute PnL for examples
   const scoreCache = new Map<string, number>()
   const pnlCache = new Map<string, number>()
+  const positionCache = new Map<string, number>() // Track position size for boosting
   const evalWallets = Array.from(new Set([...yesEval, ...noEval].map(w=>w.wallet)))
+
+  // Build position size map
+  for (const h of yesEval) positionCache.set(h.wallet, h.usd)
+  for (const h of noEval) positionCache.set(h.wallet, h.usd)
+
   for (const w of evalWallets) {
     // Skip non-address or undefined wallets for external API calls
     if (!isAddr(w)) { scoreCache.set(w, 0); pnlCache.set(w, 0); continue }
     try {
       const stats = await getWalletWhaleStats(w, cfg)
-      scoreCache.set(w, computeWhaleScore(stats, cfg))
+      let baseScore = computeWhaleScore(stats, cfg)
+
+      // Boost score based on current position size (helps in extreme markets where USD is small)
+      const posUsd = positionCache.get(w) || 0
+      const positionBoost = Math.min(20, (posUsd / 1000) * 5) // +5 score per $1k, max +20
+      const finalScore = Math.min(100, Math.round(baseScore + positionBoost))
+
+      scoreCache.set(w, finalScore)
     } catch { scoreCache.set(w, 0) }
     try {
       const pnl = await dataApi.getUserAccuratePnL(w)
