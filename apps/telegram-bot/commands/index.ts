@@ -1217,11 +1217,22 @@ export function registerCommands(bot: Telegraf) {
               const market = await gammaApi.getMarket(cond)
               const conditionId = market.condition_id || market.conditionId
 
+              logger.info('overview: market data', {
+                conditionId,
+                hasTokens: !!market.tokens,
+                tokenCount: market.tokens?.length || 0,
+                question: market.question?.slice(0, 60)
+              })
+
               // If tokens are missing, try re-fetching
               if (!market.tokens || market.tokens.length === 0) {
+                logger.warn('overview: no tokens, re-fetching', { conditionId })
                 const refetchedMarket = await gammaApi.getMarket(conditionId)
                 if (refetchedMarket?.tokens?.length > 0) {
                   Object.assign(market, refetchedMarket)
+                  logger.info('overview: refetch successful', { tokenCount: refetchedMarket.tokens.length })
+                } else {
+                  logger.error('overview: refetch also has no tokens - might be group market')
                 }
               }
 
@@ -1233,9 +1244,15 @@ export function registerCommands(bot: Telegraf) {
 
               const yesToken = (market.tokens || []).find(t => (t.outcome || '').toLowerCase() === 'yes')
               if (!yesToken) {
-                await ctx.reply('❌ This market has no tradeable outcomes.')
+                logger.error('overview: no YES token found', {
+                  conditionId,
+                  tokens: market.tokens?.map((t: any) => ({ outcome: t.outcome, token_id: t.token_id }))
+                })
+                await ctx.reply('❌ This market has no tradeable YES/NO outcomes. This might be a multi-market group. Try using /overview with the specific market URL.')
                 return
               }
+
+              logger.info('overview: YES token found', { tokenId: yesToken.token_id })
 
               // Get orderbook
               let book: any = null
