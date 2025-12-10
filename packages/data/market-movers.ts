@@ -101,7 +101,7 @@ export async function analyzeMarketMove(
 
   // 3. Get recent trades
   const recentTrades = await dataApi.getTrades({
-    market: conditionId,
+    market: [conditionId],
     limit: 200, // Get more trades to ensure we capture the movers
   });
 
