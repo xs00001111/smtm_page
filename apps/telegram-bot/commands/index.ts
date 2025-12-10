@@ -925,6 +925,15 @@ export function registerCommands(bot: Telegraf) {
         let m: any
         try {
           m = await gammaApi.getMarket(cond)
+          logger.info('skew: market fetched', {
+            conditionId: cond,
+            hasEvents: !!m?.events,
+            eventsCount: m?.events?.length || 0,
+            hasTokens: !!m?.tokens,
+            tokensCount: m?.tokens?.length || 0,
+            slug: m?.slug || m?.market_slug,
+            question: m?.question?.slice(0, 60)
+          })
         } catch (e) {
           logger.warn('skew: market fetch failed', { err: (e as any)?.message })
           await ctx.reply('❌ Failed to load market. Try again later.')
@@ -1150,8 +1159,18 @@ export function registerCommands(bot: Telegraf) {
           const url = getPolymarketMarketUrl(m)
           const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
           const no = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
+          logger.info('skew: single-market fallback', { cond, hasYes: !!yes, hasNo: !!no })
           const res = await getSmartSkew(cond, yes, no)
-          if (!res) { await ctx.reply('⚠️ Not enough data to assess skew.'); return }
+          logger.info('skew: getSmartSkew result', {
+            hasResult: !!res,
+            resultType: typeof res,
+            resultKeys: res ? Object.keys(res) : []
+          })
+          if (!res) {
+            logger.warn('skew: no result from getSmartSkew', { cond, yes, no })
+            await ctx.reply('⚠️ Not enough data to assess skew.')
+            return
+          }
           let card = formatSkewCard(m.question || 'Market', url, res, false)
           try {
             const exs: any[] = Array.isArray((res as any).examples) ? (res as any).examples : []
