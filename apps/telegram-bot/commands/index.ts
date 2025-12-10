@@ -897,14 +897,28 @@ export function registerCommands(bot: Telegraf) {
       logger.info('callback_query received', { data: data?.slice(0, 100) })
 
       // Smart Skew (markets)
-      if (data.startsWith('skew:') || data.startsWith('skw:')) {
-        const raw = data.split(':')[1]
-        let cond = raw
-        // Decode base64url token if using compact form (skw:)
-        if (data.startsWith('skw:')) {
-          const dec = tokenToCond(raw)
-          if (dec) cond = dec
+      if (data.startsWith('skew:') || data.startsWith('skw:') || data.startsWith('detopt:skew:')) {
+        let cond: string
+
+        // Handle detopt:skew: format
+        if (data.startsWith('detopt:skew:')) {
+          const token = data.split(':')[2]
+          logger.info('skew: handling detopt format', { token })
+          if (!token) { await ctx.answerCbQuery('Missing market id'); return }
+          const decoded = tokenToCond(token)
+          if (!decoded) { await ctx.answerCbQuery('Invalid market id'); return }
+          cond = decoded
+        } else {
+          // Handle skew: or skw: format
+          const raw = data.split(':')[1]
+          cond = raw
+          // Decode base64url token if using compact form (skw:)
+          if (data.startsWith('skw:')) {
+            const dec = tokenToCond(raw)
+            if (dec) cond = dec
+          }
         }
+
         if (!cond) { await ctx.answerCbQuery('Missing market id'); return }
         await ctx.answerCbQuery('Calculating skew…')
         // Fetch market with explicit error handling to avoid parser confusion around try/catch nesting
@@ -1231,15 +1245,8 @@ export function registerCommands(bot: Telegraf) {
             return
           }
 
-          await ctx.answerCbQuery(`Loading ${option}...`)
-
-          // Execute the appropriate command based on option
-          if (option === 'skew') {
-            logger.info('detopt: redirecting to skew handler', { token, cond })
-            // Redirect to skew handler (already expects token format)
-            ctx.update.callback_query.data = `skw:${token}`
-            return await next()
-          }
+          // Note: skew option is now handled directly by the skew handler above
+          // which checks for detopt:skew: prefix
 
           if (option === 'overview') {
             try {
