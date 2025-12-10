@@ -5,14 +5,11 @@
   # Skip build when:
   #  - commit message includes [skip netlify], OR
   #  - changes do not touch apps/web (monorepo optimization)
-  ignore = "bash -lc '
-    # Skip if message requests it
-    if git log -1 --pretty=%B | grep -qi "\\[skip netlify\\]"; then exit 0; fi;
-    # Determine commit range
+  ignore = """bash -lc '
+    if git log -1 --pretty=%B | grep -qi \"\\[skip netlify\\]\"; then exit 0; fi;
     FROM=${CACHED_COMMIT_REF:-HEAD~1}; TO=${COMMIT_REF:-HEAD};
-    # If apps/web changed, build (exit 1). Otherwise skip (exit 0).
-    if git diff --quiet "$FROM" "$TO" -- apps/web; then exit 0; else exit 1; fi
-  '"
+    if git diff --quiet \"$FROM\" \"$TO\" -- apps/web; then exit 0; else exit 1; fi
+  '"""
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
