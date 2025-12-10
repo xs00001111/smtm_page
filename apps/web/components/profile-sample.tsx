@@ -130,11 +130,11 @@ export function ProfileSample() {
           </div>
 
           <div className="md:ml-auto inline-flex items-center gap-2 w-full md:w-auto">
-            <button onClick={onFollow} className="h-9 px-3 rounded-md bg-teal text-black text-sm font-semibold hover:opacity-90 transition w-full md:w-auto">
+            <button onClick={onFollow} className="h-10 sm:h-9 px-4 sm:px-3 rounded-md bg-teal text-black text-sm font-semibold hover:opacity-90 transition w-full md:w-auto">
               {isFollowing ? 'Following' : 'Follow'}
             </button>
-            <GhostButton className="h-9 px-3 text-xs md:text-sm">⚔️ Challenge</GhostButton>
-            <GhostButton className="h-9 px-3 text-xs md:text-sm" onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share'}</GhostButton>
+            <GhostButton className="h-10 sm:h-9 px-4 sm:px-3 text-sm">⚔️ Challenge</GhostButton>
+            <GhostButton className="h-10 sm:h-9 px-4 sm:px-3 text-sm" onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share'}</GhostButton>
           </div>
         </div>
 
@@ -255,9 +255,9 @@ export function ProfileSample() {
 
                   {/* Reactions + Comments */}
                   <div className="mt-3 flex items-center gap-2">
-                    <button onClick={() => react(p.id, 'fire')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 hover:bg-white/[0.06]">🔥 {(reactions[p.id]?.fire)||0}</button>
-                    <button onClick={() => react(p.id, 'rocket')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 hover:bg-white/[0.06]">🚀 {(reactions[p.id]?.rocket)||0}</button>
-                    <button onClick={() => react(p.id, 'skull')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-2 py-1 hover:bg-white/[0.06]">💀 {(reactions[p.id]?.skull)||0}</button>
+                    <button onClick={() => react(p.id, 'fire')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-2 sm:py-1 hover:bg-white/[0.06] min-h-[40px] sm:min-h-0">🔥 {(reactions[p.id]?.fire)||0}</button>
+                    <button onClick={() => react(p.id, 'rocket')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-2 sm:py-1 hover:bg-white/[0.06] min-h-[40px] sm:min-h-0">🚀 {(reactions[p.id]?.rocket)||0}</button>
+                    <button onClick={() => react(p.id, 'skull')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-2 sm:py-1 hover:bg-white/[0.06] min-h-[40px] sm:min-h-0">💀 {(reactions[p.id]?.skull)||0}</button>
                     <div className="ml-auto inline-flex items-center text-muted text-sm"><MessageSquare className="h-4 w-4 mr-1" /> Comment</div>
                   </div>
                   <div className="mt-2">

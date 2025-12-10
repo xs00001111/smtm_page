@@ -36,7 +36,7 @@ export default function HomePage() {
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight">
               Track markets. Follow whales. Never miss a move.
             </h1>
-            <p className="mt-6 sm:mt-7 text-lg text-white/80 max-w-[50ch]">
+            <p className="mt-6 sm:mt-7 text-base sm:text-lg text-white/80 max-w-[50ch] leading-relaxed">
               Real-time alerts for prediction markets, whale trades, and price changes. Research tools to find the smartest traders and hottest markets.
             </p>
             <div className="mt-10 sm:mt-12 flex flex-col sm:flex-row gap-4 sm:gap-6 items-center">
@@ -46,13 +46,13 @@ export default function HomePage() {
                 rel="noopener noreferrer"
                 className="w-full sm:w-auto"
               >
-                <button className="w-full sm:w-auto bg-gradient-to-r from-[#00E5FF] to-[#B6FF00] text-black font-semibold px-6 py-3.5 rounded-xl shadow-[0_0_40px_rgba(182,255,0,0.3)] hover:shadow-[0_0_50px_rgba(182,255,0,0.4)] transition-all flex items-center justify-center gap-2">
+                <button className="w-full sm:w-auto bg-gradient-to-r from-[#00E5FF] to-[#B6FF00] text-black font-semibold px-8 py-4 sm:px-6 sm:py-3.5 rounded-xl shadow-[0_0_40px_rgba(182,255,0,0.3)] hover:shadow-[0_0_50px_rgba(182,255,0,0.4)] transition-all flex items-center justify-center gap-2 text-base sm:text-sm">
                   <Send size={20} className="rotate-45" />
                   Start Free on Telegram
                 </button>
               </a>
               <a href="#features" className="w-full sm:w-auto">
-                <button className="w-full sm:w-auto border border-[#00E5FF] text-[#00E5FF] px-6 py-3.5 rounded-xl hover:bg-[#00E5FF]/10 transition-colors">
+                <button className="w-full sm:w-auto border border-[#00E5FF] text-[#00E5FF] px-8 py-4 sm:px-6 sm:py-3.5 rounded-xl hover:bg-[#00E5FF]/10 transition-colors text-base sm:text-sm">
                   See What's Available
                 </button>
               </a>
@@ -79,7 +79,7 @@ export default function HomePage() {
         </section>
 
   {/* Demo under hero with overlap and spacing */}
-  <section id="demo" className="-mt-12 md:-mt-16 relative z-10 pt-14 md:pt-20 pb-20" style={{ contentVisibility: 'auto' }}>
+  <section id="demo" className="-mt-8 sm:-mt-12 md:-mt-16 relative z-10 pt-12 sm:pt-14 md:pt-20 pb-16 sm:pb-20" style={{ contentVisibility: 'auto' }}>
     <MockExperience />
   </section>
 

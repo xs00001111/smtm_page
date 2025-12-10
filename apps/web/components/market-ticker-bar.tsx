@@ -25,7 +25,7 @@ export function MarketTickerBar() {
               {TICKERS.map((ticker, idx) => (
                 <div
                   key={`${setIndex}-${ticker.sym}-${idx}`}
-                  className="inline-flex items-center gap-3 px-6 text-sm"
+                  className="inline-flex items-center gap-2.5 sm:gap-3 px-4 sm:px-6 text-xs sm:text-sm"
                 >
                   <span className={idx % 2 === 0 ? 'text-teal font-semibold' : 'text-lime font-semibold'}>
                     {ticker.sym}
@@ -36,7 +36,7 @@ export function MarketTickerBar() {
                   <span className={ticker.change.startsWith('-') ? 'text-red-400' : 'text-emerald-400'}>
                     {ticker.change}
                   </span>
-                  <span className="text-white/20 mx-2">•</span>
+                  <span className="text-white/20 mx-1 sm:mx-2">•</span>
                 </div>
               ))}
             </div>

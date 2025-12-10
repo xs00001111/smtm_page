@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { CheckCircle2, Share2, Shield, Trophy } from 'lucide-react'
 // removed LuckySpin per request
-import { FireworksOverlay } from '@/components/fireworks-overlay'
+import { SuccessOverlay } from '@/components/success-overlay'
 
 type BetSide = 'LONG' | 'SHORT'
 
@@ -88,10 +88,9 @@ export function MockExperience() {
     return () => obs.disconnect()
   }, [])
 
-  const mobileAnimDuration = typeof window !== 'undefined' && window.innerWidth < 640 ? 1600 : 2200
   return (
     <div ref={rootRef} className="relative">
-      <FireworksOverlay active={celebrate} onDone={() => setCelebrate(false)} message="Congratulations!" rewardAmount={rewardAmount ?? undefined} durationMs={mobileAnimDuration} />
+      <SuccessOverlay active={celebrate} onDone={() => setCelebrate(false)} message="Congratulations!" rewardAmount={rewardAmount ?? undefined} durationMs={1800} />
 
       {/* Demo grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -159,7 +158,7 @@ export function MockExperience() {
                   <span className="absolute -right-2 -bottom-2 h-3 w-3 rounded-full bg-teal animate-ping pointer-events-none" />
                 )}
                 <Button
-                  className="bg-teal text-black hover:opacity-90 w-full sm:w-auto"
+                  className="bg-teal text-black hover:opacity-90 w-full sm:w-auto min-h-[44px]"
                   onMouseEnter={() => setHoverSide('LONG')}
                   onMouseLeave={() => setHoverSide(null)}
                   onClick={() => handleBet('LONG')}
@@ -170,14 +169,14 @@ export function MockExperience() {
               <div className="relative">
                 {showHints && !bet && (
                   <span className="absolute -top-7 left-1/2 -translate-x-1/2 text-xs text-white/80 bg-black/40 px-2 py-1 rounded-md border border-white/10">
-                    Press ‘S’
+                    Press 'S'
                   </span>
                 )}
                 {showHints && !bet && (
                   <span className="absolute -right-2 -bottom-2 h-3 w-3 rounded-full bg-red-500 animate-ping pointer-events-none" />
                 )}
                 <Button
-                  className="bg-red-500 text-white hover:bg-red-500/90 w-full sm:w-auto"
+                  className="bg-red-500 text-white hover:bg-red-500/90 w-full sm:w-auto min-h-[44px]"
                   onMouseEnter={() => setHoverSide('SHORT')}
                   onMouseLeave={() => setHoverSide(null)}
                   onClick={() => handleBet('SHORT')}
