@@ -228,6 +228,12 @@ export interface SmartSkewResult {
     whaleScoreThreshold: number
     windowMs: number
     walletsEvaluated: number
+    whalesDetected?: number
+    yesWhaleCount?: number
+    noWhaleCount?: number
+    yesUsdRaw?: number
+    noUsdRaw?: number
+    hasData?: boolean
   }
 }
 
