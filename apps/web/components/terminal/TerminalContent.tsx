@@ -29,24 +29,46 @@ function catmull(values: number[], w = 800, h = 320) {
 }
 
 function useDemoSeries() {
-  const n = 40
-  const crossAt = Math.floor(n * 0.85)
+  // Generate realistic Polymarket-style price data:
+  // - Long stable periods with small noise
+  // - Occasional sudden spikes/movements
+  const n = 50
   const ys: number[] = []
   const ns: number[] = []
-  let yes = 44
-  let no = 56
+  const rng = prng(4242)
+
+  let yes = 58  // Start at 58%
+  let no = 42   // Start at 42%
+
+  // Define some spike events
+  const spikes = [
+    { at: 35, magnitude: 12 },  // Big spike near the end
+    { at: 20, magnitude: -4 },  // Small dip in middle
+  ]
+
   for (let i = 0; i < n; i++) {
-    const isLate = i >= crossAt
-    const t = i / (n - 1)
-    const noise = (0.2 + t * t * 2) * (prng(1000 + i)() - 0.5)
-    const driftY = isLate ? (67 - yes) * 0.18 : (50 - yes) * 0.02
-    const driftN = isLate ? (33 - no) * 0.18 : (50 - no) * 0.02
-    if (!isLate && Math.abs(yes - no) < 2) { yes -= 0.2; no += 0.2 }
-    yes = Math.min(95, Math.max(5, yes + driftY + noise))
-    no = Math.min(95, Math.max(5, no + driftN - noise))
-    ys.push(yes); ns.push(no)
+    // Check if this is a spike point
+    const spike = spikes.find(s => s.at === i)
+
+    if (spike) {
+      // Sudden movement
+      yes += spike.magnitude
+      no -= spike.magnitude
+    } else {
+      // Normal small random walk - mostly stays stable
+      const smallNoise = (rng() - 0.5) * 1.5
+      yes += smallNoise
+      no -= smallNoise
+    }
+
+    // Keep within bounds and ensure they sum to ~100
+    yes = Math.min(95, Math.max(5, yes))
+    no = 100 - yes
+
+    ys.push(yes)
+    ns.push(no)
   }
-  ys[crossAt] = ns[crossAt]
+
   return { ys, ns }
 }
 
@@ -299,16 +321,136 @@ function OrderTicket() {
 
 function ChartLines() {
   const { ys, ns } = useDemoSeries()
+
+  // Chart dimensions with margins for axes
+  const chartWidth = 800
+  const chartHeight = 320
+  const marginLeft = 50
+  const marginBottom = 30
+  const marginTop = 10
+  const marginRight = 10
+  const plotWidth = chartWidth - marginLeft - marginRight
+  const plotHeight = chartHeight - marginTop - marginBottom
+
+  // Generate time labels (last 24 hours)
+  const now = new Date()
+  const timeLabels = [0, 6, 12, 18, 24].map(h => {
+    const d = new Date(now)
+    d.setHours(now.getHours() - (24 - h))
+    return `${d.getHours()}:00`
+  })
+
   return (
-    <div className="relative h-80 rounded-md border border-white/5 bg-gradient-to-b from-teal/5 to-transparent">
-      <svg className="w-full h-full" viewBox="0 0 800 320" preserveAspectRatio="none">
-        {[0,25,50,75,100].map((y)=> (
-          <line key={y} x1="0" y1={320-(y*3.2)} x2="800" y2={320-(y*3.2)} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-        ))}
-        <path d={catmull(ys)} fill="none" stroke="#00E5FF" strokeOpacity="0.95" strokeWidth="2" />
-        <path d={catmull(ns)} fill="none" stroke="#EF4444" strokeOpacity="0.95" strokeWidth="2" />
-        <circle cx="800" cy={320 - (ys[ys.length-1]/100)*320} r={6} stroke="#00E5FF" strokeWidth={2} fill="#0C0C0C" />
-        <circle cx="800" cy={320 - (ns[ns.length-1]/100)*320} r={6} stroke="#EF4444" strokeWidth={2} fill="#0C0C0C" />
+    <div className="relative h-80 rounded-md border border-white/5 bg-gradient-to-b from-teal/5 to-transparent p-4">
+      <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet">
+        {/* Y-axis grid lines and labels */}
+        {[0, 25, 50, 75, 100].map((pct) => {
+          const y = marginTop + plotHeight - (pct / 100) * plotHeight
+          return (
+            <g key={pct}>
+              <line
+                x1={marginLeft}
+                y1={y}
+                x2={chartWidth - marginRight}
+                y2={y}
+                stroke="rgba(255,255,255,0.05)"
+                strokeWidth="1"
+              />
+              <text
+                x={marginLeft - 10}
+                y={y + 4}
+                textAnchor="end"
+                className="fill-white/40"
+                fontSize="11"
+              >
+                {pct}%
+              </text>
+            </g>
+          )
+        })}
+
+        {/* X-axis time labels */}
+        {timeLabels.map((label, i) => {
+          const x = marginLeft + (i / (timeLabels.length - 1)) * plotWidth
+          return (
+            <text
+              key={i}
+              x={x}
+              y={chartHeight - 10}
+              textAnchor="middle"
+              className="fill-white/40"
+              fontSize="11"
+            >
+              {label}
+            </text>
+          )
+        })}
+
+        {/* Clip path for chart area */}
+        <defs>
+          <clipPath id="chart-clip">
+            <rect x={marginLeft} y={marginTop} width={plotWidth} height={plotHeight} />
+          </clipPath>
+        </defs>
+
+        {/* Chart lines */}
+        <g clipPath="url(#chart-clip)">
+          <path
+            d={catmull(ys, plotWidth, plotHeight)}
+            fill="none"
+            stroke="#00E5FF"
+            strokeOpacity="0.95"
+            strokeWidth="2.5"
+            transform={`translate(${marginLeft}, ${marginTop})`}
+          />
+          <path
+            d={catmull(ns, plotWidth, plotHeight)}
+            fill="none"
+            stroke="#EF4444"
+            strokeOpacity="0.95"
+            strokeWidth="2.5"
+            transform={`translate(${marginLeft}, ${marginTop})`}
+          />
+
+          {/* End point indicators */}
+          <circle
+            cx={marginLeft + plotWidth}
+            cy={marginTop + plotHeight - (ys[ys.length-1] / 100) * plotHeight}
+            r={5}
+            stroke="#00E5FF"
+            strokeWidth={2}
+            fill="#0C0C0C"
+          />
+          <circle
+            cx={marginLeft + plotWidth}
+            cy={marginTop + plotHeight - (ns[ns.length-1] / 100) * plotHeight}
+            r={5}
+            stroke="#EF4444"
+            strokeWidth={2}
+            fill="#0C0C0C"
+          />
+        </g>
+
+        {/* Axis labels */}
+        <text
+          x={marginLeft - 35}
+          y={chartHeight / 2}
+          textAnchor="middle"
+          className="fill-white/50"
+          fontSize="12"
+          transform={`rotate(-90, ${marginLeft - 35}, ${chartHeight / 2})`}
+        >
+          Probability (%)
+        </text>
+        <text
+          x={chartWidth / 2}
+          y={chartHeight - 2}
+          textAnchor="middle"
+          className="fill-white/50"
+          fontSize="12"
+        >
+          Time (Last 24h)
+        </text>
       </svg>
     </div>
   )
