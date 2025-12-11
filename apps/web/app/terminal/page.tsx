@@ -126,6 +126,25 @@ function PriceMovers() {
   )
 }
 
+function DepthHeatmapCard() {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
+      <div className="text-sm font-semibold text-white/80 mb-3">Depth Heatmap</div>
+      <div className="grid grid-cols-12 gap-[2px]">
+        {Array.from({length: 12}).map((_,i)=> (
+          <div key={i} className="h-6 bg-teal/10" style={{opacity: 0.4 + i/20}} />
+        ))}
+      </div>
+      <div className="grid grid-cols-12 gap-[2px] mt-[2px]">
+        {Array.from({length: 12}).map((_,i)=> (
+          <div key={i} className="h-6 bg-red-500/10" style={{opacity: 1 - i/20}} />
+        ))}
+      </div>
+      <div className="mt-2 text-xs text-white/60">Top: YES depth • Bottom: NO depth</div>
+    </div>
+  )
+}
+
 function SignalHeatmap() {
   // 2 rows (YES/NO) x 12 buckets
   const yesVals = Array.from({length:12}, (_,i)=> Math.round(40 + i*4 + Math.sin(i)*3))
@@ -352,22 +371,102 @@ function SignalHeatmap() {
           </div>
         </div>
 
-        {/* Featured + Odds */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <div className="lg:col-span-2">
+        {/* Top layout: Featured + Chart left; Odds/Movers/Depth right */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <div className="lg:col-span-2 space-y-4">
             <FeaturedMarkets />
+            {/* Chart Card */}
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 glass-card">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold">Price Chart</h2>
+                <div className="flex gap-2 items-center">
+                  <button onClick={()=>setShowTuning(v=>!v)} className="inline-flex items-center gap-1 text-xs rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10">
+                    <Sliders className="h-3.5 w-3.5" /> Tuning
+                  </button>
+                  {['1H', '1D', '1W', '1M', 'ALL'].map((period) => (
+                    <button
+                      key={period}
+                      className="px-3 py-1 text-xs rounded-md bg-white/5 hover:bg-white/10 transition"
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <AlphaChips />
+              {showTuning && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3 text-xs text-white/70 mt-3">
+                <label className="block">
+                  <div>Volatility {volatility.toFixed(1)}</div>
+                  <input type="range" min={0.5} max={6} step={0.1} value={volatility} onChange={(e)=>setVolatility(parseFloat(e.target.value))} className="w-full" />
+                </label>
+                <label className="block">
+                  <div>Jump prob {(jumpProb*100).toFixed(1)}%</div>
+                  <input type="range" min={0} max={0.12} step={0.005} value={jumpProb} onChange={(e)=>setJumpProb(parseFloat(e.target.value))} className="w-full" />
+                </label>
+                <label className="block">
+                  <div>Stroke {strokeWidth.toFixed(1)}px</div>
+                  <input type="range" min={1} max={4} step={0.5} value={strokeWidth} onChange={(e)=>setStrokeWidth(parseFloat(e.target.value))} className="w-full" />
+                </label>
+                <label className="block">
+                  <div>Opacity {Math.round(strokeOpacity*100)}%</div>
+                  <input type="range" min={0.3} max={1} step={0.05} value={strokeOpacity} onChange={(e)=>setStrokeOpacity(parseFloat(e.target.value))} className="w-full" />
+                </label>
+                <label className="block">
+                  <div>Marker {markerSize}px</div>
+                  <input type="range" min={4} max={10} step={1} value={markerSize} onChange={(e)=>setMarkerSize(parseInt(e.target.value))} className="w-full" />
+                </label>
+              </div>
+              )}
+              {/* Chart */}
+              <div className="relative h-80 bg-gradient-to-b from-teal/5 to-transparent rounded-lg border border-white/5">
+                <svg className="w-full h-full" viewBox="0 0 800 320" preserveAspectRatio="none">
+                  <defs>
+                    <filter id="yesGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="2.2" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                    <filter id="noGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="2.2" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  {[0, 25, 50, 75, 100].map((y) => (
+                    <line key={y} x1="0" y1={320 - (y * 3.2)} x2="800" y2={320 - (y * 3.2)} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                  ))}
+                  <path d={catmullRomPath(YES_SERIES)} fill="none" stroke="#00E5FF" strokeOpacity={strokeOpacity} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" filter="url(#yesGlow)" />
+                  <path d={catmullRomPath(NO_SERIES)} fill="none" stroke="#EF4444" strokeOpacity={strokeOpacity} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" filter="url(#noGlow)" />
+                  {[50, 120, 200, 280, 350, 420, 500, 580, 650, 720].map((x, i) => (
+                    <rect key={i} x={x} y={320 - (VOLUMES[i % VOLUMES.length] + 10)} width="40" height={VOLUMES[i % VOLUMES.length]} fill="rgba(0,229,255,0.18)" />
+                  ))}
+                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r={markerSize} stroke="#00E5FF" strokeWidth={Math.max(1, markerSize/3)} fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r={Math.max(1, Math.round(markerSize/3))} fill="#FFFFFF" />
+                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r={markerSize} stroke="#EF4444" strokeWidth={Math.max(1, markerSize/3)} fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r={Math.max(1, Math.round(markerSize/3))} fill="#FFFFFF" />
+                </svg>
+                {/* axis labels minimal to save space */}
+              </div>
+            </div>
           </div>
-          <div className="space-y-6">
+          <div className="space-y-4">
             <OddsGauge percent={Math.round(YES_SERIES[YES_SERIES.length-1])} />
             <PriceMovers />
+            <DepthHeatmapCard />
           </div>
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Left Column - Chart & Orderbook */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4">
             {/* Chart Section */}
+              {false && (
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 glass-card">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold">Price Chart</h2>
@@ -385,6 +484,7 @@ function SignalHeatmap() {
                   ))}
                 </div>
               </div>
+              )}
               {/* Alpha signal chips */}
               <AlphaChips />
               {/* Tuning controls */}
@@ -619,21 +719,7 @@ function SignalHeatmap() {
             </div>
           </div>
 
-          {/* Depth Heatmap (concept) */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
-            <h2 className="text-lg font-semibold mb-4">Depth Heatmap</h2>
-            <div className="grid grid-cols-12 gap-[2px]">
-              {Array.from({length: 12}).map((_,i)=> (
-                <div key={i} className="h-8 bg-teal/10" style={{opacity: 0.4 + i/20}} />
-              ))}
-            </div>
-            <div className="grid grid-cols-12 gap-[2px] mt-[2px]">
-              {Array.from({length: 12}).map((_,i)=> (
-                <div key={i} className="h-8 bg-red-500/10" style={{opacity: 1 - i/20}} />
-              ))}
-            </div>
-            <div className="mt-2 text-xs text-white/60">Top: YES depth • Bottom: NO depth</div>
-          </div>
+          {/* Depth heatmap moved to right column above */}
 
           {/* Right Column - Signals & Trade */}
           <div className="space-y-6">
