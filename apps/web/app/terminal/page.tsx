@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from 'react'
-import { TrendingUp, TrendingDown, Activity, Users, DollarSign, AlertCircle } from 'lucide-react'
+import { TrendingUp, TrendingDown, Activity, Users, DollarSign, AlertCircle, Sliders } from 'lucide-react'
 
 export default function TerminalPage() {
   const [selectedOutcome, setSelectedOutcome] = useState<'YES' | 'NO'>('YES')
@@ -24,7 +24,36 @@ export default function TerminalPage() {
     alpha: 78,
     direction: 'YES' as const,
     skew: 0.82,
-  }
+}
+
+function AlphaChips() {
+  // Mock alpha series for chips
+  const momentum = [55,56,57,58,57,59,61,63,62,64]
+  const whales = [48,50,53,52,54,57,59,58,60,62]
+  const crowd = [42,41,43,45,44,46,47,49,48,50]
+  const items = [
+    { label: 'Momentum', color: '#00E5FF', data: momentum },
+    { label: 'Whale Flow', color: '#B6FF00', data: whales },
+    { label: 'Crowd Sentiment', color: '#ffffff', data: crowd },
+  ]
+  return (
+    <div className="flex flex-wrap gap-2 mb-1">
+      {items.map((it,i)=> (
+        <div key={i} className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs">
+          <span className="text-white/80">{it.label}</span>
+          <svg width="60" height="18" viewBox="0 0 60 18">
+            <path d={(() => {
+              const h=18; const w=60;
+              const step=w/(it.data.length-1);
+              const ys=it.data.map(v=> h - (v/100)*h);
+              let d=`M 0 ${ys[0]}`; for(let j=1;j<ys.length;j++) d+=` L ${j*step} ${ys[j]}`; return d;
+            })()} fill="none" stroke={it.color} strokeWidth="1.5" />
+          </svg>
+        </div>
+      ))}
+    </div>
+  )
+}
 
   // Mock whale activity
   const whaleActivity = [
@@ -75,6 +104,7 @@ export default function TerminalPage() {
   const [strokeWidth, setStrokeWidth] = useState(2)
   const [strokeOpacity, setStrokeOpacity] = useState(0.95)
   const [markerSize, setMarkerSize] = useState(6)
+  const [showTuning, setShowTuning] = useState(false)
 
   // Deterministic pseudo‑random for realistic jitter
   function prng(seed: number) {
@@ -136,6 +166,16 @@ export default function TerminalPage() {
   const volRnd = prng(98765)
   const VOLUMES = Array.from({ length: 10 }, () => 10 + Math.floor(volRnd() * 40))
 
+  // Tiny sparkline util for chips
+  function spark(values: number[], w = 60, h = 18) {
+    if (!values.length) return ''
+    const step = w / (values.length - 1)
+    const ys = values.map(v => h - (v / 100) * h)
+    let d = `M 0 ${ys[0]}`
+    for (let i = 1; i < ys.length; i++) d += ` L ${i * step} ${ys[i]}`
+    return d
+  }
+
   return (
     <div className="min-h-screen bg-[#0C0C0C] text-white">
       {/* Header */}
@@ -186,9 +226,12 @@ export default function TerminalPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Chart Section */}
               <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold">Price Chart</h2>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  <button onClick={()=>setShowTuning(v=>!v)} className="inline-flex items-center gap-1 text-xs rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10">
+                    <Sliders className="h-3.5 w-3.5" /> Tuning
+                  </button>
                   {['1H', '1D', '1W', '1M', 'ALL'].map((period) => (
                     <button
                       key={period}
@@ -199,8 +242,11 @@ export default function TerminalPage() {
                   ))}
                 </div>
               </div>
+              {/* Alpha signal chips */}
+              <AlphaChips />
               {/* Tuning controls */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3 text-xs text-white/70">
+              {showTuning && (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3 text-xs text-white/70 mt-3">
                 <label className="block">
                   <div>Volatility {volatility.toFixed(1)}</div>
                   <input type="range" min={0.5} max={6} step={0.1} value={volatility} onChange={(e)=>setVolatility(parseFloat(e.target.value))} className="w-full" />
@@ -222,6 +268,7 @@ export default function TerminalPage() {
                   <input type="range" min={4} max={10} step={1} value={markerSize} onChange={(e)=>setMarkerSize(parseInt(e.target.value))} className="w-full" />
                 </label>
               </div>
+              )}
               {/* Mock Chart Area */}
               <div className="relative h-80 bg-gradient-to-b from-teal/5 to-transparent rounded-lg border border-white/5">
                 <svg className="w-full h-full" viewBox="0 0 800 320" preserveAspectRatio="none">
@@ -507,7 +554,22 @@ export default function TerminalPage() {
 
             {/* Trade Panel */}
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
-              <h2 className="text-lg font-semibold mb-4">Place Order</h2>
+              <h2 className="text-lg font-semibold mb-2">Place Order</h2>
+              {/* Best bid/ask + spread */}
+              <div className="mb-3 flex flex-wrap gap-2 text-xs">
+                {(() => {
+                  const bestBid = Math.max(...orderbook.yes.map(o=>o.price))
+                  const bestAsk = Math.min(bestBid + 0.01, 0.99)
+                  const spread = (bestAsk - bestBid) * 100
+                  return (
+                    <>
+                      <span className="rounded-md border border-teal/40 bg-teal/10 text-teal px-2 py-1">Bid {Math.round(bestBid*100)}¢</span>
+                      <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">Ask {Math.round(bestAsk*100)}¢</span>
+                      <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">Spread ~{spread.toFixed(1)}¢</span>
+                    </>
+                  )
+                })()}
+              </div>
 
               {/* Outcome Toggle */}
               <div className="grid grid-cols-2 gap-2 mb-4">
@@ -556,7 +618,29 @@ export default function TerminalPage() {
               </div>
             </div>
 
-            {/* Advanced options */}
+              {/* Mini ladder */}
+              <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+                <div className="rounded-md border border-white/10 p-2">
+                  <div className="text-white/60 mb-1">Top YES</div>
+                  {orderbook.yes.slice(0,3).map((o,i)=>(
+                    <div key={i} className="flex justify-between">
+                      <span className="text-teal">{Math.round(o.price*100)}¢</span>
+                      <span className="text-white/60">{(o.size/1000).toFixed(1)}K</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="rounded-md border border-white/10 p-2">
+                  <div className="text-white/60 mb-1">Top NO</div>
+                  {orderbook.no.slice(0,3).map((o,i)=>(
+                    <div key={i} className="flex justify-between">
+                      <span className="text-red-400">{Math.round(o.price*100)}¢</span>
+                      <span className="text-white/60">{(o.size/1000).toFixed(1)}K</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Advanced options */}
             <div className="mb-4">
               <div className="text-xs text-white/60 mb-2">Order Type</div>
               <div className="flex flex-wrap gap-2 mb-3 text-xs">
