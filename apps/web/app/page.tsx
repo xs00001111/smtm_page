@@ -19,8 +19,10 @@ export default function HomePage() {
         {/* Hero */}
         <section id="hero" className="relative min-h-[70vh] md:min-h-[80vh] flex items-center justify-center overflow-hidden">
           <TradingGrid />
-          {/* Lightweight event lines + arcade claw reference (mobile friendly) */}
-          <PolymarketEventLines />
+          {/* Decorative event lines — hide on small screens to reduce clutter */}
+          <div className="hidden sm:block">
+            <PolymarketEventLines />
+          </div>
           {/* Full-bleed glow overlay (spans entire viewport width) */}
           <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 min-w-[100%] w-full bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.12),transparent_60%)]" />
           {/* Ticker strip anchored to top, sharing hero background */}

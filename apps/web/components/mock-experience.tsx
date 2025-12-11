@@ -157,6 +157,7 @@ export function MockExperience() {
                 onChange={(e)=>setAmount(Number(e.target.value || 0))}
                 className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:border-teal/60"
                 min={0}
+                inputMode="decimal"
               />
               {[25,50,100].map(v=> (
                 <button key={v} onClick={()=>setAmount(v)} className="px-2 py-2 rounded-md border border-white/10 bg-white/5 text-xs hover:bg-white/10 min-h-[40px]">
