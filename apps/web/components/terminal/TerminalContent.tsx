@@ -9,21 +9,47 @@ function prng(seed: number) {
   return () => (s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32
 }
 
-function catmull(values: number[], w = 800, h = 320) {
+// Fritsch–Carlson monotone cubic interpolation to avoid overshoot/curls
+function monotonePath(values: number[], w = 800, h = 320) {
   if (!values.length) return ''
-  const stepX = w / (values.length - 1)
-  const pts = values.map((v, i) => [i * stepX, h - (v / 100) * h]) as [number, number][]
-  let d = `M ${pts[0][0]} ${pts[0][1]}`
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] || pts[i]
-    const p1 = pts[i]
-    const p2 = pts[i + 1]
-    const p3 = pts[i + 2] || p2
-    const c1x = p1[0] + (p2[0] - p0[0]) / 6
-    const c1y = p1[1] + (p2[1] - p0[1]) / 6
-    const c2x = p2[0] - (p3[0] - p1[0]) / 6
-    const c2y = p2[1] - (p3[1] - p1[1]) / 6
-    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`
+  const n = values.length
+  const stepX = w / (n - 1)
+  const xs = Array.from({ length: n }, (_, i) => i * stepX)
+  const ys = values.map((v) => h - (v / 100) * h)
+  const dx = Array.from({ length: n - 1 }, (_, i) => xs[i + 1] - xs[i])
+  const dy = Array.from({ length: n - 1 }, (_, i) => ys[i + 1] - ys[i])
+  const m = dy.map((d, i) => (d === 0 ? 0 : d / dx[i]))
+  const tangents = new Array<number>(n)
+  tangents[0] = m[0]
+  tangents[n - 1] = m[n - 2]
+  for (let i = 1; i < n - 1; i++) {
+    if (m[i - 1] * m[i] <= 0) tangents[i] = 0
+    else tangents[i] = (m[i - 1] * dx[i] + m[i] * dx[i - 1]) / (dx[i - 1] + dx[i])
+  }
+  // Limit the tangents to preserve monotonicity
+  for (let i = 0; i < n - 1; i++) {
+    if (m[i] === 0) {
+      tangents[i] = 0
+      tangents[i + 1] = 0
+      continue
+    }
+    const a = tangents[i] / m[i]
+    const b = tangents[i + 1] / m[i]
+    const s = a * a + b * b
+    if (s > 9) {
+      const t = 3 / Math.sqrt(s)
+      tangents[i] = t * a * m[i]
+      tangents[i + 1] = t * b * m[i]
+    }
+  }
+  let d = `M ${xs[0]} ${ys[0]}`
+  for (let i = 0; i < n - 1; i++) {
+    const x0 = xs[i], x1 = xs[i + 1]
+    const y0 = ys[i], y1 = ys[i + 1]
+    const t0 = tangents[i]
+    const t1 = tangents[i + 1]
+    const dx01 = x1 - x0
+    d += ` C ${x0 + dx01 / 3} ${y0 + (t0 * dx01) / 3}, ${x1 - dx01 / 3} ${y1 - (t1 * dx01) / 3}, ${x1} ${y1}`
   }
   return d
 }
@@ -471,6 +497,10 @@ function ChartLines() {
     return `${d.getHours()}:00`
   })
 
+  // Memoize paths for performance when resizing
+  const yesPath = React.useMemo(() => monotonePath(ys, plotWidth, plotHeight), [ys, plotWidth, plotHeight])
+  const noPath = React.useMemo(() => monotonePath(ns, plotWidth, plotHeight), [ns, plotWidth, plotHeight])
+
   return (
     <div ref={containerRef} className="relative h-80">
       {/* Use a dynamic viewBox so the chart truly fills the box width. */}
@@ -528,7 +558,7 @@ function ChartLines() {
         {/* Chart lines */}
         <g clipPath="url(#chart-clip)">
           <path
-            d={catmull(ys, plotWidth, plotHeight)}
+            d={yesPath}
             fill="none"
             stroke="#00E5FF"
             strokeOpacity="0.95"
@@ -538,7 +568,7 @@ function ChartLines() {
             transform={`translate(${marginLeft}, ${marginTop})`}
           />
           <path
-            d={catmull(ns, plotWidth, plotHeight)}
+            d={noPath}
             fill="none"
             stroke="#EF4444"
             strokeOpacity="0.95"

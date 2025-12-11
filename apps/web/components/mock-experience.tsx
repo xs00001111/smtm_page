@@ -101,12 +101,18 @@ export function MockExperience() {
           <div className="flex items-center gap-3 mb-3">
             <div className="h-9 w-9 rounded-full grid place-items-center text-sm font-semibold border border-white/10" style={avatarStyle('CryptoChad')}>C</div>
             <div className="min-w-0">
-              <div className="font-semibold leading-tight">{claim.influencer}</div>
-              <div className="text-xs text-muted truncate">{claim.influencerMeta}</div>
+              <div className="font-semibold leading-tight truncate max-w-[60vw] sm:max-w-none">{claim.influencer}</div>
+              <div className="text-xs text-muted truncate max-w-[70vw] sm:max-w-none">{claim.influencerMeta}</div>
             </div>
             <div className="ml-auto hidden sm:block">
               <Button variant="outline" size="sm" className="truncate max-w-[160px]">
                 💸 Tip Creator ($1–5)
+              </Button>
+            </div>
+            {/* Compact tip on mobile */}
+            <div className="ml-auto sm:hidden">
+              <Button variant="outline" size="icon" aria-label="Tip Creator" title="Tip Creator" className="h-9 w-9">
+                💸
               </Button>
             </div>
           </div>
@@ -118,7 +124,7 @@ export function MockExperience() {
             <span className={`${shared ? 'text-teal' : 'text-white/70'}`}>3) Share</span>
           </div>
           <div className="text-muted text-xs mb-1">Market</div>
-          <div className="text-2xl md:text-3xl font-bold leading-snug mb-4">{claim.text}</div>
+          <div className="text-2xl md:text-3xl font-bold leading-snug mb-4 break-words">{claim.text}</div>
 
           {/* Side selector + mini price */}
           <div className="mb-3 grid grid-cols-2 gap-2">
@@ -153,7 +159,7 @@ export function MockExperience() {
                 min={0}
               />
               {[25,50,100].map(v=> (
-                <button key={v} onClick={()=>setAmount(v)} className="px-2 py-2 rounded-md border border-white/10 bg-white/5 text-xs hover:bg-white/10">
+                <button key={v} onClick={()=>setAmount(v)} className="px-2 py-2 rounded-md border border-white/10 bg-white/5 text-xs hover:bg-white/10 min-h-[40px]">
                   ${v}
                 </button>
               ))}
@@ -276,13 +282,13 @@ export function MockExperience() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-3 relative">
+          <div className="mt-4 flex items-center gap-3 relative md:static sticky bottom-2 z-20 px-2 py-2 md:px-0 md:py-0 rounded-xl md:rounded-none bg-black/50 md:bg-transparent backdrop-blur md:backdrop-blur-0 border border-white/10 md:border-0 pb-[env(safe-area-inset-bottom)]">
             {!shared && bet && confidenceTouched && (
               <span className="absolute -top-7 left-0 text-xs text-white/80 bg-black/40 px-2 py-1 rounded-md border border-white/10 animate-bounce">
                 Finish: Share your card →
               </span>
             )}
-            <Button variant="cta" size="lg" className="px-5 py-3 w-full sm:w-auto" onClick={() => setShared(true)}>
+            <Button variant="cta" size="lg" className="px-5 py-3 w-full sm:w-auto min-h-[44px]" onClick={() => setShared(true)}>
               <Share2 className="h-4 w-4 mr-2" /> Share → Auto Meme Card
             </Button>
           </div>
