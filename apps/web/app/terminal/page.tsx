@@ -56,13 +56,27 @@ export default function TerminalPage() {
   const maxPayout = betAmount ? (parseFloat(betAmount) / (selectedOutcome === 'YES' ? market.yesPrice : market.noPrice)).toFixed(2) : '0.00'
   const potentialProfit = betAmount ? (parseFloat(maxPayout) - parseFloat(betAmount)).toFixed(2) : '0.00'
 
+  // Controls (tunable by user)
+  const [volatility, setVolatility] = useState(2)
+  const [jumpProb, setJumpProb] = useState(0.04)
+  const [strokeWidth, setStrokeWidth] = useState(2)
+  const [strokeOpacity, setStrokeOpacity] = useState(0.95)
+  const [markerSize, setMarkerSize] = useState(6)
+
   // Deterministic pseudo‑random for realistic jitter
   function prng(seed: number) {
     let s = seed >>> 0
     return () => (s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32
   }
 
-  function generateSeries(count: number, start: number, end: number, seed: number, noise = 1.8) {
+  function generateSeries(
+    count: number,
+    start: number,
+    end: number,
+    seed: number,
+    noise = volatility,
+    jump = jumpProb,
+  ) {
     // Random‑walk with small volatility + rare jumps; trends from start → end
     const rnd = prng(seed)
     const series: number[] = []
@@ -71,7 +85,7 @@ export default function TerminalPage() {
     for (let i = 0; i < count; i++) {
       // base trend + noise
       const n = (rnd() - 0.5) * noise
-      if (rnd() < 0.04) {
+      if (rnd() < jump) {
         // occasional micro jump
         val += (rnd() - 0.5) * 6
       }
@@ -102,8 +116,8 @@ export default function TerminalPage() {
   }
 
   // Build chart series (not perfectly complementary to appear real)
-  const YES_SERIES = generateSeries(36, 44, 67, 12345, 2)
-  const NO_SERIES = generateSeries(36, 58, 33, 54321, 2.1)
+  const YES_SERIES = useMemo(() => generateSeries(36, 44, 67, 12345, volatility, jumpProb), [volatility, jumpProb])
+  const NO_SERIES = useMemo(() => generateSeries(36, 58, 33, 54321, volatility * 1.05, jumpProb * 1.05), [volatility, jumpProb])
 
   // Deterministic volumes
   const volRnd = prng(98765)
@@ -158,7 +172,7 @@ export default function TerminalPage() {
           {/* Left Column - Chart & Orderbook */}
           <div className="lg:col-span-2 space-y-6">
             {/* Chart Section */}
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">Price Chart</h2>
                 <div className="flex gap-2">
@@ -171,6 +185,29 @@ export default function TerminalPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+              {/* Tuning controls */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3 text-xs text-white/70">
+                <label className="block">
+                  <div>Volatility {volatility.toFixed(1)}</div>
+                  <input type="range" min={0.5} max={6} step={0.1} value={volatility} onChange={(e)=>setVolatility(parseFloat(e.target.value))} className="w-full" />
+                </label>
+                <label className="block">
+                  <div>Jump prob {(jumpProb*100).toFixed(1)}%</div>
+                  <input type="range" min={0} max={0.12} step={0.005} value={jumpProb} onChange={(e)=>setJumpProb(parseFloat(e.target.value))} className="w-full" />
+                </label>
+                <label className="block">
+                  <div>Stroke {strokeWidth.toFixed(1)}px</div>
+                  <input type="range" min={1} max={4} step={0.5} value={strokeWidth} onChange={(e)=>setStrokeWidth(parseFloat(e.target.value))} className="w-full" />
+                </label>
+                <label className="block">
+                  <div>Opacity {Math.round(strokeOpacity*100)}%</div>
+                  <input type="range" min={0.3} max={1} step={0.05} value={strokeOpacity} onChange={(e)=>setStrokeOpacity(parseFloat(e.target.value))} className="w-full" />
+                </label>
+                <label className="block">
+                  <div>Marker {markerSize}px</div>
+                  <input type="range" min={4} max={10} step={1} value={markerSize} onChange={(e)=>setMarkerSize(parseInt(e.target.value))} className="w-full" />
+                </label>
               </div>
               {/* Mock Chart Area */}
               <div className="relative h-80 bg-gradient-to-b from-teal/5 to-transparent rounded-lg border border-white/5">
@@ -220,7 +257,8 @@ export default function TerminalPage() {
                     d={catmullRomPath(YES_SERIES)}
                     fill="none"
                     stroke="#00E5FF"
-                    strokeWidth="2"
+                    strokeOpacity={strokeOpacity}
+                    strokeWidth={strokeWidth}
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     filter="url(#yesGlow)"
@@ -231,7 +269,8 @@ export default function TerminalPage() {
                     d={catmullRomPath(NO_SERIES)}
                     fill="none"
                     stroke="#EF4444"
-                    strokeWidth="2"
+                    strokeOpacity={strokeOpacity}
+                    strokeWidth={strokeWidth}
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     filter="url(#noGlow)"
@@ -250,12 +289,12 @@ export default function TerminalPage() {
                   ))}
 
                   {/* Current price marker for YES */}
-                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r="6" stroke="#00E5FF" strokeWidth="2" fill="#0C0C0C" />
-                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r="2" fill="#FFFFFF" />
+                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r={markerSize} stroke="#00E5FF" strokeWidth={Math.max(1, markerSize/3)} fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r={Math.max(1, Math.round(markerSize/3))} fill="#FFFFFF" />
 
                   {/* Current price marker for NO */}
-                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r="6" stroke="#EF4444" strokeWidth="2" fill="#0C0C0C" />
-                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r="2" fill="#FFFFFF" />
+                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r={markerSize} stroke="#EF4444" strokeWidth={Math.max(1, markerSize/3)} fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r={Math.max(1, Math.round(markerSize/3))} fill="#FFFFFF" />
                 </svg>
 
                 {/* Price labels on the right */}
