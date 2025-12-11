@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { TrendingUp, TrendingDown, Activity, Users, DollarSign, AlertCircle } from 'lucide-react'
 
 export default function TerminalPage() {
