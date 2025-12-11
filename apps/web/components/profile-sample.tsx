@@ -55,6 +55,20 @@ export function ProfileSample() {
     },
   ]
 
+  // Trading-focused activity feed (replaces social-style feed)
+  const tradeFeed: Array<
+    | { type: 'trade'; time: string; action: 'Bought' | 'Sold'; market: string; side: 'YES' | 'NO'; price: number; size: number }
+    | { type: 'close'; time: string; market: string; side: 'LONG' | 'SHORT'; pnl: number; multiple: number }
+    | { type: 'flip'; time: string; market: string; from: 'YES' | 'NO'; to: 'YES' | 'NO'; price: number }
+    | { type: 'reward'; time: string; market: string; reward: number }
+  > = [
+    { type: 'trade', time: '2m', action: 'Bought', market: 'ETH spot ETF approved by Q4', side: 'YES', price: 0.62, size: 800 },
+    { type: 'close', time: '10m', market: 'NVDA will beat earnings by >10%', side: 'LONG', pnl: 87, multiple: 1.22 },
+    { type: 'flip', time: '15m', market: 'Measles cases in U.S. > 2000 in 2025', from: 'NO', to: 'YES', price: 0.53 },
+    { type: 'trade', time: '32m', action: 'Sold', market: "Will SpaceX's market cap > $1T by 2025?", side: 'NO', price: 0.34, size: 1200 },
+    { type: 'reward', time: '1h', market: 'Weekly challenge complete', reward: 25 },
+  ]
+
   const [isFollowing, setIsFollowing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [followerCount, setFollowerCount] = useState(profile.stats.followers)
@@ -278,15 +292,63 @@ export function ProfileSample() {
         </div>
       )}
 
-      {/* Feed */}
+      {/* Feed (trading-focused) */}
       {activeTab === 'feed' && (
-        <div id="feed" className="mt-6 space-y-3">
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white/80">
-            You followed <span className="text-foreground font-medium">@AlphaWolf</span>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-white/80">
-            <span className="text-foreground font-medium">@CryptoChad</span> posted a new prediction: <em>“NVDA beats by &gt;10%”</em>
-          </div>
+        <div id="feed" className="mt-4 space-y-2">
+          {tradeFeed.map((e, idx) => (
+            <div key={idx} className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm">
+              {e.type === 'trade' && (
+                <div className="flex items-start gap-3">
+                  <div className={`mt-0.5 h-5 w-5 rounded grid place-items-center text-[10px] font-bold ${e.action === 'Bought' ? 'bg-teal text-black' : 'bg-red-500 text-white'}`}>{e.action === 'Bought' ? 'B' : 'S'}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-white/90 font-medium truncate">{e.market}</span>
+                      <span className={`px-1.5 py-0.5 rounded border text-xs ${e.side === 'YES' ? 'border-teal/40 text-teal' : 'border-red-400/40 text-red-400'}`}>{e.side}</span>
+                      <span className="text-xs text-white/60">@ {(e.price * 100).toFixed(0)}¢ • {e.size} shares</span>
+                    </div>
+                    <div className="text-xs text-white/40 mt-0.5">{e.time} ago</div>
+                  </div>
+                </div>
+              )}
+              {e.type === 'close' && (
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 h-5 w-5 rounded grid place-items-center text-[10px] font-bold bg-white/10">P&L</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-white/90 font-medium truncate">Closed {e.side} — {e.market}</span>
+                      <span className={`${e.pnl >= 0 ? 'text-teal' : 'text-red-400'} text-xs font-semibold`}>{e.pnl >= 0 ? '+' : ''}${e.pnl}</span>
+                      <span className="text-xs text-white/60">×{e.multiple.toFixed(2)}</span>
+                    </div>
+                    <div className="text-xs text-white/40 mt-0.5">{e.time} ago</div>
+                  </div>
+                </div>
+              )}
+              {e.type === 'flip' && (
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 h-5 w-5 rounded grid place-items-center text-[10px] font-bold bg-white/10">FLIP</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-white/90 font-medium truncate">{e.market}</span>
+                      <span className="text-xs text-white/60">{e.from} → {e.to} @ {(e.price * 100).toFixed(0)}¢</span>
+                    </div>
+                    <div className="text-xs text-white/40 mt-0.5">{e.time} ago</div>
+                  </div>
+                </div>
+              )}
+              {e.type === 'reward' && (
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 h-5 w-5 rounded grid place-items-center text-[10px] font-bold bg-gradient-to-r from-teal to-lime text-black">$</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-white/90 font-medium truncate">{e.market}</span>
+                      <span className="text-xs text-teal font-semibold">+${e.reward}</span>
+                    </div>
+                    <div className="text-xs text-white/40 mt-0.5">{e.time} ago</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
