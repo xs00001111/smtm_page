@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useMemo, useState } from 'react'
-import { CheckCircle2, Coins, Globe, LineChart, Link2, MessageSquare, Share2, Shield, TrendingUp, Trophy, UserPlus } from 'lucide-react'
+import { CheckCircle2, Coins, Globe, LineChart, Link2, Share2, Shield, TrendingUp, Trophy, UserPlus } from 'lucide-react'
 
 export function ProfileSample() {
   const profile = {
@@ -72,7 +72,7 @@ export function ProfileSample() {
   const [isFollowing, setIsFollowing] = useState(false)
   const [copied, setCopied] = useState(false)
   const [followerCount, setFollowerCount] = useState(profile.stats.followers)
-  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({})
+  // Comments removed for mobile simplicity
   const [reactions, setReactions] = useState<Record<string, { fire: number; skull: number; rocket: number }>>({})
   const [activeTab, setActiveTab] = useState<'predictions' | 'feed' | 'leaderboard' | 'badges' | 'about'>(
     'predictions'
@@ -103,14 +103,7 @@ export function ProfileSample() {
     })
   }, [])
 
-  const onCommentChange = useCallback((id: string, text: string) => {
-    setCommentDrafts((prev) => ({ ...prev, [id]: text }))
-  }, [])
-
-  const onSubmitComment = useCallback((id: string) => {
-    // Mock submit; clear draft
-    setCommentDrafts((prev) => ({ ...prev, [id]: '' }))
-  }, [])
+  // Comment handlers removed
 
   const accuracySeries = useMemo(() => [62, 65, 61, 68, 70, 72, 71, 74, 73, 75], [])
 
@@ -268,25 +261,14 @@ export function ProfileSample() {
                   </div>
                   <div className="text-xs text-muted mt-1">Posted 3d ago • #{p.id}</div>
 
-                  {/* Reactions + Comments */}
+                  {/* Reactions only (comments removed) */}
                   <div className="mt-3 flex items-center gap-2">
                     <button onClick={() => react(p.id, 'fire')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-2 sm:py-1 hover:bg-white/[0.06] min-h-[40px] sm:min-h-0">🔥 {(reactions[p.id]?.fire)||0}</button>
                     <button onClick={() => react(p.id, 'rocket')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-2 sm:py-1 hover:bg-white/[0.06] min-h-[40px] sm:min-h-0">🚀 {(reactions[p.id]?.rocket)||0}</button>
                     <button onClick={() => react(p.id, 'skull')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-2 sm:py-1 hover:bg-white/[0.06] min-h-[40px] sm:min-h-0">💀 {(reactions[p.id]?.skull)||0}</button>
-                    <div className="ml-auto hidden sm:inline-flex items-center text-muted text-sm"><MessageSquare className="h-4 w-4 mr-1" /> Comment</div>
+                    {/* Comment UI removed */}
                   </div>
-                  {/* Hide full comment box on mobile to reduce clutter/overflow */}
-                  <div className="mt-2 hidden sm:block">
-                    <div className="flex items-center gap-2">
-                      <input
-                        value={commentDrafts[p.id] || ''}
-                        onChange={(e)=>onCommentChange(p.id, e.target.value)}
-                        placeholder="Add a comment..."
-                        className="flex-1 rounded-md border border-white/10 bg-white/[0.02] px-3 py-1.5 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-teal/60"
-                      />
-                      <button onClick={()=>onSubmitComment(p.id)} className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm hover:bg-white/[0.06]">Post</button>
-                    </div>
-                  </div>
+                  {/* Comment input removed */}
                 </div>
               </div>
             </div>
