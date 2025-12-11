@@ -1,6 +1,40 @@
 "use client"
 
 import { useState, useMemo } from 'react'
+
+// Pure helpers used by the terminal chart
+function prng(seed: number) {
+  let s = seed >>> 0
+  return () => (s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32
+}
+
+function catmullRomPath(values: number[], width = 800, height = 320) {
+  if (values.length === 0) return ''
+  const stepX = width / (values.length - 1)
+  const pts = values.map((v, i) => [i * stepX, height - (v / 100) * height]) as [number, number][]
+  let d = `M ${pts[0][0]} ${pts[0][1]}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i]
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    const p3 = pts[i + 2] || p2
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`
+  }
+  return d
+}
+
+function spark(values: number[], w = 60, h = 18) {
+  if (!values.length) return ''
+  const step = w / (values.length - 1)
+  const ys = values.map(v => h - (v / 100) * h)
+  let d = `M 0 ${ys[0]}`
+  for (let i = 1; i < ys.length; i++) d += ` L ${i * step} ${ys[i]}`
+  return d
+}
 import { TrendingUp, TrendingDown, Activity, Users, DollarSign, AlertCircle, Sliders } from 'lucide-react'
 
 export default function TerminalPage() {
@@ -24,7 +58,7 @@ export default function TerminalPage() {
     alpha: 78,
     direction: 'YES' as const,
     skew: 0.82,
-}
+  }
 
 // helpers moved below component
 
@@ -79,64 +113,12 @@ export default function TerminalPage() {
   const [markerSize, setMarkerSize] = useState(6)
   const [showTuning, setShowTuning] = useState(false)
 
-  // Deterministic pseudo‑random for realistic jitter
-  function prng(seed: number) {
-    let s = seed >>> 0
-    return () => (s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32
-  }
-
-  function generateSeries(
-    count: number,
-    start: number,
-    end: number,
-    seed: number,
-    noise = volatility,
-    jump = jumpProb,
-  ) {
-    // Random‑walk with small volatility + rare jumps; trends from start → end
-    const rnd = prng(seed)
-    const series: number[] = []
-    const slope = (end - start) / (count - 1)
-    let val = start
-    for (let i = 0; i < count; i++) {
-      // base trend + noise
-      const n = (rnd() - 0.5) * noise
-      if (rnd() < jump) {
-        // occasional micro jump
-        val += (rnd() - 0.5) * 6
-      }
-      val = Math.min(99.5, Math.max(0.5, val + slope + n))
-      series.push(val)
-    }
-    return series
-  }
-
-  function catmullRomPath(values: number[], width = 800, height = 320) {
-    if (values.length === 0) return ''
-    const stepX = width / (values.length - 1)
-    const pts = values.map((v, i) => [i * stepX, height - (v / 100) * height]) as [number, number][]
-    // Catmull‑Rom to cubic Bezier (alpha=0.5)
-    let d = `M ${pts[0][0]} ${pts[0][1]}`
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i - 1] || pts[i]
-      const p1 = pts[i]
-      const p2 = pts[i + 1]
-      const p3 = pts[i + 2] || p2
-      const c1x = p1[0] + (p2[0] - p0[0]) / 6
-      const c1y = p1[1] + (p2[1] - p0[1]) / 6
-      const c2x = p2[0] - (p3[0] - p1[0]) / 6
-      const c2y = p2[1] - (p3[1] - p1[1]) / 6
-      d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`
-    }
-    return d
-  }
+  // helpers are defined top-level
 
   // Build chart series: flat early, cross close to resolution, sharper late
   const { YES_SERIES, NO_SERIES } = useMemo(() => {
     const n = 40
     const crossAt = Math.floor(n * 0.85)
-    const rndYes = prng(12345)
-    const rndNo = prng(54321)
     let yes = 44
     let no = 56
     const ys: number[] = []
@@ -152,10 +134,11 @@ export default function TerminalPage() {
         yes -= 0.2
         no += 0.2
       }
-      yes += driftYes + (rndYes() - 0.5) * noiseAmp
-      no += driftNo + (rndNo() - 0.5) * noiseAmp
-      if (rndYes() < jumpProb && isLate) yes += (rndYes() - 0.5) * 5
-      if (rndNo() < jumpProb && isLate) no += (rndNo() - 0.5) * 5
+      const ry = prng(1000 + i)(); const rn = prng(2000 + i)()
+      yes += driftYes + (ry - 0.5) * noiseAmp
+      no += driftNo + (rn - 0.5) * noiseAmp
+      if (prng(3000 + i)() < jumpProb && isLate) yes += (prng(4000 + i)() - 0.5) * 5
+      if (prng(5000 + i)() < jumpProb && isLate) no += (prng(6000 + i)() - 0.5) * 5
       yes = Math.min(95, Math.max(5, yes))
       no = Math.min(95, Math.max(5, no))
       ys.push(yes)
@@ -171,15 +154,7 @@ export default function TerminalPage() {
   const volRnd = prng(98765)
   const VOLUMES = Array.from({ length: 10 }, () => 10 + Math.floor(volRnd() * 40))
 
-  // Tiny sparkline util for chips
-  function spark(values: number[], w = 60, h = 18) {
-    if (!values.length) return ''
-    const step = w / (values.length - 1)
-    const ys = values.map(v => h - (v / 100) * h)
-    let d = `M 0 ${ys[0]}`
-    for (let i = 1; i < ys.length; i++) d += ` L ${i * step} ${ys[i]}`
-    return d
-  }
+  // spark helper is defined at top level
 
   return (
     <div className="min-h-screen bg-[#0C0C0C] text-white relative">
