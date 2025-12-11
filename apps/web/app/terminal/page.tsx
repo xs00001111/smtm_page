@@ -217,9 +217,7 @@ export default function TerminalPage() {
                     <button
                       key={period}
                       className="px-3 py-1 text-xs rounded-md bg-white/5 hover:bg-white/10 transition"
-                    >
-                      {period}
-                    </button>
+                    >{period}</button>
                   ))}
                 </div>
               </div>
@@ -308,9 +306,7 @@ export default function TerminalPage() {
                     <button
                       key={period}
                       className="px-3 py-1 text-xs rounded-md bg-white/5 hover:bg-white/10 transition"
-                    >
-                      {period}
-                    </button>
+                    >{period}</button>
                   ))}
                 </div>
               </div>
@@ -472,9 +468,7 @@ export default function TerminalPage() {
                 <button key={i}
                   onClick={()=>setSelectedOutcome(s.side)}
                   className={`px-3 py-2 rounded-md border text-xs transition ${selectedOutcome===s.side? 'border-teal/50 bg-teal/10 text-teal':'border-white/10 bg-white/5 hover:bg-white/10'}`}
-                >
-                  {s.label}
-                </button>
+                >{s.label}</button>
               ))}
             </div>
           </div>
@@ -641,9 +635,7 @@ export default function TerminalPage() {
                       ? 'bg-teal text-black'
                       : 'bg-white/5 text-white/60 hover:bg-white/10'
                   }`}
-                >
-                  YES {(market.yesPrice * 100).toFixed(0)}¢
-                </button>
+                >YES {(market.yesPrice * 100).toFixed(0)}¢</button>
                 <button
                   onClick={() => setSelectedOutcome('NO')}
                   className={`py-3 rounded-lg font-semibold transition ${
@@ -651,9 +643,7 @@ export default function TerminalPage() {
                       ? 'bg-red-500 text-white'
                       : 'bg-white/5 text-white/60 hover:bg-white/10'
                   }`}
-                >
-                  NO {(market.noPrice * 100).toFixed(0)}¢
-                </button>
+                >NO {(market.noPrice * 100).toFixed(0)}¢</button>
               </div>
 
             {/* Amount Input */}
@@ -672,9 +662,7 @@ export default function TerminalPage() {
                     key={amount}
                     onClick={() => setBetAmount(amount)}
                     className="flex-1 py-1.5 text-xs rounded bg-white/5 hover:bg-white/10 transition"
-                  >
-                    ${amount}
-                  </button>
+                  >${amount}</button>
                 ))}
               </div>
             </div>
