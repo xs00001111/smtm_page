@@ -25,7 +25,11 @@ export const metadata: Metadata = {
     images: ['/opengraph-image'],
   },
   icons: {
-    icon: '/favicon.svg',
+    icon: [
+      { url: '/logo-mark.png', sizes: '32x32', type: 'image/png' },
+      { url: '/logo-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: '/logo-512.png',
   },
 }
 
