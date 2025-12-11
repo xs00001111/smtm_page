@@ -164,17 +164,35 @@ function PriceMovers() {
 }
 
 function DepthHeatmapCard() {
+  // Generate realistic-looking depth: more around mid‑price with light noise
+  const bins = 12
+  const mid = Math.floor(bins / 2)
+  const r = prng(4242)
+  const sigma = 2.2
+  const yes = Array.from({ length: bins }, (_, i) => {
+    const g = Math.exp(-Math.pow(i - mid, 2) / (2 * sigma * sigma)) // 0..1 bell curve
+    const base = 0.25 + 0.65 * g // 0.25..0.9
+    const noise = (r() - 0.5) * 0.12
+    return Math.max(0.12, Math.min(1, base + noise))
+  })
+  // NO depth is typically lower when YES skew is high; mirror with slight skew
+  const no = yes.map((v, i) => {
+    const mirror = yes[bins - 1 - i]
+    const noise = (r() - 0.5) * 0.1
+    const val = 0.18 + (0.55 * (1 - mirror)) + noise
+    return Math.max(0.12, Math.min(1, val))
+  })
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
       <div className="text-sm font-semibold text-white/80 mb-3">Depth Heatmap</div>
       <div className="grid grid-cols-12 gap-[2px]">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div key={i} className="h-6 bg-teal/10" style={{ opacity: 0.4 + i / 20 }} />
+        {yes.map((v, i) => (
+          <div key={i} className="h-6 bg-teal" style={{ opacity: v * 0.9 }} />
         ))}
       </div>
       <div className="grid grid-cols-12 gap-[2px] mt-[2px]">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div key={i} className="h-6 bg-red-500/10" style={{ opacity: 1 - i / 20 }} />
+        {no.map((v, i) => (
+          <div key={i} className="h-6 bg-red-500" style={{ opacity: v * 0.9 }} />
         ))}
       </div>
       <div className="mt-2 text-xs text-white/60">Top: YES depth • Bottom: NO depth</div>
