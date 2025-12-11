@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 import type { GammaMarket, MarketsQueryParams } from '../types';
-import { clobApi } from './clob-api';
+// Do not import clob-api at module scope to avoid optional dep in web builds.
 
 /**
  * Polymarket Gamma Markets API Client
@@ -53,14 +53,13 @@ export class GammaApiClient {
       const { data } = await this.client.get<GammaMarket>(`/markets/${conditionId}`);
       return data;
     } catch (err: any) {
-      // Gamma API path param lookup fails, use CLOB API instead
-      // CLOB API /markets/${conditionId} works correctly
+      // Optional fallback to CLOB API when available (and only on server)
       try {
-        const market = await clobApi.getMarket(conditionId);
-        return market as GammaMarket;
-      } catch (clobErr) {
-        // If CLOB also fails, throw original error
-        throw err;
+        const mod: any = await import('./clob-api')
+        const market = await mod.clobApi.getMarket(conditionId)
+        return market as GammaMarket
+      } catch {
+        throw err
       }
     }
   }
