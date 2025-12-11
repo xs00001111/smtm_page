@@ -6,6 +6,13 @@ import { TrendingUp, TrendingDown, Activity, Users, DollarSign, AlertCircle } fr
 export default function TerminalPage() {
   const [selectedOutcome, setSelectedOutcome] = useState<'YES' | 'NO'>('YES')
   const [betAmount, setBetAmount] = useState('')
+  // Advanced order states (concept)
+  const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT' | 'BRACKET' | 'TWAP'>('LIMIT')
+  const [slippagePct, setSlippagePct] = useState(0.5)
+  const [tpEnabled, setTpEnabled] = useState(false)
+  const [tpPrice, setTpPrice] = useState('0.85')
+  const [slEnabled, setSlEnabled] = useState(false)
+  const [slPrice, setSlPrice] = useState('0.55')
 
   // Mock market data
   const market = {
@@ -55,6 +62,12 @@ export default function TerminalPage() {
 
   const maxPayout = betAmount ? (parseFloat(betAmount) / (selectedOutcome === 'YES' ? market.yesPrice : market.noPrice)).toFixed(2) : '0.00'
   const potentialProfit = betAmount ? (parseFloat(maxPayout) - parseFloat(betAmount)).toFixed(2) : '0.00'
+  const impact = useMemo(() => {
+    const amt = Number(betAmount || 0)
+    if (!amt) return 0
+    const depth = 80000 // toy depth
+    return Math.min(3, (amt / depth) * 100)
+  }, [betAmount])
 
   // Controls (tunable by user)
   const [volatility, setVolatility] = useState(2)
@@ -320,8 +333,31 @@ export default function TerminalPage() {
                 <div className="absolute bottom-2 left-1/2 text-xs text-white/40">Dec 6</div>
                 <div className="absolute bottom-2 right-1/4 text-xs text-white/40">Dec 7</div>
                 <div className="absolute bottom-2 right-20 text-xs text-white/40">Dec 8</div>
-              </div>
             </div>
+          </div>
+
+          {/* Strategy Builder */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">Strategy Builder</h2>
+              <div className="text-xs text-white/60">Smart routing: <span className="text-teal">CLOB</span></div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {[
+                { label: 'Momentum YES', side: 'YES' as const },
+                { label: 'Mean Revert NO', side: 'NO' as const },
+                { label: 'Breakout', side: 'YES' as const },
+                { label: 'Hedge Tail', side: 'NO' as const },
+              ].map((s, i) => (
+                <button key={i}
+                  onClick={()=>setSelectedOutcome(s.side)}
+                  className={`px-3 py-2 rounded-md border text-xs transition ${selectedOutcome===s.side? 'border-teal/50 bg-teal/10 text-teal':'border-white/10 bg-white/5 hover:bg-white/10'}`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
             {/* Orderbook */}
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
@@ -366,11 +402,11 @@ export default function TerminalPage() {
                     </div>
                   ))}
                 </div>
-              </div>
             </div>
+          </div>
 
-            {/* Recent Trades */}
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+          {/* Recent Trades */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
               <h2 className="text-lg font-semibold mb-4">Recent Trades</h2>
               <div className="space-y-2">
                 <div className="text-xs text-white/60 flex justify-between px-2">
@@ -391,6 +427,22 @@ export default function TerminalPage() {
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Depth Heatmap (concept) */}
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+            <h2 className="text-lg font-semibold mb-4">Depth Heatmap</h2>
+            <div className="grid grid-cols-12 gap-[2px]">
+              {Array.from({length: 12}).map((_,i)=> (
+                <div key={i} className="h-8 bg-teal/10" style={{opacity: 0.4 + i/20}} />
+              ))}
+            </div>
+            <div className="grid grid-cols-12 gap-[2px] mt-[2px]">
+              {Array.from({length: 12}).map((_,i)=> (
+                <div key={i} className="h-8 bg-red-500/10" style={{opacity: 1 - i/20}} />
+              ))}
+            </div>
+            <div className="mt-2 text-xs text-white/60">Top: YES depth • Bottom: NO depth</div>
           </div>
 
           {/* Right Column - Signals & Trade */}
@@ -481,28 +533,58 @@ export default function TerminalPage() {
                 </button>
               </div>
 
-              {/* Amount Input */}
-              <div className="mb-4">
-                <label className="text-xs text-white/60 mb-2 block">Amount (USD)</label>
-                <input
-                  type="number"
-                  value={betAmount}
-                  onChange={(e) => setBetAmount(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-teal focus:outline-none text-lg"
-                />
-                <div className="flex gap-2 mt-2">
-                  {['25', '50', '100', '500'].map((amount) => (
-                    <button
-                      key={amount}
-                      onClick={() => setBetAmount(amount)}
-                      className="flex-1 py-1.5 text-xs rounded bg-white/5 hover:bg-white/10 transition"
-                    >
-                      ${amount}
-                    </button>
-                  ))}
-                </div>
+            {/* Amount Input */}
+            <div className="mb-4">
+              <label className="text-xs text-white/60 mb-2 block">Amount (USD)</label>
+              <input
+                type="number"
+                value={betAmount}
+                onChange={(e) => setBetAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 focus:border-teal focus:outline-none text-lg"
+              />
+              <div className="flex gap-2 mt-2">
+                {['25', '50', '100', '500'].map((amount) => (
+                  <button
+                    key={amount}
+                    onClick={() => setBetAmount(amount)}
+                    className="flex-1 py-1.5 text-xs rounded bg-white/5 hover:bg-white/10 transition"
+                  >
+                    ${amount}
+                  </button>
+                ))}
               </div>
+            </div>
+
+            {/* Advanced options */}
+            <div className="mb-4">
+              <div className="text-xs text-white/60 mb-2">Order Type</div>
+              <div className="flex flex-wrap gap-2 mb-3 text-xs">
+                {(['MARKET','LIMIT','BRACKET','TWAP'] as const).map(t => (
+                  <button key={t} onClick={()=>setOrderType(t)} className={`px-2.5 py-1 rounded border ${orderType===t? 'border-teal/50 bg-teal/10 text-teal':'border-white/10 bg-white/5 hover:bg-white/10'}`}>{t}</button>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <label className="block">Slippage {slippagePct}%
+                  <input type="range" min={0} max={2} step={0.1} value={slippagePct} onChange={(e)=>setSlippagePct(parseFloat(e.target.value))} className="w-full" />
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={tpEnabled} onChange={(e)=>setTpEnabled(e.target.checked)} />
+                  Take Profit
+                  <input type="number" value={tpPrice} onChange={(e)=>setTpPrice(e.target.value)} className="ml-2 w-24 rounded-md border border-white/10 bg-white/5 px-2 py-1" />
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={slEnabled} onChange={(e)=>setSlEnabled(e.target.checked)} />
+                  Stop Loss
+                  <input type="number" value={slPrice} onChange={(e)=>setSlPrice(e.target.value)} className="ml-2 w-24 rounded-md border border-white/10 bg-white/5 px-2 py-1" />
+                </label>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">Est. impact <span className="text-teal">{impact.toFixed(2)}%</span></span>
+                <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">Route <span className="text-white/70">CLOB</span></span>
+                <span className="rounded-md border border-white/10 bg-white/5 px-2 py-1">Fees <span className="text-white/70">0.20%</span></span>
+              </div>
+            </div>
 
               {/* Position Info */}
               <div className="space-y-2 mb-4 p-3 rounded-lg bg-white/5">
