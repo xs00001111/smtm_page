@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { gammaApi, dataApi } from '@smtm/data'
-import { findMarket as findMarketUtil } from '@smtm/data'
+import { gammaApi } from '@smtm/data/clients/gamma-api'
+import { dataApi } from '@smtm/data/clients/data-api'
+import { findMarket as findMarketUtil } from '@smtm/data/find-market'
 
 type Holder = { address: string; balance: string }
 
@@ -75,4 +76,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message || 'Unexpected error' }, { status: 500 })
   }
 }
-

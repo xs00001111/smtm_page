@@ -4,15 +4,13 @@ export * from './types';
 // Export API clients
 export * from './clients/data-api';
 export * from './clients/gamma-api';
-// Note: clob-api depends on optional '@polymarket/clob-client'.
-// Exporting it here forces Next to resolve that package during web builds.
-// Keep it internal to server-only contexts to avoid bundling issues.
+// Do NOT export clob-api in the public barrel; it pulls an optional dep.
 // export * from './clients/clob-api';
 
-// Export utilities
-export * from './utils';
+// Keep public surface minimal for web bundles; avoid utils that depend on clob.
+// export * from './utils';
 export * from './whales';
-export * from './whale-descriptions';
-export * from './alpha';
-export * from './trades';
-export * from './market-movers';
+// export * from './whale-descriptions';
+// export * from './alpha';
+// export * from './trades';
+// export * from './market-movers';

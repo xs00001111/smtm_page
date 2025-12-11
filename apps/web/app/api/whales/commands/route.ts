@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { dataApi } from '@smtm/data'
-import { findMarket as findMarketUtil } from '@smtm/data'
+import { dataApi } from '@smtm/data/clients/data-api'
+import { findMarket as findMarketUtil } from '@smtm/data/find-market'
 
 function truncate(text: string, len = 60) {
   if (!text) return ''
@@ -65,4 +65,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message || 'Unexpected error' }, { status: 500 })
   }
 }
-

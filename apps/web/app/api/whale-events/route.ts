@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { WhaleDetector } from '@smtm/data'
+import { WhaleDetector } from '@smtm/data/whales'
 
 export async function GET(req: Request) {
   try {
@@ -13,4 +13,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message || 'Unexpected error' }, { status: 500 })
   }
 }
-
