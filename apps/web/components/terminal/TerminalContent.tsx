@@ -165,18 +165,18 @@ function FeaturedMarkets() {
   ]
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
-      <div className="text-sm font-semibold text-white/80 mb-3">Featured Questions</div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="text-sm font-semibold text-white/80 mb-4">Featured Questions</div>
+      <div className="grid grid-cols-3 gap-6">
         {items.map((it, i) => (
-          <div key={i} className="rounded-lg border border-white/10 bg-[#0F0F0F]/70 p-3">
+          <div key={i} className="group cursor-pointer">
             <div className="text-xs text-white/50 mb-1">{it.tag}</div>
-            <div className="font-semibold text-white/90 line-clamp-2">{it.title}</div>
-            <div className="mt-3 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-teal" style={{ width: `${it.pct}%` }} />
+            <div className="font-semibold text-white/90 mb-3 group-hover:text-teal transition">{it.title}</div>
+            <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden mb-2">
+              <div className="h-full bg-teal transition-all group-hover:bg-lime" style={{ width: `${it.pct}%` }} />
             </div>
-            <div className="mt-3 flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-xs">
               <span className="text-white/60">YES {it.pct}%</span>
-              <button className="px-2 py-1 rounded-md border border-teal/40 bg-teal/10 text-teal">View</button>
+              <span className="text-teal/70 group-hover:text-teal transition">View →</span>
             </div>
           </div>
         ))}
@@ -441,7 +441,7 @@ function ChartLines() {
   })
 
   return (
-    <div className="relative h-80 rounded-md border border-white/5 bg-gradient-to-b from-teal/5 to-transparent p-4">
+    <div className="relative h-80">
       <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMinYMid meet">
         {/* Y-axis grid lines and labels */}
         {[0, 25, 50, 75, 100].map((pct) => {
