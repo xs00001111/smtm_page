@@ -435,13 +435,31 @@ function OrderTicket() {
 function ChartLines() {
   const { ys, ns } = useDemoSeries()
 
+  // Dynamically size the chart to fill its container width.
+  // This avoids a large unused gap on the right side.
+  const containerRef = React.useRef<HTMLDivElement | null>(null)
+  const [containerWidth, setContainerWidth] = React.useState(800)
+
+  React.useLayoutEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    // Initialize width immediately
+    setContainerWidth(el.clientWidth)
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect
+      if (cr) setContainerWidth(cr.width)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   // Chart dimensions with margins for axes
-  const chartWidth = 800
+  const chartWidth = Math.max(320, Math.floor(containerWidth))
   const chartHeight = 320
   const marginLeft = 50  // Optimized for Y-axis label
   const marginBottom = 25  // Reduced since we removed bottom label
   const marginTop = 10
-  const marginRight = 10  // Minimal margin for maximum chart width
+  const marginRight = 10  // Keep a small 10px right margin
   const plotWidth = chartWidth - marginLeft - marginRight
   const plotHeight = chartHeight - marginTop - marginBottom
 
@@ -454,8 +472,9 @@ function ChartLines() {
   })
 
   return (
-    <div className="relative h-80">
-      <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMinYMid meet">
+    <div ref={containerRef} className="relative h-80">
+      {/* Use a dynamic viewBox so the chart truly fills the box width. */}
+      <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none">
         {/* Y-axis grid lines and labels */}
         {[0, 25, 50, 75, 100].map((pct) => {
           const y = marginTop + plotHeight - (pct / 100) * plotHeight
