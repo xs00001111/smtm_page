@@ -533,6 +533,8 @@ function ChartLines() {
             stroke="#00E5FF"
             strokeOpacity="0.95"
             strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
             transform={`translate(${marginLeft}, ${marginTop})`}
           />
           <path
@@ -541,25 +543,9 @@ function ChartLines() {
             stroke="#EF4444"
             strokeOpacity="0.95"
             strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
             transform={`translate(${marginLeft}, ${marginTop})`}
-          />
-
-          {/* End point indicators */}
-          <circle
-            cx={marginLeft + plotWidth}
-            cy={marginTop + plotHeight - (ys[ys.length-1] / 100) * plotHeight}
-            r={5}
-            stroke="#00E5FF"
-            strokeWidth={2}
-            fill="#0C0C0C"
-          />
-          <circle
-            cx={marginLeft + plotWidth}
-            cy={marginTop + plotHeight - (ns[ns.length-1] / 100) * plotHeight}
-            r={5}
-            stroke="#EF4444"
-            strokeWidth={2}
-            fill="#0C0C0C"
           />
         </g>
 
