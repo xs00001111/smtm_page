@@ -1,7 +1,96 @@
 "use client"
 
 import React from 'react'
-import { Sliders, Activity } from 'lucide-react'
+import { Sliders, Activity, TrendingUp } from 'lucide-react'
+
+// --- lightweight helpers for the demo chart
+function prng(seed: number) {
+  let s = seed >>> 0
+  return () => (s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32
+}
+
+function catmull(values: number[], w = 800, h = 320) {
+  if (!values.length) return ''
+  const stepX = w / (values.length - 1)
+  const pts = values.map((v, i) => [i * stepX, h - (v / 100) * h]) as [number, number][]
+  let d = `M ${pts[0][0]} ${pts[0][1]}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i]
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    const p3 = pts[i + 2] || p2
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6
+    const c1y = p1[1] + (p2[1] - p0[1]) / 6
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6
+    const c2y = p2[1] - (p3[1] - p1[1]) / 6
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`
+  }
+  return d
+}
+
+function useDemoSeries() {
+  const n = 40
+  const crossAt = Math.floor(n * 0.85)
+  const ys: number[] = []
+  const ns: number[] = []
+  let yes = 44
+  let no = 56
+  for (let i = 0; i < n; i++) {
+    const isLate = i >= crossAt
+    const t = i / (n - 1)
+    const noise = (0.2 + t * t * 2) * (prng(1000 + i)() - 0.5)
+    const driftY = isLate ? (67 - yes) * 0.18 : (50 - yes) * 0.02
+    const driftN = isLate ? (33 - no) * 0.18 : (50 - no) * 0.02
+    if (!isLate && Math.abs(yes - no) < 2) { yes -= 0.2; no += 0.2 }
+    yes = Math.min(95, Math.max(5, yes + driftY + noise))
+    no = Math.min(95, Math.max(5, no + driftN - noise))
+    ys.push(yes); ns.push(no)
+  }
+  ys[crossAt] = ns[crossAt]
+  return { ys, ns }
+}
+
+function SmartSignalCard() {
+  const alpha = 78
+  const dir = 'YES'
+  const skew = 82
+  const yesVals = [40,47,51,52,54,57,63,70,75,77,78,81]
+  const noVals = yesVals.map(v => 100 - v - 5)
+  const Row = ({ vals, color, label }: { vals: number[], color: string, label: string }) => (
+    <div className="mb-1">
+      <div className="flex items-center justify-between text-xs text-white/60 mb-1">
+        <span>{label}</span>
+        <span className="text-white/50">avg {(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(0)}%</span>
+      </div>
+      <div className="grid grid-cols-12 gap-[2px]">
+        {vals.map((v,i)=> (
+          <div key={i} className="h-6 rounded-sm" style={{ backgroundColor: color, opacity: Math.max(0.25, v/100) }} />
+        ))}
+      </div>
+    </div>
+  )
+  return (
+    <div className="rounded-xl border border-teal/30 bg-gradient-to-br from-teal/10 to-transparent p-6 glass-card">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Smart Money Signal</h2>
+        <TrendingUp className="text-teal" size={18} />
+      </div>
+      <div className="text-center mb-3">
+        <div className="text-6xl font-extrabold bg-gradient-to-r from-teal to-lime bg-clip-text text-transparent">{alpha}</div>
+        <div className="text-xs text-white/70">Alpha Score</div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+        <div className="rounded-md bg-white/5 p-2 flex items-center justify-between"><span className="text-white/70">Direction</span><span className="text-teal font-semibold">{dir}</span></div>
+        <div className="rounded-md bg-white/5 p-2 flex items-center justify-between"><span className="text-white/70">Skew</span><span className="font-semibold">{skew}% YES</span></div>
+      </div>
+      <div className="p-3 rounded-md bg-white/5 border border-white/10">
+        <div className="text-xs text-white/70 mb-2">Signal Heatmap</div>
+        <Row vals={yesVals} color="rgba(0,229,255,0.5)" label="YES" />
+        <Row vals={noVals} color="rgba(239,68,68,0.5)" label="NO" />
+      </div>
+    </div>
+  )
+}
 
 function OddsGauge({ percent }: { percent: number }) {
   const p = Math.min(99, Math.max(1, percent))
@@ -117,15 +206,12 @@ export default function TerminalContent() {
               <h2 className="text-lg font-semibold">Price Chart</h2>
               <button className="inline-flex items-center gap-1 text-xs rounded-md border border-white/10 bg-white/5 px-2 py-1 hover:bg-white/10"><Sliders className="h-3.5 w-3.5" /> Tuning</button>
             </div>
-            <div className="h-80 rounded-md border border-white/5 bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.08),transparent_60%)] grid place-items-center text-white/60">
-              <div className="text-center">
-                <Activity className="mx-auto mb-3 opacity-60" />
-                <div className="text-sm">Live chart placeholder</div>
-              </div>
-            </div>
+            {/* Simple SVG chart with two paths */}
+            <ChartLines />
           </div>
         </div>
         <div className="space-y-4">
+          <SmartSignalCard />
           <OddsGauge percent={63} />
           <PriceMovers />
           <DepthHeatmapCard />
@@ -135,3 +221,19 @@ export default function TerminalContent() {
   )
 }
 
+function ChartLines() {
+  const { ys, ns } = useDemoSeries()
+  return (
+    <div className="relative h-80 rounded-md border border-white/5 bg-gradient-to-b from-teal/5 to-transparent">
+      <svg className="w-full h-full" viewBox="0 0 800 320" preserveAspectRatio="none">
+        {[0,25,50,75,100].map((y)=> (
+          <line key={y} x1="0" y1={320-(y*3.2)} x2="800" y2={320-(y*3.2)} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+        ))}
+        <path d={catmull(ys)} fill="none" stroke="#00E5FF" strokeOpacity="0.95" strokeWidth="2" />
+        <path d={catmull(ns)} fill="none" stroke="#EF4444" strokeOpacity="0.95" strokeWidth="2" />
+        <circle cx="800" cy={320 - (ys[ys.length-1]/100)*320} r={6} stroke="#00E5FF" strokeWidth={2} fill="#0C0C0C" />
+        <circle cx="800" cy={320 - (ns[ns.length-1]/100)*320} r={6} stroke="#EF4444" strokeWidth={2} fill="#0C0C0C" />
+      </svg>
+    </div>
+  )
+}
