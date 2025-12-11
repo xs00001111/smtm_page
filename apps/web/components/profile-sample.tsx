@@ -95,6 +95,7 @@ export function ProfileSample() {
   }, [])
 
   const react = useCallback((id: string, kind: 'fire' | 'skull' | 'rocket') => {
+    vibe(8)
     setReactions((prev) => {
       const current = prev[id] ?? { fire: 0, skull: 0, rocket: 0 }
       const next = { ...current, [kind]: current[kind] + 1 }
@@ -494,4 +495,5 @@ function avatarStyle(seed: string): React.CSSProperties {
   }
 }
 
+  const vibe = (ms = 10) => { try { (navigator as any)?.vibrate?.(ms) } catch {} }
  

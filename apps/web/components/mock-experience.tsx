@@ -22,6 +22,13 @@ export function MockExperience() {
   const [rewardAmount, setRewardAmount] = useState<number | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [amount, setAmount] = useState<number>(50)
+  const [showStickyCta, setShowStickyCta] = useState(true)
+  const lastScrollRef = useRef(0)
+  const scrollTRef = useRef<number | null>(null)
+
+  const vibe = (ms = 12) => {
+    try { (navigator as any)?.vibrate?.(ms) } catch {}
+  }
 
   const claim = {
     asset: 'DOGE',
@@ -41,6 +48,7 @@ export function MockExperience() {
   }
 
   const handleBet = (side: BetSide) => {
+    vibe()
     setBet(side)
     setShowHints(false)
     // trigger celebration fireworks with preview reward
@@ -87,6 +95,25 @@ export function MockExperience() {
     }, { threshold: 0.35 })
     obs.observe(el)
     return () => obs.disconnect()
+  }, [])
+
+  // Auto-hide sticky CTA on scroll down; reveal on scroll up (mobile only)
+  useEffect(() => {
+    const onScroll = () => {
+      if (scrollTRef.current) cancelAnimationFrame(scrollTRef.current)
+      scrollTRef.current = requestAnimationFrame(() => {
+        const y = window.scrollY || 0
+        const last = lastScrollRef.current
+        const dy = y - last
+        lastScrollRef.current = y
+        // Small hysteresis to avoid flicker
+        if (Math.abs(dy) < 6) return
+        if (y < 24) { setShowStickyCta(true); return }
+        setShowStickyCta(dy <= 0)
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   return (
@@ -283,13 +310,13 @@ export function MockExperience() {
             </div>
           </div>
 
-          <div className="mt-4 flex items-center gap-3 relative md:static sticky bottom-2 z-20 px-2 py-2 md:px-0 md:py-0 rounded-xl md:rounded-none bg-black/50 md:bg-transparent backdrop-blur md:backdrop-blur-0 border border-white/10 md:border-0 pb-[env(safe-area-inset-bottom)]">
+          <div className={`mt-4 flex items-center gap-3 relative md:static sticky bottom-2 z-20 px-2 py-2 md:px-0 md:py-0 rounded-xl md:rounded-none bg-black/50 md:bg-transparent backdrop-blur md:backdrop-blur-0 border border-white/10 md:border-0 pb-[env(safe-area-inset-bottom)] transition-transform duration-200 ${showStickyCta ? 'translate-y-0' : 'translate-y-[130%]'}`}>
             {!shared && bet && confidenceTouched && (
               <span className="absolute -top-7 left-0 text-xs text-white/80 bg-black/40 px-2 py-1 rounded-md border border-white/10 animate-bounce">
                 Finish: Share your card →
               </span>
             )}
-            <Button variant="cta" size="lg" className="px-5 py-3 w-full sm:w-auto min-h-[44px]" onClick={() => setShared(true)}>
+            <Button variant="cta" size="lg" className="px-5 py-3 w-full sm:w-auto min-h-[44px]" onClick={() => { setShared(true); vibe(10) }}>
               <Share2 className="h-4 w-4 mr-2" /> Share → Auto Meme Card
             </Button>
           </div>
