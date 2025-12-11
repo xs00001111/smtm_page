@@ -438,10 +438,10 @@ function ChartLines() {
   // Chart dimensions with margins for axes
   const chartWidth = 800
   const chartHeight = 320
-  const marginLeft = 60  // Increased for Y-axis label spacing
-  const marginBottom = 35
+  const marginLeft = 50  // Optimized for Y-axis label
+  const marginBottom = 25  // Reduced since we removed bottom label
   const marginTop = 10
-  const marginRight = 20  // Reduced to extend price line
+  const marginRight = 10  // Minimal margin for maximum chart width
   const plotWidth = chartWidth - marginLeft - marginRight
   const plotHeight = chartHeight - marginTop - marginBottom
 
@@ -489,7 +489,7 @@ function ChartLines() {
             <text
               key={i}
               x={x}
-              y={chartHeight - 10}
+              y={chartHeight - 8}
               textAnchor="middle"
               className="fill-white/40"
               fontSize="11"
@@ -546,23 +546,14 @@ function ChartLines() {
 
         {/* Axis labels */}
         <text
-          x={15}
+          x={10}
           y={chartHeight / 2}
           textAnchor="middle"
           className="fill-white/50"
           fontSize="11"
-          transform={`rotate(-90, 15, ${chartHeight / 2})`}
+          transform={`rotate(-90, 10, ${chartHeight / 2})`}
         >
           Probability (%)
-        </text>
-        <text
-          x={chartWidth - marginRight - 5}
-          y={chartHeight - 8}
-          textAnchor="end"
-          className="fill-white/50"
-          fontSize="11"
-        >
-          Time (Last 24h)
         </text>
       </svg>
     </div>
