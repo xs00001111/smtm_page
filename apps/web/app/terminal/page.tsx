@@ -57,9 +57,9 @@ function AlphaChips() {
 
 function FeaturedMarkets() {
   const items = [
-    { title: 'Who will win the next election?', tag: 'Politics', pct: 65 },
-    { title: 'Will SpaceX reach Mars by 2030?', tag: 'Tech', pct: 42 },
-    { title: 'ETH ETF approved by Q4?', tag: 'Crypto', pct: 61 },
+    { title: 'Bitcoin above $100k by year end?', tag: 'Bitcoin', pct: 65 },
+    { title: 'ETH spot ETF approved by Q4?', tag: 'Ethereum', pct: 61 },
+    { title: 'Solana flips BNB market cap?', tag: 'Solana', pct: 42 },
   ]
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
@@ -105,11 +105,11 @@ function OddsGauge({ percent }: { percent: number }) {
 
 function PriceMovers() {
   const movers = [
-    { name: 'Biden', ch: -1.3 },
-    { name: 'Trump', ch: +2.6 },
-    { name: 'EU GDP', ch: -0.8 },
+    { name: 'BTC Dominance', ch: +0.9 },
     { name: 'ETH ETF', ch: +1.1 },
-    { name: 'Inflation < 3%', ch: -0.6 },
+    { name: 'SOL Upgrade', ch: +0.6 },
+    { name: 'DeFi TVL', ch: -0.5 },
+    { name: 'Stablecoin Supply', ch: +0.3 },
   ]
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
