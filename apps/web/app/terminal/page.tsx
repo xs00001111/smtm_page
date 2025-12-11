@@ -56,6 +56,49 @@ export default function TerminalPage() {
   const maxPayout = betAmount ? (parseFloat(betAmount) / (selectedOutcome === 'YES' ? market.yesPrice : market.noPrice)).toFixed(2) : '0.00'
   const potentialProfit = betAmount ? (parseFloat(maxPayout) - parseFloat(betAmount)).toFixed(2) : '0.00'
 
+  // Deterministic pseudo‑random for realistic jitter
+  function prng(seed: number) {
+    let s = seed >>> 0
+    return () => (s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32
+  }
+
+  function generateSeries(count: number, start: number, end: number, seed: number) {
+    const rnd = prng(seed)
+    const arr: number[] = []
+    for (let i = 0; i < count; i++) {
+      const t = i / (count - 1)
+      const base = start + (end - start) * t
+      // Jitter with rare spikes; clamp to 0..100
+      const amp = 3 + 2 * Math.sin(t * Math.PI)
+      let noise = (rnd() - 0.5) * amp
+      if (rnd() < 0.06) noise += (rnd() - 0.5) * 10 // occasional micro spike
+      arr.push(Math.min(99.5, Math.max(0.5, base + noise)))
+    }
+    return arr
+  }
+
+  function linePath(values: number[], width = 800, height = 320) {
+    if (values.length === 0) return ''
+    const stepX = width / (values.length - 1)
+    const points = values.map((v, i) => {
+      const x = i * stepX
+      const y = height - (v / 100) * height
+      return [x, y]
+    })
+    // Use straight segments (Polymarket style is not overly curved)
+    let d = `M ${points[0][0]} ${points[0][1]}`
+    for (let i = 1; i < points.length; i++) d += ` L ${points[i][0]} ${points[i][1]}`
+    return d
+  }
+
+  // Build chart series similar to Polymarket
+  const YES_SERIES = generateSeries(24, 42, 67, 12345)
+  const NO_SERIES = YES_SERIES.map(v => 100 - v)
+
+  // Deterministic volumes
+  const volRnd = prng(98765)
+  const VOLUMES = Array.from({ length: 10 }, () => 10 + Math.floor(volRnd() * 40))
+
   return (
     <div className="min-h-screen bg-[#0C0C0C] text-white">
       {/* Header */}
@@ -164,10 +207,10 @@ export default function TerminalPage() {
 
                   {/* YES line (teal) - trending up */}
                   <path
-                    d="M 0 200 C 60 197, 140 190, 200 185 C 260 178, 340 170, 400 165 C 460 158, 540 148, 600 140 C 660 132, 740 116, 800 105"
+                    d={linePath(YES_SERIES)}
                     fill="none"
                     stroke="url(#yesGrad)"
-                    strokeWidth="3"
+                    strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     filter="url(#yesGlow)"
@@ -175,34 +218,34 @@ export default function TerminalPage() {
 
                   {/* NO line (red) - trending down */}
                   <path
-                    d="M 0 120 C 60 123, 140 130, 200 135 C 260 142, 340 150, 400 155 C 460 162, 540 172, 600 180 C 660 188, 740 205, 800 215"
+                    d={linePath(NO_SERIES)}
                     fill="none"
                     stroke="url(#noGrad)"
-                    strokeWidth="3"
+                    strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     filter="url(#noGlow)"
                   />
 
-                  {/* Volume bars at bottom */}
+                  {/* Volume bars at bottom (deterministic) */}
                   {[50, 120, 200, 280, 350, 420, 500, 580, 650, 720].map((x, i) => (
                     <rect
                       key={i}
                       x={x}
-                      y={320 - (Math.random() * 30 + 10)}
+                      y={320 - (VOLUMES[i % VOLUMES.length] + 10)}
                       width="40"
-                      height={Math.random() * 30 + 10}
-                      fill="rgba(0,229,255,0.2)"
+                      height={VOLUMES[i % VOLUMES.length]}
+                      fill="rgba(0,229,255,0.18)"
                     />
                   ))}
 
                   {/* Current price marker for YES */}
-                  <circle cx="800" cy="105" r="6" fill="#00E5FF" />
-                  <circle cx="800" cy="105" r="4" fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r="6" fill="#00E5FF" />
+                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r="4" fill="#0C0C0C" />
 
                   {/* Current price marker for NO */}
-                  <circle cx="800" cy="215" r="6" fill="#EF4444" />
-                  <circle cx="800" cy="215" r="4" fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r="6" fill="#EF4444" />
+                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r="4" fill="#0C0C0C" />
                 </svg>
 
                 {/* Price labels on the right */}
