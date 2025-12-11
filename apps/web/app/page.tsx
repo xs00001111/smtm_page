@@ -7,6 +7,7 @@ import { MockExperience } from '@/components/mock-experience'
 import { ProfileSample } from '@/components/profile-sample'
 import { BrainCircuit, TrendingUp, Share2, Send, Bell, Search, Zap, Twitter, MessageSquare } from 'lucide-react'
 import { MarketTickerBar } from '@/components/market-ticker-bar'
+import { TerminalOverlay } from '@/components/terminal-overlay'
 
 export default function HomePage() {
   return (
@@ -19,6 +20,8 @@ export default function HomePage() {
         {/* Hero */}
         <section id="hero" className="relative min-h-[70vh] md:min-h-[80vh] flex items-center justify-center">
           <TradingGrid />
+          {/* Terminal-style animated overlay (market stream) */}
+          <TerminalOverlay />
           {/* Full-bleed glow overlay (spans entire viewport width) */}
           <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.12),transparent_60%)]" />
           {/* Ticker strip anchored to top, sharing hero background */}
