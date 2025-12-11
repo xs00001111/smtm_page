@@ -114,7 +114,7 @@ export function ProfileSample() {
   const accuracySeries = useMemo(() => [62, 65, 61, 68, 70, 72, 71, 74, 73, 75], [])
 
   return (
-    <div id="sample-profile" className="mx-auto max-w-4xl px-6">
+    <div id="sample-profile" className="mx-auto max-w-4xl px-6 overflow-x-hidden">
 
       <div className="rounded-xl border border-white/20 p-4 md:p-6">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -181,7 +181,7 @@ export function ProfileSample() {
         <Strip label="Resolved" value={predictions.filter(p=>p.status==='Resolved').length.toString()} />
       </div>
 
-      <nav className="mt-6 flex items-center gap-3 text-sm" role="tablist" aria-label="Profile sections">
+      <nav className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm" role="tablist" aria-label="Profile sections">
         <button
           role="tab"
           aria-selected={activeTab === 'predictions'}

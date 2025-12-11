@@ -22,9 +22,9 @@ export default function HomePage() {
           {/* Lightweight event lines + arcade claw reference (mobile friendly) */}
           <PolymarketEventLines />
           {/* Full-bleed glow overlay (spans entire viewport width) */}
-          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-screen bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.12),transparent_60%)]" />
+          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 min-w-[100%] w-full bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.12),transparent_60%)]" />
           {/* Ticker strip anchored to top, sharing hero background */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-screen">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 min-w-[100%] w-full">
             <MarketTickerBar />
           </div>
           <div className="relative z-10 w-full max-w-3xl mx-auto flex flex-col items-center text-center pt-16 sm:pt-20 md:pt-24">
