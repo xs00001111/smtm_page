@@ -48,37 +48,43 @@ function useDemoSeries() {
   const yesEvents = [
     { at: 10, magnitude: 5 },
     { at: 11, magnitude: -2 },
+    { at: 14, magnitude: 3 },   // YES-only event
     { at: 18, magnitude: -8 },
     { at: 19, magnitude: -3 },
     { at: 22, magnitude: 6 },
+    { at: 25, magnitude: -2 },  // YES-only dip
     { at: 30, magnitude: -6 },
     { at: 35, magnitude: 18 },
     { at: 36, magnitude: 5 },
     { at: 37, magnitude: -8 },
     { at: 38, magnitude: -4 },
+    { at: 42, magnitude: 3 },   // YES-only bump
     { at: 48, magnitude: 4 },
     { at: 52, magnitude: 8 },
     { at: 53, magnitude: -3 },
     { at: 57, magnitude: 5 },
   ]
 
-  // NO has slightly different events (not perfectly mirrored)
+  // NO has very different events (independent movements)
   const noEvents = [
-    { at: 10, magnitude: -4 },
-    { at: 11, magnitude: 1 },
-    { at: 17, magnitude: 3 },  // Different timing
-    { at: 18, magnitude: 7 },
-    { at: 19, magnitude: 4 },
-    { at: 22, magnitude: -5 },
-    { at: 30, magnitude: 5 },
-    { at: 35, magnitude: -16 }, // Slightly different magnitude
-    { at: 36, magnitude: -6 },
-    { at: 37, magnitude: 9 },
-    { at: 38, magnitude: 3 },
-    { at: 48, magnitude: -3 },
-    { at: 52, magnitude: -7 },
-    { at: 53, magnitude: 2 },
-    { at: 57, magnitude: -4 },
+    { at: 9, magnitude: 2 },    // Different timing
+    { at: 10, magnitude: -3 },  // Different magnitude
+    { at: 12, magnitude: 4 },   // NO-only event
+    { at: 17, magnitude: 3 },
+    { at: 18, magnitude: 5 },   // Much smaller reaction
+    { at: 20, magnitude: 2 },   // NO-only
+    { at: 22, magnitude: -4 },
+    { at: 28, magnitude: -3 },  // Different timing
+    { at: 30, magnitude: 7 },
+    { at: 34, magnitude: 4 },   // Different timing
+    { at: 35, magnitude: -12 }, // Different magnitude
+    { at: 37, magnitude: 6 },   // Different timing
+    { at: 39, magnitude: 5 },   // Different timing
+    { at: 45, magnitude: -4 },  // NO-only event
+    { at: 49, magnitude: 2 },   // Different timing
+    { at: 51, magnitude: -5 },  // Different timing
+    { at: 54, magnitude: 3 },   // Different timing
+    { at: 58, magnitude: -2 },  // Different timing
   ]
 
   for (let i = 0; i < n; i++) {
@@ -120,21 +126,6 @@ function SmartSignalCard() {
   const alpha = 78
   const dir = 'YES'
   const skew = 82
-  const yesVals = [40,47,51,52,54,57,63,70,75,77,78,81]
-  const noVals = yesVals.map(v => 100 - v - 5)
-  const Row = ({ vals, color, label }: { vals: number[], color: string, label: string }) => (
-    <div className="mb-1">
-      <div className="flex items-center justify-between text-xs text-white/60 mb-1">
-        <span>{label}</span>
-        <span className="text-white/50">avg {(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(0)}%</span>
-      </div>
-      <div className="grid grid-cols-12 gap-[2px]">
-        {vals.map((v,i)=> (
-          <div key={i} className="h-6 rounded-sm" style={{ backgroundColor: color, opacity: Math.max(0.25, v/100) }} />
-        ))}
-      </div>
-    </div>
-  )
   return (
     <div className="rounded-xl border border-teal/30 bg-gradient-to-br from-teal/10 to-transparent p-6 glass-card">
       <div className="flex items-center justify-between mb-3">
@@ -145,7 +136,7 @@ function SmartSignalCard() {
         <div className="text-6xl font-extrabold bg-gradient-to-r from-teal to-lime bg-clip-text text-transparent">{alpha}</div>
         <div className="text-xs text-white/70">Alpha Score</div>
       </div>
-      <div className="flex items-center justify-between text-xs mb-4 pb-3 border-b border-white/10">
+      <div className="flex items-center justify-between text-xs pb-3 border-b border-white/10">
         <div className="flex items-center gap-2">
           <span className="text-white/60">Direction</span>
           <span className="text-teal font-semibold">{dir}</span>
@@ -154,11 +145,6 @@ function SmartSignalCard() {
           <span className="text-white/60">Skew</span>
           <span className="font-semibold">{skew}% YES</span>
         </div>
-      </div>
-      <div>
-        <div className="text-xs text-white/60 mb-2">Signal Heatmap</div>
-        <Row vals={yesVals} color="rgba(0,229,255,0.5)" label="YES" />
-        <Row vals={noVals} color="rgba(239,68,68,0.5)" label="NO" />
       </div>
     </div>
   )
@@ -259,12 +245,12 @@ function DepthHeatmapCard() {
       <div className="text-sm font-semibold text-white/80 mb-3">Depth Heatmap</div>
       <div className="grid grid-cols-12 gap-[2px]">
         {yes.map((v, i) => (
-          <div key={i} className="h-6 bg-teal" style={{ opacity: v * 0.9 }} />
+          <div key={i} className="h-12 bg-teal" style={{ opacity: v * 0.9 }} />
         ))}
       </div>
       <div className="grid grid-cols-12 gap-[2px] mt-[2px]">
         {no.map((v, i) => (
-          <div key={i} className="h-6 bg-red-500" style={{ opacity: v * 0.9 }} />
+          <div key={i} className="h-12 bg-red-500" style={{ opacity: v * 0.9 }} />
         ))}
       </div>
       <div className="mt-2 text-xs text-white/60">Top: YES depth • Bottom: NO depth</div>
@@ -455,7 +441,7 @@ function ChartLines() {
   const marginLeft = 60  // Increased for Y-axis label spacing
   const marginBottom = 35
   const marginTop = 10
-  const marginRight = 10
+  const marginRight = 20  // Reduced to extend price line
   const plotWidth = chartWidth - marginLeft - marginRight
   const plotHeight = chartHeight - marginTop - marginBottom
 
