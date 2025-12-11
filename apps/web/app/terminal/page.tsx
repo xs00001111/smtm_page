@@ -62,7 +62,7 @@ function FeaturedMarkets() {
     { title: 'ETH ETF approved by Q4?', tag: 'Crypto', pct: 61 },
   ]
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
       <div className="text-sm font-semibold text-white/80 mb-3">Featured Questions</div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {items.map((it,i)=> (
@@ -89,7 +89,7 @@ function OddsGauge({ percent }: { percent: number }) {
   const c = 2 * Math.PI * r
   const offset = c * (1 - p / 100)
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
       <div className="text-sm font-semibold text-white/80 mb-3">Market Odds & Probabilities</div>
       <div className="flex items-center justify-center">
         <svg width="140" height="140" viewBox="0 0 140 140">
@@ -112,7 +112,7 @@ function PriceMovers() {
     { name: 'Inflation < 3%', ch: -0.6 },
   ]
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
       <div className="text-sm font-semibold text-white/80 mb-3">Real‑Time Price Movements</div>
       <div className="space-y-2 text-sm">
         {movers.map((m,i)=>(
@@ -122,6 +122,34 @@ function PriceMovers() {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function SignalHeatmap() {
+  // 2 rows (YES/NO) x 12 buckets
+  const yesVals = Array.from({length:12}, (_,i)=> Math.round(40 + i*4 + Math.sin(i)*3))
+  const noVals = yesVals.map(v=> 100 - v - 5)
+  const row = (vals: number[], color: string, label: string) => (
+    <div className="mb-1">
+      <div className="flex items-center justify-between text-xs text-white/60 mb-1">
+        <span>{label}</span>
+        <span className="text-white/50">avg {(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(0)}%</span>
+      </div>
+      <div className="grid grid-cols-12 gap-[2px]">
+        {vals.map((v,i)=> (
+          <div key={i} className="relative h-7 rounded-sm" style={{ backgroundColor: color, opacity: Math.max(0.25, v/100) }}>
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white/90">{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+  return (
+    <div className="mt-2 p-3 rounded-md bg-white/5 border border-white/10">
+      <div className="text-xs text-white/70 mb-2">Signal Heatmap</div>
+      {row(yesVals, 'rgba(0,229,255,0.5)', 'YES')}
+      {row(noVals, 'rgba(239,68,68,0.5)', 'NO')}
     </div>
   )
 }
@@ -280,7 +308,8 @@ function PriceMovers() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0C0C0C] text-white">
+    <div className="min-h-screen bg-[#0C0C0C] text-white relative">
+      <div aria-hidden className="terminal-bg fixed inset-0 -z-20" />
       {/* Header */}
       <header className="border-b border-white/10 bg-[#0C0C0C]/70 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -339,7 +368,7 @@ function PriceMovers() {
           {/* Left Column - Chart & Orderbook */}
           <div className="lg:col-span-2 space-y-6">
             {/* Chart Section */}
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 glass-card">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-lg font-semibold">Price Chart</h2>
                 <div className="flex gap-2 items-center">
@@ -498,7 +527,7 @@ function PriceMovers() {
           </div>
 
           {/* Strategy Builder */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 glass-card">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Strategy Builder</h2>
               <div className="text-xs text-white/60">Smart routing: <span className="text-teal">CLOB</span></div>
@@ -521,7 +550,7 @@ function PriceMovers() {
           </div>
 
             {/* Orderbook */}
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 glass-card">
               <h2 className="text-lg font-semibold mb-4">Order Book</h2>
               <div className="grid grid-cols-2 gap-4">
                 {/* YES Orders */}
@@ -567,7 +596,7 @@ function PriceMovers() {
           </div>
 
           {/* Recent Trades */}
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6">
+          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 glass-card">
               <h2 className="text-lg font-semibold mb-4">Recent Trades</h2>
               <div className="space-y-2">
                 <div className="text-xs text-white/60 flex justify-between px-2">
@@ -609,7 +638,7 @@ function PriceMovers() {
           {/* Right Column - Signals & Trade */}
           <div className="space-y-6">
             {/* Alpha Signal */}
-            <div className="rounded-xl border border-teal/30 bg-gradient-to-br from-teal/10 to-transparent p-6">
+            <div className="rounded-xl border border-teal/30 bg-gradient-to-br from-teal/10 to-transparent p-6 glass-card">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">Smart Money Signal</h2>
                 <AlertCircle size={20} className="text-teal" />
@@ -636,6 +665,8 @@ function PriceMovers() {
                   <div className="text-xs text-teal mb-1">Signal</div>
                   <div className="text-sm font-medium">Strong Buy - Smart money heavily favors YES</div>
                 </div>
+                {/* Heatmap under the score */}
+                <SignalHeatmap />
               </div>
             </div>
 
