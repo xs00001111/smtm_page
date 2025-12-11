@@ -1,7 +1,6 @@
 import { TradingGrid } from '@/components/trading-grid'
 import { Button } from '@/components/ui/button'
 import { FeatureCard } from '@/components/feature-card'
-import { WaitlistForm } from '@/components/waitlist-form'
 import { Footer } from '@/components/footer'
 import { MockExperience } from '@/components/mock-experience'
 import { ProfileSample } from '@/components/profile-sample'
@@ -108,7 +107,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-12">
             <FeatureCard
               title="Real-Time Alerts"
               description="Follow markets and whales. Get notified on price changes and large trades instantly."
@@ -124,33 +123,13 @@ export default function HomePage() {
               description="Browse hot markets, search predictions, check live prices and net positions."
               icon={<TrendingUp size={28} className="text-teal" />}
             />
-          </div>
-
-          {/* Coming Soon Section */}
-          <div className="text-center mb-6 sm:mb-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.05] px-4 py-1.5 mb-4">
-              <span className="text-xs tracking-wide text-white/70 font-medium">COMING SOON</span>
-            </div>
-            <h3 className="font-display text-2xl md:text-3xl font-bold">What's Next</h3>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-            <FeatureCard
-              title="Discord Bot"
-              description="Bring alerts and research to your Discord servers. Same features, new platform."
-              icon={<MessageSquare size={28} className="text-white/50" />}
-            />
-            <FeatureCard
-              title="Twitter Integration"
-              description="Get alerts via DMs and tweet your best predictions with verified receipts."
-              icon={<Twitter size={28} className="text-white/50" />}
-            />
             <FeatureCard
               title="Trade Execution"
-              description="Execute trades directly from alerts. One-tap to enter positions when opportunities arise."
-              icon={<Zap size={28} className="text-white/50" />}
+              description="Execute directly from alerts. One‑tap when opportunities arise."
+              icon={<Zap size={28} className="text-teal" />}
             />
           </div>
+          {/* Simplified: 4 key features; removed separate "What's Next" grid */}
         </div>
       </section>
 
@@ -211,39 +190,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="waitlist" className="relative py-12 md:py-16">
-        <div className="mx-auto max-w-6xl px-6">
-          <hr className="mx-auto mb-6 h-px w-40 sm:w-60 border-0 rounded bg-[linear-gradient(90deg,transparent,rgba(0,229,255,0.8),rgba(182,255,0,0.8),transparent)] opacity-70" />
-          <h3 className="font-display text-2xl md:text-3xl font-bold">Join the Waitlist for Early Access</h3>
-          <p className="text-white/80 mt-2">Get early access to trade execution, Discord/Twitter bots, and exclusive features. Try the Telegram bot now while you wait.</p>
-
-          {/* Feature previews */}
-          <div className="mt-5 overflow-x-auto whitespace-nowrap">
-            <div className="inline-flex items-center gap-4 text-sm text-white/85">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">⚡ One-tap trade execution</span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">🎯 Advanced analytics</span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">🏆 Leaderboards & reputation</span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1">📱 Multi-platform support</span>
-            </div>
-          </div>
-
-          <div className="mt-6 max-w-lg">
-            <WaitlistForm />
-          </div>
-
-          <div className="mt-6">
-            <a
-              href="https://t.me/TradeWithSMTM_bot"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-[#229ED9] hover:text-[#00E5FF] transition-colors text-sm font-medium"
-            >
-              <Send size={16} className="rotate-45" />
-              Or start using the Telegram bot now (free, no signup) →
-            </a>
-          </div>
-        </div>
-      </section>
+      {/* Waitlist removed (bot is live) */}
 
       <Footer />
     </main>

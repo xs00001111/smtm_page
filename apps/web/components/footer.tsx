@@ -17,8 +17,8 @@ export function Footer() {
             <p className="text-white/70 mt-2 max-w-xs mx-auto md:mx-0">Get rewarded for being right. Outplay the scammers.</p>
             <p className="text-white/50 mt-1 text-xs">SMTM — Where conviction pays, and hype dies.</p>
             <div className="mt-4">
-              <a href="#waitlist" className="inline-block w-full sm:w-auto">
-                <Button variant="cta" size="sm" className="w-full sm:w-auto">Join the Waitlist</Button>
+              <a href="https://t.me/TradeWithSMTM_bot" target="_blank" rel="noopener noreferrer" className="inline-block w-full sm:w-auto">
+                <Button variant="cta" size="sm" className="w-full sm:w-auto">Open Telegram Bot</Button>
               </a>
             </div>
           </div>
