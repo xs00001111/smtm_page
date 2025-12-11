@@ -34,59 +34,77 @@ function useDemoSeries() {
   // - Explosive movements on breaking news
   // - Quick reversals and corrections
   // - Multiple dramatic events throughout the timeline
+  // - Independent movements to avoid perfect symmetry
   const n = 60
   const ys: number[] = []
   const ns: number[] = []
   const rng = prng(4242)
+  const rng2 = prng(8484) // Second RNG for NO line independence
 
   let yes = 45  // Start at 45%
-  let no = 55   // Start at 55%
+  let no = 53   // Start at 53% (doesn't sum to exactly 100)
 
   // Define dramatic news events with steep changes and reversals
-  const newsEvents = [
-    // Early consolidation with small moves
-    { at: 10, magnitude: 5, type: 'spike' },      // Breaking news pushes YES up
-    { at: 11, magnitude: -2, type: 'correction' }, // Immediate correction
+  const yesEvents = [
+    { at: 10, magnitude: 5 },
+    { at: 11, magnitude: -2 },
+    { at: 18, magnitude: -8 },
+    { at: 19, magnitude: -3 },
+    { at: 22, magnitude: 6 },
+    { at: 30, magnitude: -6 },
+    { at: 35, magnitude: 18 },
+    { at: 36, magnitude: 5 },
+    { at: 37, magnitude: -8 },
+    { at: 38, magnitude: -4 },
+    { at: 48, magnitude: 4 },
+    { at: 52, magnitude: 8 },
+    { at: 53, magnitude: -3 },
+    { at: 57, magnitude: 5 },
+  ]
 
-    // Mid-period volatility
-    { at: 18, magnitude: -8, type: 'crash' },     // Bad news crashes YES
-    { at: 19, magnitude: -3, type: 'continuation' }, // Continues down
-    { at: 22, magnitude: 6, type: 'recovery' },   // Recovery rally
-
-    // Major news event sequence
-    { at: 30, magnitude: -6, type: 'dip' },       // Pre-news dip
-    { at: 35, magnitude: 18, type: 'explosion' }, // MASSIVE news spike!
-    { at: 36, magnitude: 5, type: 'continuation' }, // Momentum continues
-    { at: 37, magnitude: -8, type: 'profit-taking' }, // Profit taking
-    { at: 38, magnitude: -4, type: 'correction' }, // More correction
-
-    // Late consolidation and final push
-    { at: 48, magnitude: 4, type: 'accumulation' },
-    { at: 52, magnitude: 8, type: 'breakout' },   // Final breakout
-    { at: 53, magnitude: -3, type: 'consolidation' },
-    { at: 57, magnitude: 5, type: 'pump' },       // Last pump
+  // NO has slightly different events (not perfectly mirrored)
+  const noEvents = [
+    { at: 10, magnitude: -4 },
+    { at: 11, magnitude: 1 },
+    { at: 17, magnitude: 3 },  // Different timing
+    { at: 18, magnitude: 7 },
+    { at: 19, magnitude: 4 },
+    { at: 22, magnitude: -5 },
+    { at: 30, magnitude: 5 },
+    { at: 35, magnitude: -16 }, // Slightly different magnitude
+    { at: 36, magnitude: -6 },
+    { at: 37, magnitude: 9 },
+    { at: 38, magnitude: 3 },
+    { at: 48, magnitude: -3 },
+    { at: 52, magnitude: -7 },
+    { at: 53, magnitude: 2 },
+    { at: 57, magnitude: -4 },
   ]
 
   for (let i = 0; i < n; i++) {
-    // Check for news events
-    const events = newsEvents.filter(e => e.at === i)
+    // Check for news events on YES
+    const yesEvent = yesEvents.find(e => e.at === i)
+    const noEvent = noEvents.find(e => e.at === i)
 
-    if (events.length > 0) {
-      // Apply all events at this timestamp
-      events.forEach(event => {
-        yes += event.magnitude
-        no -= event.magnitude
-      })
+    if (yesEvent) {
+      yes += yesEvent.magnitude
     } else {
-      // Normal periods: very small movements (consolidation)
-      const microNoise = (rng() - 0.5) * 0.8
+      // Normal periods: independent small movements
+      const microNoise = (rng() - 0.5) * 0.9
       yes += microNoise
-      no -= microNoise
     }
 
-    // Keep within bounds and ensure they sum to ~100
-    yes = Math.min(92, Math.max(8, yes))
-    no = 100 - yes
+    if (noEvent) {
+      no += noEvent.magnitude
+    } else {
+      // NO has its own independent noise
+      const microNoise = (rng2() - 0.5) * 0.85
+      no += microNoise
+    }
+
+    // Keep within bounds
+    yes = Math.min(90, Math.max(10, yes))
+    no = Math.min(90, Math.max(10, no))
 
     ys.push(yes)
     ns.push(no)
