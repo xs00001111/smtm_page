@@ -254,18 +254,18 @@ export default function TerminalContent() {
             {/* Simple SVG chart with two paths */}
             <ChartLines />
           </div>
-          {/* Order book + ticket under chart */}
+          {/* Order book + ticket under chart - use flex to align bottoms */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <OrderBook />
             <OrderTicket />
           </div>
-          {/* Depth heatmap aligned at bottom */}
-          <DepthHeatmapCard />
         </div>
-        <div className="space-y-4">
+        <div className="space-y-4 flex flex-col">
           <SmartSignalCard />
           <OddsGauge percent={63} />
           <PriceMovers />
+          {/* Depth heatmap aligned at bottom with order book/ticket */}
+          <DepthHeatmapCard />
         </div>
       </div>
     </div>
@@ -311,34 +311,36 @@ function OrderTicket() {
 
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-      <div className="flex items-center gap-2 mb-3 text-sm font-semibold">
-        <button
-          onClick={() => setBuySell('buy')}
-          className={`px-3 py-1.5 rounded transition ${buySell === 'buy' ? 'bg-teal/20 text-teal border border-teal/40' : 'bg-white/5 text-white/60'}`}
-        >
-          Buy
-        </button>
-        <button
-          onClick={() => setBuySell('sell')}
-          className={`px-3 py-1.5 rounded transition ${buySell === 'sell' ? 'bg-red-400/20 text-red-400 border border-red-400/40' : 'bg-white/5 text-white/60'}`}
-        >
-          Sell
-        </button>
-      </div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <button
+            onClick={() => setBuySell('buy')}
+            className={`px-3 py-1.5 rounded transition ${buySell === 'buy' ? 'bg-teal/20 text-teal border border-teal/40' : 'bg-white/5 text-white/60'}`}
+          >
+            Buy
+          </button>
+          <button
+            onClick={() => setBuySell('sell')}
+            className={`px-3 py-1.5 rounded transition ${buySell === 'sell' ? 'bg-red-400/20 text-red-400 border border-red-400/40' : 'bg-white/5 text-white/60'}`}
+          >
+            Sell
+          </button>
+        </div>
 
-      <div className="flex items-center gap-2 mb-3 text-xs">
-        <button
-          onClick={() => setOrderType('market')}
-          className={`px-2 py-1 rounded transition ${orderType === 'market' ? 'bg-white/10 text-white border border-white/20' : 'bg-white/5 text-white/40'}`}
-        >
-          Market
-        </button>
-        <button
-          onClick={() => setOrderType('limit')}
-          className={`px-2 py-1 rounded transition ${orderType === 'limit' ? 'bg-white/10 text-white border border-white/20' : 'bg-white/5 text-white/40'}`}
-        >
-          Limit
-        </button>
+        <div className="flex items-center gap-2 text-xs">
+          <button
+            onClick={() => setOrderType('market')}
+            className={`px-2 py-1 rounded transition ${orderType === 'market' ? 'bg-white/10 text-white border border-white/20' : 'bg-white/5 text-white/40'}`}
+          >
+            Market
+          </button>
+          <button
+            onClick={() => setOrderType('limit')}
+            className={`px-2 py-1 rounded transition ${orderType === 'limit' ? 'bg-white/10 text-white border border-white/20' : 'bg-white/5 text-white/40'}`}
+          >
+            Limit
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-xs mb-3">
@@ -422,7 +424,7 @@ function ChartLines() {
 
   return (
     <div className="relative h-80 rounded-md border border-white/5 bg-gradient-to-b from-teal/5 to-transparent p-4">
-      <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMidYMid meet">
+      <svg className="w-full h-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="xMinYMid meet">
         {/* Y-axis grid lines and labels */}
         {[0, 25, 50, 75, 100].map((pct) => {
           const y = marginTop + plotHeight - (pct / 100) * plotHeight
@@ -513,21 +515,21 @@ function ChartLines() {
 
         {/* Axis labels */}
         <text
-          x={marginLeft - 35}
+          x={15}
           y={chartHeight / 2}
           textAnchor="middle"
           className="fill-white/50"
-          fontSize="12"
-          transform={`rotate(-90, ${marginLeft - 35}, ${chartHeight / 2})`}
+          fontSize="11"
+          transform={`rotate(-90, 15, ${chartHeight / 2})`}
         >
           Probability (%)
         </text>
         <text
           x={chartWidth / 2}
-          y={chartHeight - 2}
+          y={chartHeight - 8}
           textAnchor="middle"
           className="fill-white/50"
-          fontSize="12"
+          fontSize="11"
         >
           Time (Last 24h)
         </text>
