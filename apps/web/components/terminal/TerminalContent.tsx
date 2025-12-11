@@ -29,45 +29,63 @@ function catmull(values: number[], w = 800, h = 320) {
 }
 
 function useDemoSeries() {
-  // Generate realistic Polymarket-style price data:
-  // - Long stable periods with small noise
-  // - Occasional sudden spikes/movements
-  const n = 50
+  // Generate dramatic Polymarket-style price data with news events:
+  // - Long stable periods
+  // - Explosive movements on breaking news
+  // - Quick reversals and corrections
+  // - Multiple dramatic events throughout the timeline
+  const n = 60
   const ys: number[] = []
   const ns: number[] = []
   const rng = prng(4242)
 
-  let yes = 58  // Start at 58%
-  let no = 42   // Start at 42%
+  let yes = 45  // Start at 45%
+  let no = 55   // Start at 55%
 
-  // Define multiple spike events for more realistic movement
-  const spikes = [
-    { at: 8, magnitude: 3 },    // Small early spike
-    { at: 15, magnitude: -2 },  // Small dip
-    { at: 20, magnitude: -5 },  // Medium dip
-    { at: 28, magnitude: 4 },   // Recovery spike
-    { at: 35, magnitude: 12 },  // Big spike near the end
-    { at: 42, magnitude: -3 },  // Small correction
-    { at: 47, magnitude: 2 },   // Final small move
+  // Define dramatic news events with steep changes and reversals
+  const newsEvents = [
+    // Early consolidation with small moves
+    { at: 10, magnitude: 5, type: 'spike' },      // Breaking news pushes YES up
+    { at: 11, magnitude: -2, type: 'correction' }, // Immediate correction
+
+    // Mid-period volatility
+    { at: 18, magnitude: -8, type: 'crash' },     // Bad news crashes YES
+    { at: 19, magnitude: -3, type: 'continuation' }, // Continues down
+    { at: 22, magnitude: 6, type: 'recovery' },   // Recovery rally
+
+    // Major news event sequence
+    { at: 30, magnitude: -6, type: 'dip' },       // Pre-news dip
+    { at: 35, magnitude: 18, type: 'explosion' }, // MASSIVE news spike!
+    { at: 36, magnitude: 5, type: 'continuation' }, // Momentum continues
+    { at: 37, magnitude: -8, type: 'profit-taking' }, // Profit taking
+    { at: 38, magnitude: -4, type: 'correction' }, // More correction
+
+    // Late consolidation and final push
+    { at: 48, magnitude: 4, type: 'accumulation' },
+    { at: 52, magnitude: 8, type: 'breakout' },   // Final breakout
+    { at: 53, magnitude: -3, type: 'consolidation' },
+    { at: 57, magnitude: 5, type: 'pump' },       // Last pump
   ]
 
   for (let i = 0; i < n; i++) {
-    // Check if this is a spike point
-    const spike = spikes.find(s => s.at === i)
+    // Check for news events
+    const events = newsEvents.filter(e => e.at === i)
 
-    if (spike) {
-      // Sudden movement
-      yes += spike.magnitude
-      no -= spike.magnitude
+    if (events.length > 0) {
+      // Apply all events at this timestamp
+      events.forEach(event => {
+        yes += event.magnitude
+        no -= event.magnitude
+      })
     } else {
-      // Normal small random walk - mostly stays stable
-      const smallNoise = (rng() - 0.5) * 1.2
-      yes += smallNoise
-      no -= smallNoise
+      // Normal periods: very small movements (consolidation)
+      const microNoise = (rng() - 0.5) * 0.8
+      yes += microNoise
+      no -= microNoise
     }
 
     // Keep within bounds and ensure they sum to ~100
-    yes = Math.min(95, Math.max(5, yes))
+    yes = Math.min(92, Math.max(8, yes))
     no = 100 - yes
 
     ys.push(yes)
