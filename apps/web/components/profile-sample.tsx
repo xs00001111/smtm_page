@@ -235,7 +235,7 @@ export function ProfileSample() {
       </div>
 
       {activeTab === 'predictions' && (
-        <div id="predictions" className="mt-3 space-y-2">
+        <div id="predictions" className="mt-3 space-y-2 overflow-x-hidden">
           {predictions.map((p) => (
             <div key={p.id} className={`rounded-lg border border-white/10 bg-white/[0.02] p-3`}>
               <div className="flex items-start gap-3">
@@ -244,7 +244,7 @@ export function ProfileSample() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-semibold text-sm">{p.statement}</h3>
+                    <h3 className="font-semibold text-sm break-words">{p.statement}</h3>
                     <span className="text-xs rounded-md border border-white/10 px-2 py-0.5 text-muted inline-flex items-center gap-1">
                       <TrendingUp className="h-3 w-3 text-teal" /> {p.side}
                     </span>
@@ -278,15 +278,15 @@ export function ProfileSample() {
 
       {/* Feed (trading-focused) */}
       {activeTab === 'feed' && (
-        <div id="feed" className="mt-4 space-y-2">
+        <div id="feed" className="mt-4 space-y-2 overflow-x-hidden">
           {tradeFeed.map((e, idx) => (
             <div key={idx} className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm">
               {e.type === 'trade' && (
                 <div className="flex items-start gap-3">
                   <div className={`mt-0.5 h-5 w-5 rounded grid place-items-center text-[10px] font-bold ${e.action === 'Bought' ? 'bg-teal text-black' : 'bg-red-500 text-white'}`}>{e.action === 'Bought' ? 'B' : 'S'}</div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-white/90 font-medium truncate">{e.market}</span>
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className="text-white/90 font-medium break-words">{e.market}</span>
                       <span className={`px-1.5 py-0.5 rounded border text-xs ${e.side === 'YES' ? 'border-teal/40 text-teal' : 'border-red-400/40 text-red-400'}`}>{e.side}</span>
                       <span className="text-xs text-white/60">@ {(e.price * 100).toFixed(0)}¢ • {e.size} shares</span>
                     </div>
@@ -298,8 +298,8 @@ export function ProfileSample() {
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 h-5 w-5 rounded grid place-items-center text-[10px] font-bold bg-white/10">P&L</div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-white/90 font-medium truncate">Closed {e.side} — {e.market}</span>
+                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                      <span className="text-white/90 font-medium break-words">Closed {e.side} — {e.market}</span>
                       <span className={`${e.pnl >= 0 ? 'text-teal' : 'text-red-400'} text-xs font-semibold`}>{e.pnl >= 0 ? '+' : ''}${e.pnl}</span>
                       <span className="text-xs text-white/60">×{e.multiple.toFixed(2)}</span>
                     </div>
@@ -338,7 +338,7 @@ export function ProfileSample() {
 
       {/* Leaderboard */}
       {activeTab === 'leaderboard' && (
-      <div id="leaderboard" className="mt-8">
+      <div id="leaderboard" className="mt-8 overflow-x-hidden">
         <div className="flex items-center gap-3 mb-3">
           <span className="text-foreground font-semibold">Leaderboard</span>
           <span className="text-muted text-sm">This week</span>
@@ -366,7 +366,7 @@ export function ProfileSample() {
 
       {/* Badges */}
       {activeTab === 'badges' && (
-        <div id="badges" className="mt-6 flex flex-wrap gap-3 text-sm">
+        <div id="badges" className="mt-6 flex flex-wrap gap-3 text-sm overflow-x-hidden">
           <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">🏅 Top 10% Accuracy</span>
           <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">🎲 High Roller</span>
           <span className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-white/80">💸 Most Tipped</span>
@@ -375,7 +375,7 @@ export function ProfileSample() {
 
       {/* About */}
       {activeTab === 'about' && (
-        <div id="about" className="mt-6 space-y-3 text-sm text-white/80">
+        <div id="about" className="mt-6 space-y-3 text-sm text-white/80 overflow-x-hidden">
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">Joined: Jan 2024 • Location: Internet</div>
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 inline-flex items-center gap-2">
             <Shield className="h-4 w-4 text-teal" /> Trust Layer: Reputation-first
