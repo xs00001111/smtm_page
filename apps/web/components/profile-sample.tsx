@@ -116,7 +116,7 @@ export function ProfileSample() {
   return (
     <div id="sample-profile" className="mx-auto max-w-4xl px-6 overflow-x-hidden">
 
-      <div className="rounded-xl border border-white/20 p-4 md:p-6">
+      <div className="rounded-xl border border-white/20 p-4 md:p-6 overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="flex items-center gap-3">
             <div
@@ -143,12 +143,12 @@ export function ProfileSample() {
             </div>
           </div>
 
-          <div className="md:ml-auto inline-flex items-center gap-2 w-full md:w-auto">
-            <button onClick={onFollow} className="h-10 sm:h-9 px-4 sm:px-3 rounded-md bg-teal text-black text-sm font-semibold hover:opacity-90 transition w-full md:w-auto">
+          <div className="md:ml-auto flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <button onClick={onFollow} className="h-10 sm:h-9 px-4 sm:px-3 rounded-md bg-teal text-black text-sm font-semibold hover:opacity-90 transition w-full sm:flex-none">
               {isFollowing ? 'Following' : 'Follow'}
             </button>
-            <GhostButton className="h-10 sm:h-9 px-4 sm:px-3 text-sm">⚔️ Challenge</GhostButton>
-            <GhostButton className="h-10 sm:h-9 px-4 sm:px-3 text-sm" onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share'}</GhostButton>
+            <GhostButton className="h-10 sm:h-9 px-4 sm:px-3 text-sm flex-1 sm:flex-none justify-center">⚔️ Challenge</GhostButton>
+            <GhostButton className="h-10 sm:h-9 px-4 sm:px-3 text-sm flex-1 sm:flex-none justify-center" onClick={onShare} icon={<Share2 className="h-4 w-4" />}>{copied ? 'Copied!' : 'Share'}</GhostButton>
           </div>
         </div>
 
