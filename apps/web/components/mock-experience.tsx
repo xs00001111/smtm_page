@@ -21,6 +21,7 @@ export function MockExperience() {
   const autoShownRef = useRef(false)
   const [rewardAmount, setRewardAmount] = useState<number | null>(null)
   const rootRef = useRef<HTMLDivElement | null>(null)
+  const [amount, setAmount] = useState<number>(50)
 
   const claim = {
     asset: 'DOGE',
@@ -46,7 +47,7 @@ export function MockExperience() {
     triggerCelebrate(previewReward)
   }
 
-  const stake = 50 // mock dollars
+  const stake = amount // mock dollars
   const baseReward = 25
   const previewReward = useMemo(() => {
     // Simple proportional preview tied to confidence (0–100%)
@@ -94,7 +95,7 @@ export function MockExperience() {
 
       {/* Demo grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left column: Single large influencer card (no outer/inner nesting) */}
+        {/* Left column: Trading-focused ticket with integrated preview */}
         <article className="lg:col-span-7 rounded-2xl border border-white/10 bg-[#0F0F0F]/80 p-4 md:p-6 shadow-lg hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
           {/* Influencer header + Tip button (social proximity) */}
           <div className="flex items-center gap-3 mb-3">
@@ -116,8 +117,48 @@ export function MockExperience() {
             <span className={`mr-3 ${confidenceTouched ? 'text-teal' : 'text-white/70'}`}>2) Set confidence</span>
             <span className={`${shared ? 'text-teal' : 'text-white/70'}`}>3) Share</span>
           </div>
-          <div className="text-muted text-xs mb-1">Influencer Claim</div>
+          <div className="text-muted text-xs mb-1">Market</div>
           <div className="text-2xl md:text-3xl font-bold leading-snug mb-4">{claim.text}</div>
+
+          {/* Side selector + mini price */}
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleBet('LONG')}
+              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${bet === 'LONG' ? 'border-teal/60 bg-teal/15 text-teal' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+              title="Press L"
+            >
+              YES • {(claim.longPct).toFixed(0)}%
+            </button>
+            <button
+              onClick={() => handleBet('SHORT')}
+              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${bet === 'SHORT' ? 'border-red-400/60 bg-red-400/10 text-red-400' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}
+              title="Press S"
+            >
+              NO • {(claim.shortPct).toFixed(0)}%
+            </button>
+          </div>
+
+          {/* Order size */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-xs text-white/60 mb-1">
+              <span>Amount (USD)</span>
+              <span>Quick</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={amount}
+                onChange={(e)=>setAmount(Number(e.target.value || 0))}
+                className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm focus:outline-none focus:border-teal/60"
+                min={0}
+              />
+              {[25,50,100].map(v=> (
+                <button key={v} onClick={()=>setAmount(v)} className="px-2 py-2 rounded-md border border-white/10 bg-white/5 text-xs hover:bg-white/10">
+                  ${v}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Odds Bar */}
           <div className="mt-4">
@@ -146,6 +187,22 @@ export function MockExperience() {
               </div>
             </div>
 
+          {/* Integrated preview + actions */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                <div className="text-xs text-white/60 mb-1">Est. Shares</div>
+                <div className="font-semibold">{amount > 0 && bet ? Math.floor(amount / ((bet === 'LONG' ? claim.longPct : claim.shortPct)/100)) : 0}</div>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                <div className="text-xs text-white/60 mb-1">Max Payout</div>
+                <div className="font-semibold">${amount > 0 ? (amount * (bet ? (bet==='LONG'? (100/claim.longPct) : (100/claim.shortPct)) : 1)).toFixed(0) : '0'}</div>
+              </div>
+              <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+                <div className="text-xs text-white/60 mb-1">Potential Reward</div>
+                <div className="font-semibold text-teal">+${previewReward}</div>
+              </div>
+            </div>
+
           {/* Actions */}
             <div className="mt-5 flex flex-wrap gap-3">
               <div className="relative">
@@ -163,7 +220,7 @@ export function MockExperience() {
                   onMouseLeave={() => setHoverSide(null)}
                   onClick={() => handleBet('LONG')}
                 >
-                  🔵 Go Long
+                  🔵 Buy YES
                 </Button>
               </div>
               <div className="relative">
@@ -181,7 +238,7 @@ export function MockExperience() {
                   onMouseLeave={() => setHoverSide(null)}
                   onClick={() => handleBet('SHORT')}
                 >
-                  🔴 Go Short
+                  🔴 Buy NO
                 </Button>
               </div>
             </div>
@@ -241,37 +298,8 @@ export function MockExperience() {
           )}
         </article>
 
-        {/* Right column */}
+        {/* Right column: compact credibility */}
         <div className="lg:col-span-5 flex flex-col gap-6">
-          {/* Preview card */}
-          <aside className="rounded-2xl border border-white/10 bg-black/40 p-4 md:p-6 hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
-            <div className="text-sm text-muted mb-4">Prediction Preview</div>
-            <div>
-              {bet ? (
-                <>
-                  <div className="text-lg font-semibold">Your bet: {bet} ${claim.asset}</div>
-                  <div className="text-muted">Stake: Mock ${stake}</div>
-                </>
-              ) : (
-                <div className="text-muted">Hover or choose a side to preview.</div>
-              )}
-              <div
-                className={
-                  `mt-2 rounded-md px-3 py-2 inline-flex items-center gap-2 transition transition-transform hover:-translate-y-0.5 ` +
-                  `${hoverSide ? 'bg-white/[0.06] shadow-glow text-lime-300' : 'bg-white/[0.03] text-teal'}`
-                }
-              >
-                <span className="font-medium">Potential Reward:</span>
-                <span>+${previewReward}</span>
-              </div>
-              <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-2 gap-3 text-sm text-muted">
-                <div>Leaderboard Position: #32</div>
-                <div>Credibility Score: 68</div>
-              </div>
-            </div>
-          </aside>
-
-          {/* User snapshot */}
           <aside className="rounded-2xl border border-white/10 bg-black/40 p-4 md:p-6 hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-white/10 grid place-items-center text-xl">C</div>
