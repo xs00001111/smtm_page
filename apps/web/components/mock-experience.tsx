@@ -96,7 +96,7 @@ export function MockExperience() {
       {/* Demo grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left column: Trading-focused ticket with integrated preview */}
-        <article className="lg:col-span-7 rounded-2xl border border-white/10 bg-[#0F0F0F]/80 p-4 md:p-6 shadow-lg hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow">
+        <article className="lg:col-span-7 rounded-2xl border border-white/10 bg-[#0F0F0F]/80 p-4 md:p-6 shadow-lg hover:shadow-[0_0_24px_rgba(0,229,255,0.15)] transition-shadow overflow-hidden">
           {/* Influencer header + Tip button (social proximity) */}
           <div className="flex items-center gap-3 mb-3">
             <div className="h-9 w-9 rounded-full grid place-items-center text-sm font-semibold border border-white/10" style={avatarStyle('CryptoChad')}>C</div>
@@ -104,8 +104,8 @@ export function MockExperience() {
               <div className="font-semibold leading-tight">{claim.influencer}</div>
               <div className="text-xs text-muted truncate">{claim.influencerMeta}</div>
             </div>
-            <div className="ml-auto">
-              <Button variant="outline" size="sm">
+            <div className="ml-auto hidden sm:block">
+              <Button variant="outline" size="sm" className="truncate max-w-[160px]">
                 💸 Tip Creator ($1–5)
               </Button>
             </div>
@@ -212,7 +212,7 @@ export function MockExperience() {
                   </span>
                 )}
                 {showHints && !bet && (
-                  <span className="absolute -right-2 -bottom-2 h-3 w-3 rounded-full bg-teal animate-ping pointer-events-none" />
+                  <span className="absolute right-2 bottom-2 h-3 w-3 rounded-full bg-teal animate-ping pointer-events-none" />
                 )}
                 <Button
                   className="bg-teal text-black hover:opacity-90 w-full sm:w-auto min-h-[44px]"
@@ -230,7 +230,7 @@ export function MockExperience() {
                   </span>
                 )}
                 {showHints && !bet && (
-                  <span className="absolute -right-2 -bottom-2 h-3 w-3 rounded-full bg-red-500 animate-ping pointer-events-none" />
+                  <span className="absolute right-2 bottom-2 h-3 w-3 rounded-full bg-red-500 animate-ping pointer-events-none" />
                 )}
                 <Button
                   className="bg-red-500 text-white hover:bg-red-500/90 w-full sm:w-auto min-h-[44px]"
