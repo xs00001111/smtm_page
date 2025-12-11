@@ -549,9 +549,9 @@ function ChartLines() {
           Probability (%)
         </text>
         <text
-          x={chartWidth / 2}
+          x={chartWidth - marginRight - 5}
           y={chartHeight - 8}
-          textAnchor="middle"
+          textAnchor="end"
           className="fill-white/50"
           fontSize="11"
         >
