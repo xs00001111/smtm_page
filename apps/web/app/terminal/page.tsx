@@ -62,38 +62,48 @@ export default function TerminalPage() {
     return () => (s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32
   }
 
-  function generateSeries(count: number, start: number, end: number, seed: number) {
+  function generateSeries(count: number, start: number, end: number, seed: number, noise = 1.8) {
+    // Random‑walk with small volatility + rare jumps; trends from start → end
     const rnd = prng(seed)
-    const arr: number[] = []
+    const series: number[] = []
+    const slope = (end - start) / (count - 1)
+    let val = start
     for (let i = 0; i < count; i++) {
-      const t = i / (count - 1)
-      const base = start + (end - start) * t
-      // Jitter with rare spikes; clamp to 0..100
-      const amp = 3 + 2 * Math.sin(t * Math.PI)
-      let noise = (rnd() - 0.5) * amp
-      if (rnd() < 0.06) noise += (rnd() - 0.5) * 10 // occasional micro spike
-      arr.push(Math.min(99.5, Math.max(0.5, base + noise)))
+      // base trend + noise
+      const n = (rnd() - 0.5) * noise
+      if (rnd() < 0.04) {
+        // occasional micro jump
+        val += (rnd() - 0.5) * 6
+      }
+      val = Math.min(99.5, Math.max(0.5, val + slope + n))
+      series.push(val)
     }
-    return arr
+    return series
   }
 
-  function linePath(values: number[], width = 800, height = 320) {
+  function catmullRomPath(values: number[], width = 800, height = 320) {
     if (values.length === 0) return ''
     const stepX = width / (values.length - 1)
-    const points = values.map((v, i) => {
-      const x = i * stepX
-      const y = height - (v / 100) * height
-      return [x, y]
-    })
-    // Use straight segments (Polymarket style is not overly curved)
-    let d = `M ${points[0][0]} ${points[0][1]}`
-    for (let i = 1; i < points.length; i++) d += ` L ${points[i][0]} ${points[i][1]}`
+    const pts = values.map((v, i) => [i * stepX, height - (v / 100) * height]) as [number, number][]
+    // Catmull‑Rom to cubic Bezier (alpha=0.5)
+    let d = `M ${pts[0][0]} ${pts[0][1]}`
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i]
+      const p1 = pts[i]
+      const p2 = pts[i + 1]
+      const p3 = pts[i + 2] || p2
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6
+      const c1y = p1[1] + (p2[1] - p0[1]) / 6
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6
+      const c2y = p2[1] - (p3[1] - p1[1]) / 6
+      d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`
+    }
     return d
   }
 
-  // Build chart series similar to Polymarket
-  const YES_SERIES = generateSeries(24, 42, 67, 12345)
-  const NO_SERIES = YES_SERIES.map(v => 100 - v)
+  // Build chart series (not perfectly complementary to appear real)
+  const YES_SERIES = generateSeries(36, 44, 67, 12345, 2)
+  const NO_SERIES = generateSeries(36, 58, 33, 54321, 2.1)
 
   // Deterministic volumes
   const volRnd = prng(98765)
@@ -207,10 +217,10 @@ export default function TerminalPage() {
 
                   {/* YES line (teal) - trending up */}
                   <path
-                    d={linePath(YES_SERIES)}
+                    d={catmullRomPath(YES_SERIES)}
                     fill="none"
-                    stroke="url(#yesGrad)"
-                    strokeWidth="2.5"
+                    stroke="#00E5FF"
+                    strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     filter="url(#yesGlow)"
@@ -218,10 +228,10 @@ export default function TerminalPage() {
 
                   {/* NO line (red) - trending down */}
                   <path
-                    d={linePath(NO_SERIES)}
+                    d={catmullRomPath(NO_SERIES)}
                     fill="none"
-                    stroke="url(#noGrad)"
-                    strokeWidth="2.5"
+                    stroke="#EF4444"
+                    strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     filter="url(#noGlow)"
@@ -240,12 +250,12 @@ export default function TerminalPage() {
                   ))}
 
                   {/* Current price marker for YES */}
-                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r="6" fill="#00E5FF" />
-                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r="4" fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r="6" stroke="#00E5FF" strokeWidth="2" fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (YES_SERIES[YES_SERIES.length-1]/100)*320} r="2" fill="#FFFFFF" />
 
                   {/* Current price marker for NO */}
-                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r="6" fill="#EF4444" />
-                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r="4" fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r="6" stroke="#EF4444" strokeWidth="2" fill="#0C0C0C" />
+                  <circle cx="800" cy={320 - (NO_SERIES[NO_SERIES.length-1]/100)*320} r="2" fill="#FFFFFF" />
                 </svg>
 
                 {/* Price labels on the right */}
