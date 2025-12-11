@@ -331,7 +331,7 @@ function SignalHeatmap() {
       <div aria-hidden className="terminal-bg fixed inset-0 -z-20" />
       {/* Header */}
       <header className="border-b border-white/10 bg-[#0C0C0C]/70 backdrop-blur-xl sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+        <div className="mx-auto w-full max-w-screen-2xl px-4 py-4">
           <div className="flex items-center justify-between">
             <a href="/" className="text-xl font-bold bg-gradient-to-r from-[#00E5FF] to-[#B6FF00] bg-clip-text text-transparent">
               SMTM Terminal
@@ -346,7 +346,7 @@ function SignalHeatmap() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="mx-auto w-full max-w-screen-2xl px-4 py-6">
         {/* Market Header */}
         <div className="mb-6">
           <div className="flex items-start justify-between mb-4">
