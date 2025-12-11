@@ -272,9 +272,10 @@ export function ProfileSample() {
                     <button onClick={() => react(p.id, 'fire')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-2 sm:py-1 hover:bg-white/[0.06] min-h-[40px] sm:min-h-0">🔥 {(reactions[p.id]?.fire)||0}</button>
                     <button onClick={() => react(p.id, 'rocket')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-2 sm:py-1 hover:bg-white/[0.06] min-h-[40px] sm:min-h-0">🚀 {(reactions[p.id]?.rocket)||0}</button>
                     <button onClick={() => react(p.id, 'skull')} className="text-sm rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 sm:px-2 sm:py-1 hover:bg-white/[0.06] min-h-[40px] sm:min-h-0">💀 {(reactions[p.id]?.skull)||0}</button>
-                    <div className="ml-auto inline-flex items-center text-muted text-sm"><MessageSquare className="h-4 w-4 mr-1" /> Comment</div>
+                    <div className="ml-auto hidden sm:inline-flex items-center text-muted text-sm"><MessageSquare className="h-4 w-4 mr-1" /> Comment</div>
                   </div>
-                  <div className="mt-2">
+                  {/* Hide full comment box on mobile to reduce clutter/overflow */}
+                  <div className="mt-2 hidden sm:block">
                     <div className="flex items-center gap-2">
                       <input
                         value={commentDrafts[p.id] || ''}

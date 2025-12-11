@@ -15,9 +15,9 @@ export default function HomePage() {
       {/* Global radial glow across the whole page */}
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.08),transparent_60%)]" />
 
-      <main className="relative min-h-screen mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      <main className="relative min-h-screen mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 overflow-x-hidden">
         {/* Hero */}
-        <section id="hero" className="relative min-h-[70vh] md:min-h-[80vh] flex items-center justify-center">
+        <section id="hero" className="relative min-h-[70vh] md:min-h-[80vh] flex items-center justify-center overflow-hidden">
           <TradingGrid />
           {/* Lightweight event lines + arcade claw reference (mobile friendly) */}
           <PolymarketEventLines />
