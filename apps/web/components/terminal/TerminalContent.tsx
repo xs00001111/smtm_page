@@ -120,16 +120,22 @@ function SmartSignalCard() {
         <h2 className="text-lg font-semibold">Smart Money Signal</h2>
         <TrendingUp className="text-teal" size={18} />
       </div>
-      <div className="text-center mb-3">
+      <div className="text-center mb-4">
         <div className="text-6xl font-extrabold bg-gradient-to-r from-teal to-lime bg-clip-text text-transparent">{alpha}</div>
         <div className="text-xs text-white/70">Alpha Score</div>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-        <div className="rounded-md bg-white/5 p-2 flex items-center justify-between"><span className="text-white/70">Direction</span><span className="text-teal font-semibold">{dir}</span></div>
-        <div className="rounded-md bg-white/5 p-2 flex items-center justify-between"><span className="text-white/70">Skew</span><span className="font-semibold">{skew}% YES</span></div>
+      <div className="flex items-center justify-between text-xs mb-4 pb-3 border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <span className="text-white/60">Direction</span>
+          <span className="text-teal font-semibold">{dir}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-white/60">Skew</span>
+          <span className="font-semibold">{skew}% YES</span>
+        </div>
       </div>
-      <div className="p-3 rounded-md bg-white/5 border border-white/10">
-        <div className="text-xs text-white/70 mb-2">Signal Heatmap</div>
+      <div>
+        <div className="text-xs text-white/60 mb-2">Signal Heatmap</div>
         <Row vals={yesVals} color="rgba(0,229,255,0.5)" label="YES" />
         <Row vals={noVals} color="rgba(239,68,68,0.5)" label="NO" />
       </div>
