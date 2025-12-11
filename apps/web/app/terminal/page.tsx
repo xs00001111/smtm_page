@@ -26,152 +26,7 @@ export default function TerminalPage() {
     skew: 0.82,
 }
 
-function AlphaChips() {
-  // Mock alpha series for chips
-  const momentum = [55,56,57,58,57,59,61,63,62,64]
-  const whales = [48,50,53,52,54,57,59,58,60,62]
-  const crowd = [42,41,43,45,44,46,47,49,48,50]
-  const items = [
-    { label: 'Momentum', color: '#00E5FF', data: momentum },
-    { label: 'Whale Flow', color: '#B6FF00', data: whales },
-    { label: 'Crowd Sentiment', color: '#ffffff', data: crowd },
-  ]
-  return (
-    <div className="flex flex-wrap gap-2 mb-1">
-      {items.map((it,i)=> (
-        <div key={i} className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs">
-          <span className="text-white/80">{it.label}</span>
-          <svg width="60" height="18" viewBox="0 0 60 18">
-            <path d={(() => {
-              const h=18; const w=60;
-              const step=w/(it.data.length-1);
-              const ys=it.data.map(v=> h - (v/100)*h);
-              let d=`M 0 ${ys[0]}`; for(let j=1;j<ys.length;j++) d+=` L ${j*step} ${ys[j]}`; return d;
-            })()} fill="none" stroke={it.color} strokeWidth="1.5" />
-          </svg>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function FeaturedMarkets() {
-  const items = [
-    { title: 'Bitcoin above $100k by year end?', tag: 'Bitcoin', pct: 65 },
-    { title: 'ETH spot ETF approved by Q4?', tag: 'Ethereum', pct: 61 },
-    { title: 'Solana flips BNB market cap?', tag: 'Solana', pct: 42 },
-  ]
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
-      <div className="text-sm font-semibold text-white/80 mb-3">Featured Questions</div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {items.map((it,i)=> (
-          <div key={i} className="rounded-lg border border-white/10 bg-[#0F0F0F]/70 p-3">
-            <div className="text-xs text-white/50 mb-1">{it.tag}</div>
-            <div className="font-semibold text-white/90 line-clamp-2">{it.title}</div>
-            <div className="mt-3 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-teal" style={{width:`${it.pct}%`}} />
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs">
-              <span className="text-white/60">YES {it.pct}%</span>
-              <button className="px-2 py-1 rounded-md border border-teal/40 bg-teal/10 text-teal">View</button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function OddsGauge({ percent }: { percent: number }) {
-  const p = Math.min(99, Math.max(1, percent))
-  const r = 48
-  const c = 2 * Math.PI * r
-  const offset = c * (1 - p / 100)
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
-      <div className="text-sm font-semibold text-white/80 mb-3">Market Odds & Probabilities</div>
-      <div className="flex items-center justify-center">
-        <svg width="140" height="140" viewBox="0 0 140 140">
-          <circle cx="70" cy="70" r={r} stroke="rgba(255,255,255,0.1)" strokeWidth="10" fill="none" />
-          <circle cx="70" cy="70" r={r} stroke="#00E5FF" strokeWidth="10" fill="none" strokeDasharray={c} strokeDashoffset={offset} transform="rotate(-90 70 70)" />
-          <text x="70" y="75" textAnchor="middle" className="fill-white" fontSize="20" fontWeight="700">{p}%</text>
-        </svg>
-      </div>
-      <div className="mt-3 text-center text-xs text-white/60">YES probability</div>
-    </div>
-  )
-}
-
-function PriceMovers() {
-  const movers = [
-    { name: 'BTC Dominance', ch: +0.9 },
-    { name: 'ETH ETF', ch: +1.1 },
-    { name: 'SOL Upgrade', ch: +0.6 },
-    { name: 'DeFi TVL', ch: -0.5 },
-    { name: 'Stablecoin Supply', ch: +0.3 },
-  ]
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
-      <div className="text-sm font-semibold text-white/80 mb-3">Real‑Time Price Movements</div>
-      <div className="space-y-2 text-sm">
-        {movers.map((m,i)=>(
-          <div key={i} className="flex items-center justify-between">
-            <span className="text-white/80">{m.name}</span>
-            <span className={m.ch>=0? 'text-teal':'text-red-400'}>{m.ch>=0? '+':''}{m.ch.toFixed(2)}%</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function DepthHeatmapCard() {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
-      <div className="text-sm font-semibold text-white/80 mb-3">Depth Heatmap</div>
-      <div className="grid grid-cols-12 gap-[2px]">
-        {Array.from({length: 12}).map((_,i)=> (
-          <div key={i} className="h-6 bg-teal/10" style={{opacity: 0.4 + i/20}} />
-        ))}
-      </div>
-      <div className="grid grid-cols-12 gap-[2px] mt-[2px]">
-        {Array.from({length: 12}).map((_,i)=> (
-          <div key={i} className="h-6 bg-red-500/10" style={{opacity: 1 - i/20}} />
-        ))}
-      </div>
-      <div className="mt-2 text-xs text-white/60">Top: YES depth • Bottom: NO depth</div>
-    </div>
-  )
-}
-
-function SignalHeatmap() {
-  // 2 rows (YES/NO) x 12 buckets
-  const yesVals = Array.from({length:12}, (_,i)=> Math.round(40 + i*4 + Math.sin(i)*3))
-  const noVals = yesVals.map(v=> 100 - v - 5)
-  const row = (vals: number[], color: string, label: string) => (
-    <div className="mb-1">
-      <div className="flex items-center justify-between text-xs text-white/60 mb-1">
-        <span>{label}</span>
-        <span className="text-white/50">avg {(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(0)}%</span>
-      </div>
-      <div className="grid grid-cols-12 gap-[2px]">
-        {vals.map((v,i)=> (
-          <div key={i} className="relative h-7 rounded-sm" style={{ backgroundColor: color, opacity: Math.max(0.25, v/100) }}>
-            <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white/90">{v}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-  return (
-    <div className="mt-2 p-3 rounded-md bg-white/5 border border-white/10">
-      <div className="text-xs text-white/70 mb-2">Signal Heatmap</div>
-      {row(yesVals, 'rgba(0,229,255,0.5)', 'YES')}
-      {row(noVals, 'rgba(239,68,68,0.5)', 'NO')}
-    </div>
-  )
-}
+// helpers moved below component
 
   // Mock whale activity
   const whaleActivity = [
@@ -939,6 +794,152 @@ function SignalHeatmap() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ----- Helper components (outside main client component) -----
+function AlphaChips() {
+  const momentum = [55,56,57,58,57,59,61,63,62,64]
+  const whales = [48,50,53,52,54,57,59,58,60,62]
+  const crowd = [42,41,43,45,44,46,47,49,48,50]
+  const items = [
+    { label: 'Momentum', color: '#00E5FF', data: momentum },
+    { label: 'Whale Flow', color: '#B6FF00', data: whales },
+    { label: 'Crowd Sentiment', color: '#ffffff', data: crowd },
+  ]
+  return (
+    <div className="flex flex-wrap gap-2 mb-1">
+      {items.map((it,i)=> (
+        <div key={i} className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs">
+          <span className="text-white/80">{it.label}</span>
+          <svg width="60" height="18" viewBox="0 0 60 18">
+            <path d={(() => {
+              const h=18; const w=60;
+              const step=w/(it.data.length-1);
+              const ys=it.data.map(v=> h - (v/100)*h);
+              let d=`M 0 ${ys[0]}`; for(let j=1;j<ys.length;j++) d+=` L ${j*step} ${ys[j]}`; return d;
+            })()} fill="none" stroke={it.color} strokeWidth="1.5" />
+          </svg>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function FeaturedMarkets() {
+  const items = [
+    { title: 'Bitcoin above $100k by year end?', tag: 'Bitcoin', pct: 65 },
+    { title: 'ETH spot ETF approved by Q4?', tag: 'Ethereum', pct: 61 },
+    { title: 'Solana flips BNB market cap?', tag: 'Solana', pct: 42 },
+  ]
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
+      <div className="text-sm font-semibold text-white/80 mb-3">Featured Questions</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {items.map((it,i)=> (
+          <div key={i} className="rounded-lg border border-white/10 bg-[#0F0F0F]/70 p-3">
+            <div className="text-xs text-white/50 mb-1">{it.tag}</div>
+            <div className="font-semibold text-white/90 line-clamp-2">{it.title}</div>
+            <div className="mt-3 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-teal" style={{width:`${it.pct}%`}} />
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs">
+              <span className="text-white/60">YES {it.pct}%</span>
+              <button className="px-2 py-1 rounded-md border border-teal/40 bg-teal/10 text-teal">View</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function OddsGauge({ percent }: { percent: number }) {
+  const p = Math.min(99, Math.max(1, percent))
+  const r = 48
+  const c = 2 * Math.PI * r
+  const offset = c * (1 - p / 100)
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
+      <div className="text-sm font-semibold text-white/80 mb-3">Market Odds & Probabilities</div>
+      <div className="flex items-center justify-center">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle cx="70" cy="70" r={r} stroke="rgba(255,255,255,0.1)" strokeWidth="10" fill="none" />
+          <circle cx="70" cy="70" r={r} stroke="#00E5FF" strokeWidth="10" fill="none" strokeDasharray={c} strokeDashoffset={offset} transform="rotate(-90 70 70)" />
+          <text x="70" y="75" textAnchor="middle" className="fill-white" fontSize="20" fontWeight="700">{p}%</text>
+        </svg>
+      </div>
+      <div className="mt-3 text-center text-xs text-white/60">YES probability</div>
+    </div>
+  )
+}
+
+function PriceMovers() {
+  const movers = [
+    { name: 'BTC Dominance', ch: +0.9 },
+    { name: 'ETH ETF', ch: +1.1 },
+    { name: 'SOL Upgrade', ch: +0.6 },
+    { name: 'DeFi TVL', ch: -0.5 },
+    { name: 'Stablecoin Supply', ch: +0.3 },
+  ]
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
+      <div className="text-sm font-semibold text-white/80 mb-3">Real‑Time Price Movements</div>
+      <div className="space-y-2 text-sm">
+        {movers.map((m,i)=>(
+          <div key={i} className="flex items-center justify-between">
+            <span className="text-white/80">{m.name}</span>
+            <span className={m.ch>=0? 'text-teal':'text-red-400'}>{m.ch>=0? '+':''}{m.ch.toFixed(2)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DepthHeatmapCard() {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 glass-card">
+      <div className="text-sm font-semibold text-white/80 mb-3">Depth Heatmap</div>
+      <div className="grid grid-cols-12 gap-[2px]">
+        {Array.from({length: 12}).map((_,i)=> (
+          <div key={i} className="h-6 bg-teal/10" style={{opacity: 0.4 + i/20}} />
+        ))}
+      </div>
+      <div className="grid grid-cols-12 gap-[2px] mt-[2px]">
+        {Array.from({length: 12}).map((_,i)=> (
+          <div key={i} className="h-6 bg-red-500/10" style={{opacity: 1 - i/20}} />
+        ))}
+      </div>
+      <div className="mt-2 text-xs text-white/60">Top: YES depth • Bottom: NO depth</div>
+    </div>
+  )
+}
+
+function SignalHeatmap() {
+  const yesVals = Array.from({length:12}, (_,i)=> Math.round(40 + i*4 + Math.sin(i)*3))
+  const noVals = yesVals.map(v=> 100 - v - 5)
+  const row = (vals: number[], color: string, label: string) => (
+    <div className="mb-1">
+      <div className="flex items-center justify-between text-xs text-white/60 mb-1">
+        <span>{label}</span>
+        <span className="text-white/50">avg {(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(0)}%</span>
+      </div>
+      <div className="grid grid-cols-12 gap-[2px]">
+        {vals.map((v,i)=> (
+          <div key={i} className="relative h-7 rounded-sm" style={{ backgroundColor: color, opacity: Math.max(0.25, v/100) }}>
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white/90">{v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+  return (
+    <div className="mt-2 p-3 rounded-md bg-white/5 border border-white/10">
+      <div className="text-xs text-white/70 mb-2">Signal Heatmap</div>
+      {row(yesVals, 'rgba(0,229,255,0.5)', 'YES')}
+      {row(noVals, 'rgba(239,68,68,0.5)', 'NO')}
     </div>
   )
 }
