@@ -111,7 +111,7 @@ export function MockExperience() {
             </div>
             {/* Compact tip on mobile */}
             <div className="ml-auto sm:hidden">
-              <Button variant="outline" size="icon" aria-label="Tip Creator" title="Tip Creator" className="h-9 w-9">
+              <Button variant="outline" size="sm" aria-label="Tip Creator" title="Tip Creator" className="h-9 w-9 p-0">
                 💸
               </Button>
             </div>
