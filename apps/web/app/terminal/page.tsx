@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo } from 'react'
+import { TrendingUp, TrendingDown, Activity, Users, DollarSign, AlertCircle, Sliders } from 'lucide-react'
 
 // Pure helpers used by the terminal chart
 function prng(seed: number) {
@@ -35,7 +36,6 @@ function spark(values: number[], w = 60, h = 18) {
   for (let i = 1; i < ys.length; i++) d += ` L ${i * step} ${ys[i]}`
   return d
 }
-import { TrendingUp, TrendingDown, Activity, Users, DollarSign, AlertCircle, Sliders } from 'lucide-react'
 
 export default function TerminalPage() {
   const [selectedOutcome, setSelectedOutcome] = useState<'YES' | 'NO'>('YES')
