@@ -55,6 +55,77 @@ function AlphaChips() {
   )
 }
 
+function FeaturedMarkets() {
+  const items = [
+    { title: 'Who will win the next election?', tag: 'Politics', pct: 65 },
+    { title: 'Will SpaceX reach Mars by 2030?', tag: 'Tech', pct: 42 },
+    { title: 'ETH ETF approved by Q4?', tag: 'Crypto', pct: 61 },
+  ]
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="text-sm font-semibold text-white/80 mb-3">Featured Questions</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {items.map((it,i)=> (
+          <div key={i} className="rounded-lg border border-white/10 bg-[#0F0F0F]/70 p-3">
+            <div className="text-xs text-white/50 mb-1">{it.tag}</div>
+            <div className="font-semibold text-white/90 line-clamp-2">{it.title}</div>
+            <div className="mt-3 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full bg-teal" style={{width:`${it.pct}%`}} />
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs">
+              <span className="text-white/60">YES {it.pct}%</span>
+              <button className="px-2 py-1 rounded-md border border-teal/40 bg-teal/10 text-teal">View</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function OddsGauge({ percent }: { percent: number }) {
+  const p = Math.min(99, Math.max(1, percent))
+  const r = 48
+  const c = 2 * Math.PI * r
+  const offset = c * (1 - p / 100)
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="text-sm font-semibold text-white/80 mb-3">Market Odds & Probabilities</div>
+      <div className="flex items-center justify-center">
+        <svg width="140" height="140" viewBox="0 0 140 140">
+          <circle cx="70" cy="70" r={r} stroke="rgba(255,255,255,0.1)" strokeWidth="10" fill="none" />
+          <circle cx="70" cy="70" r={r} stroke="#00E5FF" strokeWidth="10" fill="none" strokeDasharray={c} strokeDashoffset={offset} transform="rotate(-90 70 70)" />
+          <text x="70" y="75" textAnchor="middle" className="fill-white" fontSize="20" fontWeight="700">{p}%</text>
+        </svg>
+      </div>
+      <div className="mt-3 text-center text-xs text-white/60">YES probability</div>
+    </div>
+  )
+}
+
+function PriceMovers() {
+  const movers = [
+    { name: 'Biden', ch: -1.3 },
+    { name: 'Trump', ch: +2.6 },
+    { name: 'EU GDP', ch: -0.8 },
+    { name: 'ETH ETF', ch: +1.1 },
+    { name: 'Inflation < 3%', ch: -0.6 },
+  ]
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="text-sm font-semibold text-white/80 mb-3">Real‑Time Price Movements</div>
+      <div className="space-y-2 text-sm">
+        {movers.map((m,i)=>(
+          <div key={i} className="flex items-center justify-between">
+            <span className="text-white/80">{m.name}</span>
+            <span className={m.ch>=0? 'text-teal':'text-red-400'}>{m.ch>=0? '+':''}{m.ch.toFixed(2)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
   // Mock whale activity
   const whaleActivity = [
     { wallet: '0x742d...3f8a', side: 'YES', amount: 50000, score: 92, time: '2m ago' },
@@ -158,9 +229,41 @@ function AlphaChips() {
     return d
   }
 
-  // Build chart series (not perfectly complementary to appear real)
-  const YES_SERIES = useMemo(() => generateSeries(36, 44, 67, 12345, volatility, jumpProb), [volatility, jumpProb])
-  const NO_SERIES = useMemo(() => generateSeries(36, 58, 33, 54321, volatility * 1.05, jumpProb * 1.05), [volatility, jumpProb])
+  // Build chart series: flat early, cross close to resolution, sharper late
+  const { YES_SERIES, NO_SERIES } = useMemo(() => {
+    const n = 40
+    const crossAt = Math.floor(n * 0.85)
+    const rndYes = prng(12345)
+    const rndNo = prng(54321)
+    let yes = 44
+    let no = 56
+    const ys: number[] = []
+    const ns: number[] = []
+    for (let i = 0; i < n; i++) {
+      const isLate = i >= crossAt
+      const t = i / (n - 1)
+      const noiseAmp = (0.3 + t * t * 2) * volatility // very low early, higher near end
+      const driftYes = isLate ? (67 - yes) * 0.18 : (50 - yes) * 0.02
+      const driftNo = isLate ? (33 - no) * 0.18 : (50 - no) * 0.02
+      if (!isLate && Math.abs(yes - no) < 2) {
+        // keep them apart early for clarity
+        yes -= 0.2
+        no += 0.2
+      }
+      yes += driftYes + (rndYes() - 0.5) * noiseAmp
+      no += driftNo + (rndNo() - 0.5) * noiseAmp
+      if (rndYes() < jumpProb && isLate) yes += (rndYes() - 0.5) * 5
+      if (rndNo() < jumpProb && isLate) no += (rndNo() - 0.5) * 5
+      yes = Math.min(95, Math.max(5, yes))
+      no = Math.min(95, Math.max(5, no))
+      ys.push(yes)
+      ns.push(no)
+    }
+    // Force a single cross around crossAt by blending a bit
+    const m = Math.floor(crossAt)
+    ys[m] = ns[m]
+    return { YES_SERIES: ys, NO_SERIES: ns }
+  }, [volatility, jumpProb])
 
   // Deterministic volumes
   const volRnd = prng(98765)
@@ -217,6 +320,17 @@ function AlphaChips() {
                 <div className="text-2xl font-bold text-red-400">{(market.noPrice * 100).toFixed(0)}%</div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Featured + Odds */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2">
+            <FeaturedMarkets />
+          </div>
+          <div className="space-y-6">
+            <OddsGauge percent={Math.round(YES_SERIES[YES_SERIES.length-1])} />
+            <PriceMovers />
           </div>
         </div>
 
