@@ -465,6 +465,8 @@ function ChartLines() {
   // This avoids a large unused gap on the right side.
   const containerRef = React.useRef<HTMLDivElement | null>(null)
   const [containerWidth, setContainerWidth] = React.useState(800)
+  const [inView, setInView] = React.useState(false)
+  const [nudge, setNudge] = React.useState(0)
 
   React.useLayoutEffect(() => {
     const el = containerRef.current
@@ -473,10 +475,28 @@ function ChartLines() {
     setContainerWidth(el.clientWidth)
     const ro = new ResizeObserver((entries) => {
       const cr = entries[0]?.contentRect
-      if (cr) setContainerWidth(cr.width)
+      if (cr) {
+        setContainerWidth(cr.width)
+        // Subtle in-view easing on resize
+        if (inView) {
+          setNudge(1)
+          setTimeout(() => setNudge(0), 180)
+        }
+      }
     })
     ro.observe(el)
     return () => ro.disconnect()
+  }, [inView])
+
+  // Track whether chart is in viewport for gentler resize animation
+  React.useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const io = new IntersectionObserver((entries) => {
+      setInView(entries[0]?.isIntersecting ?? false)
+    }, { threshold: 0.15 })
+    io.observe(el)
+    return () => io.disconnect()
   }, [])
 
   // Chart dimensions with margins for axes
@@ -556,7 +576,7 @@ function ChartLines() {
         </defs>
 
         {/* Chart lines */}
-        <g clipPath="url(#chart-clip)">
+        <g clipPath="url(#chart-clip)" style={{ transition: 'transform 180ms ease-out, opacity 180ms ease-out', transform: `translateY(${nudge ? -3 : 0}px)`, opacity: nudge ? 0.92 : 1, willChange: 'transform, opacity' }}>
           <path
             d={yesPath}
             fill="none"
