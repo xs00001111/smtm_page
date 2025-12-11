@@ -11,9 +11,8 @@ import { PolymarketEventLines } from '@/components/polymarket-event-lines'
 export default function HomePage() {
   return (
     <>
-      {/* Ticker inside hero background context (full-bleed) */}
-      {/* Global radial glow across the whole page */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.08),transparent_60%)]" />
+      {/* Global radial glow across the whole page (uniform, no seams) */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.12),transparent_60%)]" />
 
       <main className="relative min-h-screen mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 overflow-x-hidden">
         {/* Hero */}
@@ -23,8 +22,7 @@ export default function HomePage() {
           <div className="hidden sm:block">
             <PolymarketEventLines />
           </div>
-          {/* Full-bleed glow overlay (spans entire viewport width) */}
-          <div aria-hidden className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 min-w-[100%] w-full bg-[radial-gradient(ellipse_at_top,_rgba(0,229,255,0.12),transparent_60%)]" />
+          {/* Removed hero-only glow to avoid color seam; global fixed glow covers page */}
           {/* Ticker strip anchored to top, sharing hero background */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 min-w-[100%] w-full">
             <MarketTickerBar />
