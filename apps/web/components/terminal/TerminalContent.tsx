@@ -227,6 +227,11 @@ export default function TerminalContent() {
             {/* Simple SVG chart with two paths */}
             <ChartLines />
           </div>
+          {/* Order book + ticket under chart */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <OrderBook />
+            <OrderTicket />
+          </div>
         </div>
         <div className="space-y-4">
           <SmartSignalCard />
@@ -235,6 +240,59 @@ export default function TerminalContent() {
           <DepthHeatmapCard />
         </div>
       </div>
+    </div>
+  )
+}
+
+// --- Order book + ticket (lightweight mock) ---
+function OrderBook() {
+  const rows = Array.from({ length: 6 }, (_, i) => ({ price: 42 - i, size: (Math.random() * 1800 + 200).toFixed(2) }))
+  const bids = Array.from({ length: 6 }, (_, i) => ({ price: 41 + i, size: (Math.random() * 1800 + 200).toFixed(2) }))
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="flex items-center justify-between mb-2 text-sm font-semibold">Order Book</div>
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <div className="text-white/60 mb-1">NO (asks)</div>
+          {rows.map((r, i) => (
+            <div key={i} className="flex justify-between px-2 py-1 rounded bg-red-500/10 mb-1">
+              <span className="text-red-400">{r.price}¢</span>
+              <span className="text-white/70">${r.size}</span>
+            </div>
+          ))}
+        </div>
+        <div>
+          <div className="text-white/60 mb-1">YES (bids)</div>
+          {bids.map((r, i) => (
+            <div key={i} className="flex justify-between px-2 py-1 rounded bg-teal/10 mb-1">
+              <span className="text-teal">{r.price}¢</span>
+              <span className="text-white/70">${r.size}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OrderTicket() {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+      <div className="flex items-center gap-2 mb-2 text-sm font-semibold"><span className="px-2 py-1 rounded bg-white/5">Buy</span><span className="px-2 py-1 rounded bg-white/5">Sell</span></div>
+      <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+        <button className="rounded-md border border-teal/40 bg-teal/10 text-teal px-2 py-1">YES 67¢</button>
+        <button className="rounded-md border border-red-400/40 bg-red-400/10 text-red-400 px-2 py-1">NO 33¢</button>
+      </div>
+      <div className="text-4xl font-extrabold tracking-tight mb-2">$163.24</div>
+      <div className="flex gap-2 mb-2">
+        {[1, 20, 100].map((v) => (<button key={v} className="px-2 py-1 rounded border border-white/10 bg-white/5 text-xs">+${v}</button>))}
+        <button className="px-2 py-1 rounded border border-white/10 bg-white/5 text-xs">Max</button>
+      </div>
+      <div className="h-2 rounded bg-white/10 mb-2">
+        <div className="h-2 rounded bg-gradient-to-r from-teal to-lime w-[70%]" />
+      </div>
+      <div className="text-xs text-white/60 mb-2">To Win <span className="text-white/80">$388.67</span></div>
+      <button className="w-full rounded-md bg-gradient-to-r from-teal to-lime text-black font-semibold py-2">Buy YES</button>
     </div>
   )
 }
