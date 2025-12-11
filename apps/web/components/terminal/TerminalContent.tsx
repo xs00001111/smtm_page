@@ -88,19 +88,22 @@ function useDemoSeries() {
 
     if (yesEvent) {
       yes += yesEvent.magnitude
-    } else {
-      // Normal periods: independent small movements
-      const microNoise = (rng() - 0.5) * 0.9
-      yes += microNoise
     }
+
+    // Always add noise for bumpiness, even during events
+    const yesNoise = (rng() - 0.5) * 1.8
+    // Add occasional small bumps/dips (20% chance)
+    const yesBump = rng() > 0.8 ? (rng() - 0.5) * 3 : 0
+    yes += yesNoise + yesBump
 
     if (noEvent) {
       no += noEvent.magnitude
-    } else {
-      // NO has its own independent noise
-      const microNoise = (rng2() - 0.5) * 0.85
-      no += microNoise
     }
+
+    // NO has its own independent noise and bumps
+    const noNoise = (rng2() - 0.5) * 1.7
+    const noBump = rng2() > 0.8 ? (rng2() - 0.5) * 2.8 : 0
+    no += noNoise + noBump
 
     // Keep within bounds
     yes = Math.min(90, Math.max(10, yes))
