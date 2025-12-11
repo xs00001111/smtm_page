@@ -40,10 +40,15 @@ function useDemoSeries() {
   let yes = 58  // Start at 58%
   let no = 42   // Start at 42%
 
-  // Define some spike events
+  // Define multiple spike events for more realistic movement
   const spikes = [
+    { at: 8, magnitude: 3 },    // Small early spike
+    { at: 15, magnitude: -2 },  // Small dip
+    { at: 20, magnitude: -5 },  // Medium dip
+    { at: 28, magnitude: 4 },   // Recovery spike
     { at: 35, magnitude: 12 },  // Big spike near the end
-    { at: 20, magnitude: -4 },  // Small dip in middle
+    { at: 42, magnitude: -3 },  // Small correction
+    { at: 47, magnitude: 2 },   // Final small move
   ]
 
   for (let i = 0; i < n; i++) {
@@ -56,7 +61,7 @@ function useDemoSeries() {
       no -= spike.magnitude
     } else {
       // Normal small random walk - mostly stays stable
-      const smallNoise = (rng() - 0.5) * 1.5
+      const smallNoise = (rng() - 0.5) * 1.2
       yes += smallNoise
       no -= smallNoise
     }
@@ -254,12 +259,13 @@ export default function TerminalContent() {
             <OrderBook />
             <OrderTicket />
           </div>
+          {/* Depth heatmap aligned at bottom */}
+          <DepthHeatmapCard />
         </div>
         <div className="space-y-4">
           <SmartSignalCard />
           <OddsGauge percent={63} />
           <PriceMovers />
-          <DepthHeatmapCard />
         </div>
       </div>
     </div>
@@ -298,23 +304,97 @@ function OrderBook() {
 }
 
 function OrderTicket() {
+  const [orderType, setOrderType] = React.useState<'market' | 'limit'>('market')
+  const [buySell, setBuySell] = React.useState<'buy' | 'sell'>('buy')
+  const [yesNo, setYesNo] = React.useState<'yes' | 'no'>('yes')
+  const [limitPrice, setLimitPrice] = React.useState('67')
+
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
-      <div className="flex items-center gap-2 mb-2 text-sm font-semibold"><span className="px-2 py-1 rounded bg-white/5">Buy</span><span className="px-2 py-1 rounded bg-white/5">Sell</span></div>
-      <div className="grid grid-cols-2 gap-2 text-xs mb-2">
-        <button className="rounded-md border border-teal/40 bg-teal/10 text-teal px-2 py-1">YES 67¢</button>
-        <button className="rounded-md border border-red-400/40 bg-red-400/10 text-red-400 px-2 py-1">NO 33¢</button>
+      <div className="flex items-center gap-2 mb-3 text-sm font-semibold">
+        <button
+          onClick={() => setBuySell('buy')}
+          className={`px-3 py-1.5 rounded transition ${buySell === 'buy' ? 'bg-teal/20 text-teal border border-teal/40' : 'bg-white/5 text-white/60'}`}
+        >
+          Buy
+        </button>
+        <button
+          onClick={() => setBuySell('sell')}
+          className={`px-3 py-1.5 rounded transition ${buySell === 'sell' ? 'bg-red-400/20 text-red-400 border border-red-400/40' : 'bg-white/5 text-white/60'}`}
+        >
+          Sell
+        </button>
       </div>
-      <div className="text-4xl font-extrabold tracking-tight mb-2">$163.24</div>
-      <div className="flex gap-2 mb-2">
-        {[1, 20, 100].map((v) => (<button key={v} className="px-2 py-1 rounded border border-white/10 bg-white/5 text-xs">+${v}</button>))}
-        <button className="px-2 py-1 rounded border border-white/10 bg-white/5 text-xs">Max</button>
+
+      <div className="flex items-center gap-2 mb-3 text-xs">
+        <button
+          onClick={() => setOrderType('market')}
+          className={`px-2 py-1 rounded transition ${orderType === 'market' ? 'bg-white/10 text-white border border-white/20' : 'bg-white/5 text-white/40'}`}
+        >
+          Market
+        </button>
+        <button
+          onClick={() => setOrderType('limit')}
+          className={`px-2 py-1 rounded transition ${orderType === 'limit' ? 'bg-white/10 text-white border border-white/20' : 'bg-white/5 text-white/40'}`}
+        >
+          Limit
+        </button>
       </div>
+
+      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+        <button
+          onClick={() => setYesNo('yes')}
+          className={`rounded-md border px-2 py-2 transition ${yesNo === 'yes' ? 'border-teal/60 bg-teal/20 text-teal font-semibold' : 'border-teal/20 bg-teal/5 text-teal/60'}`}
+        >
+          YES 67¢
+        </button>
+        <button
+          onClick={() => setYesNo('no')}
+          className={`rounded-md border px-2 py-2 transition ${yesNo === 'no' ? 'border-red-400/60 bg-red-400/20 text-red-400 font-semibold' : 'border-red-400/20 bg-red-400/5 text-red-400/60'}`}
+        >
+          NO 33¢
+        </button>
+      </div>
+
+      {orderType === 'limit' && (
+        <div className="mb-3">
+          <label className="text-xs text-white/60 mb-1 block">Limit Price (¢)</label>
+          <input
+            type="number"
+            value={limitPrice}
+            onChange={(e) => setLimitPrice(e.target.value)}
+            className="w-full px-3 py-2 rounded-md bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-teal/50"
+            placeholder="Enter limit price"
+          />
+        </div>
+      )}
+
+      <div className="mb-3">
+        <label className="text-xs text-white/60 mb-1 block">Amount (USD)</label>
+        <div className="text-3xl font-extrabold tracking-tight mb-2">$163.24</div>
+        <div className="flex gap-2">
+          {[1, 20, 100].map((v) => (
+            <button key={v} className="px-2 py-1 rounded border border-white/10 bg-white/5 text-xs hover:bg-white/10 transition">
+              +${v}
+            </button>
+          ))}
+          <button className="px-2 py-1 rounded border border-white/10 bg-white/5 text-xs hover:bg-white/10 transition">Max</button>
+        </div>
+      </div>
+
       <div className="h-2 rounded bg-white/10 mb-2">
         <div className="h-2 rounded bg-gradient-to-r from-teal to-lime w-[70%]" />
       </div>
-      <div className="text-xs text-white/60 mb-2">To Win <span className="text-white/80">$388.67</span></div>
-      <button className="w-full rounded-md bg-gradient-to-r from-teal to-lime text-black font-semibold py-2">Buy YES</button>
+      <div className="text-xs text-white/60 mb-3">
+        To Win <span className="text-white/80 font-semibold">$388.67</span>
+      </div>
+      <button className={`w-full rounded-md font-semibold py-2.5 transition ${
+        buySell === 'buy'
+          ? 'bg-gradient-to-r from-teal to-lime text-black hover:opacity-90'
+          : 'bg-gradient-to-r from-red-500 to-red-600 text-white hover:opacity-90'
+      }`}>
+        {buySell === 'buy' ? 'Buy' : 'Sell'} {yesNo.toUpperCase()}
+      </button>
     </div>
   )
 }
@@ -325,8 +405,8 @@ function ChartLines() {
   // Chart dimensions with margins for axes
   const chartWidth = 800
   const chartHeight = 320
-  const marginLeft = 50
-  const marginBottom = 30
+  const marginLeft = 60  // Increased for Y-axis label spacing
+  const marginBottom = 35
   const marginTop = 10
   const marginRight = 10
   const plotWidth = chartWidth - marginLeft - marginRight
