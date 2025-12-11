@@ -97,18 +97,18 @@ export default function HomePage() {
       {/* Available Now: Telegram Bot Features */}
       <section id="features" className="relative py-16 md:py-20">
         <div className="mx-auto max-w-6xl px-6">
-          <div className="text-center mb-12">
+          <div className="text-center mb-8 sm:mb-12">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-4 py-1.5 mb-4">
               <Zap size={14} className="text-[#00E5FF]" />
               <span className="text-xs tracking-wide text-[#00E5FF] font-medium">AVAILABLE NOW</span>
             </div>
             <h2 className="font-display text-3xl md:text-5xl font-extrabold">Telegram Bot Features</h2>
-            <p className="mt-4 text-white/80 max-w-2xl mx-auto">
-              Get instant alerts and research tools. Free and open to everyone.
+            <p className="mt-3 sm:mt-4 text-white/80 max-w-xl mx-auto text-sm sm:text-base">
+              Instant alerts and research tools. Free for everyone.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6 mb-12">
             <FeatureCard
               title="Real-Time Alerts"
               description="Follow markets and whales. Get notified on price changes and large trades instantly."
@@ -127,14 +127,14 @@ export default function HomePage() {
           </div>
 
           {/* Coming Soon Section */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-6 sm:mb-10">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.05] px-4 py-1.5 mb-4">
               <span className="text-xs tracking-wide text-white/70 font-medium">COMING SOON</span>
             </div>
             <h3 className="font-display text-2xl md:text-3xl font-bold">What's Next</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
             <FeatureCard
               title="Discord Bot"
               description="Bring alerts and research to your Discord servers. Same features, new platform."
