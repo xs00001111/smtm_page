@@ -298,11 +298,25 @@ export class AlphaAlertsService {
 
   async sendAlphaAlert(alert: AlertPayload): Promise<void> {
     const users = await this.store.allEnabled()
-    logger.info({ alertId: alert.id, enabledUsers: users.length, confidence: alert.confidence }, 'alpha_alerts.processing')
+
+    // Whitelist check: Only send to specific users during testing
+    const whitelistEnv = process.env.ALPHA_ALERTS_WHITELIST
+    const whitelist = whitelistEnv ? whitelistEnv.split(',').map((id) => Number(id.trim())).filter(Number.isFinite) : null
+
+    const filteredUsers = whitelist ? users.filter((u) => whitelist.includes(u.userId)) : users
+
+    logger.info({
+      alertId: alert.id,
+      enabledUsers: users.length,
+      whitelistedUsers: filteredUsers.length,
+      whitelist: whitelist || 'disabled',
+      confidence: alert.confidence
+    }, 'alpha_alerts.processing')
+
     const now = new Date()
     const tasks: Promise<any>[] = []
 
-    for (const u of users) {
+    for (const u of filteredUsers) {
       // Tier-based routing
       if (u.alpha_tier === 'high_confidence' && !(alert.confidence >= 0.75)) {
         continue
