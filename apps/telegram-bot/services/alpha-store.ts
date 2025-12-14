@@ -126,8 +126,20 @@ export async function fetchRecentAlpha(opts?: { tokenIds?: string[]; conditionId
     }
     const path = `alpha_event?${buildParams().join('&')}`
     logger.info(`alpha:store fetch path schema=public ${path}`)
-    const rows = await sb<any[]>(path, undefined, 'public')
+    let rows = await sb<any[]>(path, undefined, 'public')
     logger.info(`alpha:store fetch ok rows=${rows?.length || 0}`)
+    // Fallback: if strict filter returned nothing, retry without completeness constraints
+    if ((!rows || rows.length === 0) && (opts?.onlyComplete !== false)) {
+      const relaxedParams = buildParams().filter(p => !p.startsWith('or='))
+      const path2 = `alpha_event?${relaxedParams.join('&')}`
+      logger.info(`alpha:store fetch retry relaxed schema=public ${path2}`)
+      try {
+        rows = await sb<any[]>(path2, undefined, 'public')
+        logger.info(`alpha:store fetch relaxed ok rows=${rows?.length || 0}`)
+      } catch (e) {
+        logger.warn(`alpha:store fetch relaxed failed ${(e as any)?.message || e}`)
+      }
+    }
     let events = rows.map(r => ({
       id: r.id ? String(r.id) : `${new Date(r.created_at).getTime()}-${r.token_id || ''}-${r.wallet || ''}-${r.alpha}`,
       ts: new Date(r.created_at).getTime(),

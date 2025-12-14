@@ -4633,7 +4633,7 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
       }
     } catch (e) {
-      logger.error('alpha command failed', e)
+      logger.error({ err: (e as any)?.message || e, stack: (e as any)?.stack }, 'alpha command failed')
       await ctx.reply('❌ Failed to fetch alpha. Try again later.')
     } finally {
       const userId = ctx.from?.id
