@@ -91,8 +91,8 @@ class JsonAlphaPrefsStore {
     if (cur) return cur
     const def: UserAlphaPrefs = {
       userId,
-      alpha_enabled: false,
-      alpha_tier: 'high_confidence',
+      alpha_enabled: true,
+      alpha_tier: 'high',
       quiet_hours: null,
       created_at: now,
       updated_at: now,
@@ -106,7 +106,7 @@ class JsonAlphaPrefsStore {
     const cur = await this.get(userId)
     const updated: UserAlphaPrefs = { ...cur, ...patch, userId, updated_at: Date.now() }
     // Enforce defaults/valids
-    if (!updated.alpha_tier) updated.alpha_tier = 'high_confidence'
+    if (!updated.alpha_tier) updated.alpha_tier = 'high'
     this.cache.set(userId, updated)
     await this.save()
     return updated
