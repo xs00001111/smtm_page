@@ -16,7 +16,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
     try {
       const svc = alphaAlerts()
       const prefs = await svc.getPrefs(ctx.from.id)
-      const msg = `${formatStatusLine(prefs)}`
+      const msg = `${formatStatusLine(prefs)}\n<i>Opt‑in; no backfill. Tiers: ⚡ all, 🎯 ≥0.75 conf, 🧠 daily 09:00. Quiet hours queue to digest.</i>`
       await ctx.reply(msg, { parse_mode: 'HTML', ...(svc.buildSettingsKeyboard(prefs) as any) })
     } catch (e) {
       logger.warn('alpha_alerts.alpha_cmd_post_failed', (e as any)?.message || e)
@@ -28,7 +28,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
     try {
       const svc = alphaAlerts()
       const prefs = await svc.getPrefs(ctx.from.id)
-      const msg = `Settings — ${formatStatusLine(prefs)}`
+      const msg = `Settings — ${formatStatusLine(prefs)}\n<i>Opt‑in; no backfill. Tiers: ⚡ all, 🎯 ≥0.75 conf, 🧠 daily 09:00. Quiet hours queue to digest.</i>`
       await ctx.reply(msg, { parse_mode: 'HTML', ...(svc.buildSettingsKeyboard(prefs) as any) })
     } catch {}
   })

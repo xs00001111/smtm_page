@@ -874,6 +874,7 @@ export function registerCommands(bot: Telegraf) {
         '• /overview <market> — orderbook & positions\n' +
         '• /follow 0x<market_id> — price alerts\n' +
         '• /list — view your follows\n\n' +
+        'Alpha Alerts (opt‑in): Off by default. Tiers: ⚡ All, 🎯 ≥0.75 conf, 🧠 daily 09:00. No backfill; quiet hours queue to digest. Manage: /settings\n\n' +
         'More commands: /help',
       {
         reply_markup: {
@@ -2104,7 +2105,8 @@ export function registerCommands(bot: Telegraf) {
         '• /follow 0x<market_id> — price alerts\n' +
         '• /follow 0x<wallet> — whale trades (all markets)\n' +
         '• /follow 0x<wallet> 0x<market_id> — whale on specific market\n' +
-        '• /unfollow <...>  •  /list — manage follows\n\n' +
+        '• /unfollow <...>  •  /list — manage follows\n' +
+        '• Alpha Alerts (opt‑in): OFF by default. Tiers: ⚡ All, 🎯 ≥0.75 conf, 🧠 daily 09:00. No backfill; quiet hours queue to digest. Manage: /settings\n\n' +
         'Analysis\n' +
         '• /profile_card [address|@username|url] — trader profile\n' +
         '   e.g. /profile_card @alice  •  /profile_card 0xABC...\n' +
