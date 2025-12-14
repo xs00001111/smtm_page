@@ -27,6 +27,22 @@ export const wsMonitor = new WebSocketMonitorService(bot);
 
 // Register all commands
 initAnalyticsLogging(bot);
+
+// Auto-enable alpha alerts for any user who chats with the bot
+bot.use(async (ctx, next) => {
+  try {
+    const userId = ctx.from?.id;
+    if (userId && !ctx.from?.is_bot) {
+      // Silently ensure user has alpha preferences (will create if missing)
+      await alphaAlerts().getPrefs(userId);
+    }
+  } catch (err) {
+    // Don't block the request if prefs fail
+    logger.warn({ err: (err as any)?.message, userId: ctx.from?.id }, 'Failed to auto-create alpha prefs');
+  }
+  return next();
+});
+
 registerCommands(bot);
 
 // Error handling
