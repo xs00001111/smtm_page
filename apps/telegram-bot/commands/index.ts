@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf';
 import { logger } from '../utils/logger';
 import { getTopRewardMarket, formatRewardInfo } from '../services/rewards';
-import { findMarket, findMarketFuzzy, findWhaleFuzzy, findWhaleFuzzyWide, gammaApi, dataApi, clobApi } from '@smtm/data';
+import { findMarket, findMarketFuzzy, findWhaleFuzzy, findWhaleFuzzyWide, gammaApi, dataApi, clobApi, formatLargeNum } from '@smtm/data';
 import { wsMonitor } from '../index';
 // Toggle DB-first surfacing of alpha events (enable to surface unseen DB alpha before live scan)
 const DB_FIRST_ENABLED = true;
@@ -13,6 +13,22 @@ import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, reso
 import { logActionEvent } from '../services/analytics';
 import { recordSurveyResponse } from '../services/survey';
 import { registerAlphaAlertsCommands } from './alpha-alerts';
+
+
+// Helper function for deduplicating alpha results by stable ID
+function dedupeByIdStable(arr: any[]): any[] {
+  const seen = new Set<string>()
+  const out: any[] = []
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const e: any = arr[i]
+    const id = String(e?.id || `${e?.ts || ''}-${e?.tokenId || ''}-${e?.wallet || ''}-${e?.alpha || ''}`)
+    if (seen.has(id)) continue
+    seen.add(id)
+    out.push(e)
+  }
+  out.reverse()
+  return out
+}
 
 // Lightweight skew cache to avoid recomputation storms (10 minutes)
 const SkewCache: Map<string, { ts: number; result: any }> = new Map()
@@ -56,7 +72,7 @@ async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?
     SkewCache.set(conditionId, { ts: now, result: res })
     return res
   } catch (e) {
-    logger.warn('skew:get failed', { conditionId, err: (e as any)?.message || String(e) })
+    logger.warn({ conditionId, err: (e as any)?.message || String(e) }, 'skew:get failed')
     return null
   }
 }
@@ -528,7 +544,7 @@ async function getGroupSubMarkets(groupUrl: string): Promise<Array<{ slug: strin
       }
     }
     return uniq
-  } catch (e) { try { logger.warn('getGroupSubMarkets failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
+  } catch (e) { try { logger.warn({ err: (e as any)?.message || String(e) }, 'getGroupSubMarkets failed') } catch {} ; return [] }
 }
 
 // Extract all sub-market slugs from a Polymarket event page
@@ -570,7 +586,7 @@ async function getEventSubMarketSlugs(eventUrl: string): Promise<string[]> {
     const out = Array.from(slugs)
     logger.info({ count: out.length, sample: out.slice(0,5) }, 'getEventSubMarketSlugs: extracted slugs')
     return out
-  } catch (e) { try { logger.warn('getEventSubMarketSlugs failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
+  } catch (e) { try { logger.warn({ err: (e as any)?.message || String(e) }, 'getEventSubMarketSlugs failed') } catch {} ; return [] }
 }
 
 // Extract sub‑market metadata (conditionId, slug, tokens) from an event page
@@ -668,7 +684,7 @@ async function getEventSubMarkets(eventUrl: string): Promise<Array<{ slug: strin
       targetEventSlug
     }, 'getEventSubMarkets: processed queries')
     return uniq
-  } catch (e) { try { logger.warn('getEventSubMarkets failed', { err: (e as any)?.message || String(e) }) } catch {} ; return [] }
+  } catch (e) { try { logger.warn({ err: (e as any)?.message || String(e) }, 'getEventSubMarkets failed') } catch {} ; return [] }
 }
 
 /**
@@ -756,14 +772,14 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
   const isCondId = looksLikeCond.test(trimmedInput)
   const isUrl = looksLikeUrl.test(trimmedInput)
 
-  logger.info('resolveMarketFromInput: input analysis', {
+  logger.info({
     originalLength: input.length,
     trimmedLength: trimmedInput.length,
     firstChars: trimmedInput.slice(0, 30),
     isCondId,
     isUrl,
     allowFuzzy
-  })
+  }, 'resolveMarketFromInput: input analysis')
 
   try {
     // 1. Try condition ID (0x...)
@@ -785,7 +801,7 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
           // Example: /event/maduro-out-in-2025/maduro-out-in-2025-411
           //          parts[0]=event, parts[1]=event-slug, parts[2]=market-slug
           let slug = parts[idx+2] ? decodeURIComponent(parts[idx+2]) : decodeURIComponent(parts[idx+1])
-          logger.info('resolveMarketFromInput: extracted slug from URL', { slug, hasMarketSlug: !!parts[idx+2] })
+          logger.info({ slug, hasMarketSlug: !!parts[idx+2] }, 'resolveMarketFromInput: extracted slug from URL')
 
           // Try to find market by slug first
           const m = await findMarket(slug)
@@ -822,7 +838,7 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
                   const best = ranked[0]?.m
                   const bestSlug = best?.slug || best?.market_slug
                   if (bestSlug) {
-                    logger.info('resolveMarketFromInput: picked best sub-market from event', { slug: bestSlug })
+                    logger.info({ slug: bestSlug }, 'resolveMarketFromInput: picked best sub-market from event')
                     const fullMarket = await findMarket(bestSlug)
                     if (fullMarket) return fullMarket
                   }
@@ -830,7 +846,7 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
               }
             }
           } catch (scrapeErr) {
-            logger.error('resolveMarketFromInput: scraping event page failed', { error: (scrapeErr as any)?.message })
+            logger.error({ error: (scrapeErr as any)?.message }, 'resolveMarketFromInput: scraping event page failed')
           }
         }
       } catch {}
@@ -838,22 +854,22 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
 
     // 3. Fallback to fuzzy search/slug resolution (only if allowed)
     if (allowFuzzy) {
-      logger.info('resolveMarketFromInput: trying fuzzy search fallback', { input: trimmedInput })
+      logger.info({ input: trimmedInput }, 'resolveMarketFromInput: trying fuzzy search fallback')
       return await findMarket(trimmedInput)
     }
 
-    logger.warn('resolveMarketFromInput: input not recognized as URL or ID', {
+    logger.warn({
       input: trimmedInput,
       originalInput: input
-    })
+    }, 'resolveMarketFromInput: input not recognized as URL or ID')
     return null
   } catch (e) {
-    logger.error('resolveMarketFromInput failed', {
+    logger.error({
       input: trimmedInput,
       originalInput: input,
       error: (e as any)?.message,
       stack: (e as any)?.stack
-    })
+    }, 'resolveMarketFromInput failed')
     return null
   }
 }
@@ -863,7 +879,7 @@ export function registerCommands(bot: Telegraf) {
   registerAlphaAlertsCommands(bot)
   // Start command
   bot.command('start', async (ctx) => {
-    logger.info('User started bot', { userId: ctx.from?.id });
+    logger.info({ userId: ctx.from?.id }, 'User started bot');
     await ctx.reply(
       'Welcome to SMTM 🎯\n\n' +
         'Quick actions:\n' +
@@ -898,7 +914,7 @@ export function registerCommands(bot: Telegraf) {
       if (!data) return await next()
 
       // Log all callback queries for debugging
-      logger.info('callback_query received', { data: data?.slice(0, 100) })
+      logger.info({ data: data?.slice(0, 100) }, 'callback_query received')
 
       // Smart Skew (markets)
       if (data.startsWith('skew:') || data.startsWith('skw:') || data.startsWith('detopt:skew:')) {
@@ -907,7 +923,7 @@ export function registerCommands(bot: Telegraf) {
         // Handle detopt:skew: format
         if (data.startsWith('detopt:skew:')) {
           const token = data.split(':')[2]
-          logger.info('skew: handling detopt format', { token })
+          logger.info({ token }, 'skew: handling detopt format')
           if (!token) { await ctx.answerCbQuery('Missing market id'); return }
           const decoded = tokenToCond(token)
           if (!decoded) { await ctx.answerCbQuery('Invalid market id'); return }
@@ -929,7 +945,7 @@ export function registerCommands(bot: Telegraf) {
         let m: any
         try {
           m = await gammaApi.getMarket(cond)
-          logger.info('skew: market fetched', {
+          logger.info({
             conditionId: cond,
             hasEvents: !!m?.events,
             eventsCount: m?.events?.length || 0,
@@ -937,9 +953,9 @@ export function registerCommands(bot: Telegraf) {
             tokensCount: m?.tokens?.length || 0,
             slug: m?.slug || m?.market_slug,
             question: m?.question?.slice(0, 60)
-          })
+          }, 'skew: market fetched')
         } catch (e) {
-          logger.warn('skew: market fetch failed', { err: (e as any)?.message })
+          logger.warn({ err: (e as any)?.message }, 'skew: market fetch failed')
           await ctx.reply('❌ Failed to load market. Try again later.')
           return
         }
@@ -948,14 +964,14 @@ export function registerCommands(bot: Telegraf) {
           // prefer parsing the group (event+market) page first. Fallback to event-wide search only if needed.
           const eventSlug = Array.isArray(m?.events) && m.events.length ? m.events[0]?.slug : undefined
 
-          logger.info('skew: checking for group market', {
+          logger.info({
             conditionId: cond,
             hasEvents: !!m?.events,
             eventsLength: m?.events?.length || 0,
             eventSlug,
             marketSlug: m?.slug || m?.market_slug,
             question: m?.question?.slice(0, 60)
-          })
+          }, 'skew: checking for group market')
 
           if (eventSlug) {
             // Try group page first (most series are one page with date toggles)
@@ -964,9 +980,9 @@ export function registerCommands(bot: Telegraf) {
               const marketSlug = (m as any)?.slug || (m as any)?.market_slug
               if (marketSlug) {
                 const groupUrl = `https://polymarket.com/event/${eventSlug}/${marketSlug}`
-                logger.info('skew: trying group expansion', { groupUrl })
+                logger.info({ groupUrl }, 'skew: trying group expansion')
                 const groupChildren = await getGroupSubMarkets(groupUrl)
-                logger.info('skew: group children fetched', { count: groupChildren?.length || 0 })
+                logger.info({ count: groupChildren?.length || 0 }, 'skew: group children fetched')
                 // Sort by end date ascending (soonest first)
                 const gc = Array.isArray(groupChildren)
                   ? groupChildren
@@ -1163,15 +1179,15 @@ export function registerCommands(bot: Telegraf) {
           const url = getPolymarketMarketUrl(m)
           const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
           const no = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
-          logger.info('skew: single-market fallback', { cond, hasYes: !!yes, hasNo: !!no })
+          logger.info({ cond, hasYes: !!yes, hasNo: !!no }, 'skew: single-market fallback')
           const res = await getSmartSkew(cond, yes, no)
-          logger.info('skew: getSmartSkew result', {
+          logger.info({
             hasResult: !!res,
             resultType: typeof res,
             resultKeys: res ? Object.keys(res) : []
-          })
+          }, 'skew: getSmartSkew result')
           if (!res) {
-            logger.warn('skew: no result from getSmartSkew', { cond, yes, no })
+            logger.warn({ cond, yes, no }, 'skew: no result from getSmartSkew')
             await ctx.reply('⚠️ Not enough data to assess skew.')
             return
           }
@@ -1188,7 +1204,7 @@ export function registerCommands(bot: Telegraf) {
           } catch {}
           await ctx.reply(card, { parse_mode: 'HTML' })
         } catch (e) {
-          logger.warn('skew: handler failed', { err: (e as any)?.message })
+          logger.warn({ err: (e as any)?.message }, 'skew: handler failed')
           await ctx.reply('❌ Failed to compute skew. Try again later.')
         }
         return
@@ -1238,7 +1254,7 @@ export function registerCommands(bot: Telegraf) {
               reply_markup: { inline_keyboard: keyboard }
             })
           } catch (e) {
-            logger.warn('detback: failed', { err: (e as any)?.message })
+            logger.warn({ err: (e as any)?.message }, 'detback: failed')
             await ctx.answerCbQuery('Failed to load market')
           }
           return
@@ -1250,20 +1266,20 @@ export function registerCommands(bot: Telegraf) {
           const option = parts[1]  // skew, overview, price, net
           const token = parts[2]
 
-          logger.info('detopt: handling', { option, token, data })
+          logger.info({ option, token, data }, 'detopt: handling')
 
           if (!token) {
-            logger.warn('detopt: missing token', { data })
+            logger.warn({ data }, 'detopt: missing token')
             await ctx.answerCbQuery('Missing market id')
             return
           }
 
           // Decode token to condition ID
           const cond = tokenToCond(token)
-          logger.info('detopt: decoded token', { token, cond })
+          logger.info({ token, cond }, 'detopt: decoded token')
 
           if (!cond) {
-            logger.error('detopt: invalid token', { token })
+            logger.error({ token }, 'detopt: invalid token')
             await ctx.answerCbQuery('Invalid market id')
             return
           }
@@ -1276,20 +1292,20 @@ export function registerCommands(bot: Telegraf) {
               const market = await gammaApi.getMarket(cond)
               const conditionId = market.condition_id || market.conditionId
 
-              logger.info('overview: market data', {
+              logger.info({
                 conditionId,
                 hasTokens: !!market.tokens,
                 tokenCount: market.tokens?.length || 0,
                 question: market.question?.slice(0, 60)
-              })
+              }, 'overview: market data')
 
               // If tokens are missing, try re-fetching
               if (!market.tokens || market.tokens.length === 0) {
-                logger.warn('overview: no tokens, re-fetching', { conditionId })
+                logger.warn({ conditionId }, 'overview: no tokens, re-fetching')
                 const refetchedMarket = await gammaApi.getMarket(conditionId)
                 if (refetchedMarket?.tokens?.length > 0) {
                   Object.assign(market, refetchedMarket)
-                  logger.info('overview: refetch successful', { tokenCount: refetchedMarket.tokens.length })
+                  logger.info({ tokenCount: refetchedMarket.tokens.length }, 'overview: refetch successful')
                 } else {
                   logger.error('overview: refetch also has no tokens - might be group market')
                 }
@@ -1303,15 +1319,15 @@ export function registerCommands(bot: Telegraf) {
 
               const yesToken = (market.tokens || []).find(t => (t.outcome || '').toLowerCase() === 'yes')
               if (!yesToken) {
-                logger.error('overview: no YES token found', {
+                logger.error({
                   conditionId,
                   tokens: market.tokens?.map((t: any) => ({ outcome: t.outcome, token_id: t.token_id }))
-                })
+                }, 'overview: no YES token found')
                 await ctx.reply('❌ This market has no tradeable YES/NO outcomes. This might be a multi-market group. Try using /overview with the specific market URL.')
                 return
               }
 
-              logger.info('overview: YES token found', { tokenId: yesToken.token_id })
+              logger.info({ tokenId: yesToken.token_id }, 'overview: YES token found')
 
               // Get orderbook
               let book: any = null
@@ -1326,7 +1342,7 @@ export function registerCommands(bot: Telegraf) {
                   spread = bestAsk - bestBid
                 }
               } catch (err) {
-                logger.error('overview: orderbook fetch failed', { error: err })
+                logger.error({ error: err }, 'overview: orderbook fetch failed')
               }
 
               // Build orderbook overview message
@@ -1387,10 +1403,10 @@ export function registerCommands(bot: Telegraf) {
                   await ctx.reply(card, { parse_mode: 'HTML' })
                 }
               } catch (e) {
-                logger.warn('overview: skew fetch failed', { err: (e as any)?.message })
+                logger.warn({ err: (e as any)?.message }, 'overview: skew fetch failed')
               }
             } catch (e) {
-              logger.error('overview: failed', { err: (e as any)?.message })
+              logger.error({ err: (e as any)?.message }, 'overview: failed')
               await ctx.reply('❌ Failed to load market overview.')
             }
             return
@@ -1463,7 +1479,7 @@ export function registerCommands(bot: Telegraf) {
 
               await ctx.reply(message)
             } catch (e) {
-              logger.error('price: failed', { err: (e as any)?.message })
+              logger.error({ err: (e as any)?.message }, 'price: failed')
               await ctx.reply('❌ Unable to load market data.')
             }
             return
@@ -1478,16 +1494,16 @@ export function registerCommands(bot: Telegraf) {
         const raw = data.split(':')[1]
         let cond = raw
 
-        logger.info('det: processing', { raw, data })
+        logger.info({ raw, data }, 'det: processing')
 
         if (data.startsWith('det:')) {
           const dec = tokenToCond(raw)
-          logger.info('det: decoded', { raw, decoded: dec })
+          logger.info({ raw, decoded: dec }, 'det: decoded')
           if (dec) cond = dec
         }
 
         if (!cond) {
-          logger.warn('det: missing cond', { raw, data })
+          logger.warn({ raw, data }, 'det: missing cond')
           await ctx.answerCbQuery('Missing market id')
           return
         }
@@ -1495,9 +1511,9 @@ export function registerCommands(bot: Telegraf) {
         await ctx.answerCbQuery('Opening details...')
 
         try {
-          logger.info('det: fetching market', { cond })
+          logger.info({ cond }, 'det: fetching market')
           const m = await gammaApi.getMarket(cond)
-          logger.info('det: market fetched', { question: m.question })
+          logger.info({ question: m.question }, 'det: market fetched')
 
           const message = `📊 ${esc(m.question || 'Market')}\n\nChoose analysis:`
 
@@ -1516,21 +1532,21 @@ export function registerCommands(bot: Telegraf) {
             ]
           ]
 
-          logger.info('det: editing message', { messageLength: message.length })
+          logger.info({ messageLength: message.length }, 'det: editing message')
           await ctx.editMessageText(message, {
             parse_mode: 'HTML',
             reply_markup: { inline_keyboard: keyboard }
           })
           logger.info('det: success')
         } catch (e) {
-          logger.warn('det: failed', {
+          logger.warn({
             err: (e as any)?.message,
             stack: (e as any)?.stack,
             name: (e as any)?.name,
             cond,
             raw,
             data
-          })
+          }, 'det: failed')
           await ctx.answerCbQuery('Failed to load details')
         }
         return
@@ -1631,7 +1647,7 @@ export function registerCommands(bot: Telegraf) {
                 winRateStr = `${winRate.toFixed(1)}%`
               }
             } catch (e) {
-              logger.warn('Failed to fetch win rate', { user: entry.user_id, error: (e as any)?.message })
+              logger.warn({ user: entry.user_id, error: (e as any)?.message }, 'Failed to fetch win rate')
             }
             // Compute whale score and generate description (windowed stats)
             let whaleScoreStr = '—'
@@ -1706,7 +1722,7 @@ export function registerCommands(bot: Telegraf) {
           msg += '💡 Tap 🐳 Follow to get alerts, or 📊 Stats for accurate all-time PnL.'
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
         } catch (e: any) {
-          logger.error('whales:showmore: failed to load leaderboard', { error: e?.message })
+          logger.error({ error: e?.message }, 'whales:showmore: failed to load leaderboard')
           await ctx.reply('❌ Unable to load more traders. Try again later.')
         }
         return
@@ -1759,7 +1775,7 @@ export function registerCommands(bot: Telegraf) {
 
           await ctx.reply(msg, { reply_markup: { inline_keyboard: keyboard } as any })
         } catch (e: any) {
-          logger.error('whale:stats: failed to fetch detailed stats', { error: e?.message })
+          logger.error({ error: e?.message }, 'whale:stats: failed to fetch detailed stats')
           await ctx.reply('❌ Unable to load detailed stats. Try again later.')
         }
         return
@@ -1788,7 +1804,7 @@ export function registerCommands(bot: Telegraf) {
           try {
             markets = await gammaApi.getActiveMarkets(fetchLimit, orderBy)
           } catch (inner: any) {
-            logger.error('markets:showmore: gammaApi active failed', { error: inner?.message })
+            logger.error({ error: inner?.message }, 'markets:showmore: gammaApi active failed')
             await ctx.reply('❌ Unable to load more markets. Try again later.')
             return
           }
@@ -1991,7 +2007,7 @@ export function registerCommands(bot: Telegraf) {
           message += '💡 Tap Follow to get alerts for any of these markets.'
           await replySafe(ctx, message, { inline_keyboard: keyboard })
         } catch (e: any) {
-          logger.error('markets:showmore: failed to load markets', { error: e?.message })
+          logger.error({ error: e?.message }, 'markets:showmore: failed to load markets')
           await ctx.reply('❌ Unable to load more markets. Try again later.')
         }
         return
@@ -2080,7 +2096,7 @@ export function registerCommands(bot: Telegraf) {
         } catch { await ctx.answerCbQuery('❌ Failed to unfollow') }
       }
     } catch (e) {
-      logger.error('callback action failed', e)
+      logger.error(e, 'callback action failed')
       try { await ctx.answerCbQuery('❌ Failed. Please try again.') } catch {}
     }
   })
@@ -2140,7 +2156,7 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply('ℹ️ No market follows found. Use /follow <conditionId> or tap Follow in markets to add one.')
       }
     } catch (e) {
-      logger.error('debug_price failed', e)
+      logger.error(e, 'debug_price failed')
       await ctx.reply('❌ Failed to send test price alert.')
     }
   })
@@ -2155,7 +2171,7 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply('ℹ️ No whale follows found. Use /follow or whale follow buttons to add one.')
       }
     } catch (e) {
-      logger.error('debug_whale failed', e)
+      logger.error(e, 'debug_whale failed')
       await ctx.reply('❌ Failed to send test whale alert.')
     }
   })
@@ -2245,7 +2261,7 @@ export function registerCommands(bot: Telegraf) {
         '• /link @username'
       )
     } catch (e:any) {
-      logger.error('link command failed', { error: e?.message })
+      logger.error({ error: e?.message }, 'link command failed')
       await ctx.reply('❌ Failed to link. Please check the format and try again.')
     }
   }) */
@@ -2262,7 +2278,7 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply('ℹ️ You had no linked profiles.')
       }
     } catch (e:any) {
-      logger.error('unlink command failed', { error: e?.message })
+      logger.error({ error: e?.message }, 'unlink command failed')
       await ctx.reply('❌ Failed to unlink. Please try again.')
     }
   }) */
@@ -2450,7 +2466,7 @@ export function registerCommands(bot: Telegraf) {
 
       await ctx.reply(msg)
     } catch (e:any) {
-      logger.error('stats command failed', { error: e?.message })
+      logger.error({ error: e?.message }, 'stats command failed')
       await ctx.reply('❌ Failed to fetch stats. Please try again with an address or profile URL.')
     }
   })
@@ -2476,7 +2492,7 @@ export function registerCommands(bot: Telegraf) {
 
     const query = args.join(' ').trim(); // Join and trim for safety
     const userId = ctx.from?.id;
-    logger.info('Price command', { userId, query });
+    logger.info({ userId, query }, 'Price command');
 
     try {
       await ctx.reply('🔍 Loading market...');
@@ -2498,27 +2514,27 @@ export function registerCommands(bot: Telegraf) {
 
       const conditionId = market.condition_id || market.conditionId;
 
-      logger.info('price: market resolved', {
+      logger.info({
         conditionId,
         hasTokens: !!market.tokens,
         tokenCount: market.tokens?.length || 0
-      });
+      }, 'price: market resolved');
 
       // If tokens are missing, try re-fetching by condition ID
       if (!market.tokens || market.tokens.length === 0) {
-        logger.warn('price: market has no tokens, re-fetching by condition ID', { conditionId })
+        logger.warn({ conditionId }, 'price: market has no tokens, re-fetching by condition ID')
         try {
           const refetchedMarket = await gammaApi.getMarket(conditionId)
           if (refetchedMarket && refetchedMarket.tokens && refetchedMarket.tokens.length > 0) {
-            logger.info('price: refetched market has tokens', {
+            logger.info({
               tokenCount: refetchedMarket.tokens.length
-            })
+            }, 'price: refetched market has tokens')
             Object.assign(market, refetchedMarket) // Merge in the tokens
           } else {
             logger.warn('price: refetched market also has no tokens')
           }
         } catch (refetchErr) {
-          logger.error('price: failed to refetch market', { error: refetchErr })
+          logger.error({ error: refetchErr }, 'price: failed to refetch market')
         }
       }
 
@@ -2552,7 +2568,7 @@ export function registerCommands(bot: Telegraf) {
             }));
           }
         } catch (parseErr) {
-          logger.error('price: failed to parse outcomes', { error: parseErr });
+          logger.error({ error: parseErr }, 'price: failed to parse outcomes');
         }
       }
 
@@ -2600,7 +2616,7 @@ export function registerCommands(bot: Telegraf) {
       await ctx.reply(message);
 
     } catch (error: any) {
-      logger.error('Error in price command', { error: error?.message || error });
+      logger.error({ error: error?.message || error }, 'Error in price command');
       await ctx.reply('❌ Unable to load market data. Try another market or use /markets to browse.');
     }
   });
@@ -2628,14 +2644,14 @@ export function registerCommands(bot: Telegraf) {
         try {
           logger.info('whales: fetching leaderboard (limit=10)')
           let leaderboard = await dataApi.getLeaderboard({ limit: 10 })
-          logger.info('whales: leaderboard returned', { count: leaderboard.length })
+          logger.info({ count: leaderboard.length }, 'whales: leaderboard returned')
 
           // Soft retry once if empty (transient bot protections)
           if (leaderboard.length === 0) {
             await new Promise(r => setTimeout(r, 400));
             logger.info('whales: retrying leaderboard fetch')
             leaderboard = await dataApi.getLeaderboard({ limit: 10 })
-            logger.info('whales: retry returned', { count: leaderboard.length })
+            logger.info({ count: leaderboard.length }, 'whales: retry returned')
           }
 
           if (leaderboard.length === 0) {
@@ -2665,7 +2681,7 @@ export function registerCommands(bot: Telegraf) {
                 }
               }
             } catch (e:any) {
-              logger.error('whales: snapshot fallback failed', { error: e?.message })
+              logger.error({ error: e?.message }, 'whales: snapshot fallback failed')
             }
             await ctx.reply('❌ Unable to load leaderboard right now. Try a specific market: `/whales 0x<market_id>`\n\nBrowse: https://polymarket.com/leaderboard', { parse_mode: 'Markdown' })
             return
@@ -2699,7 +2715,7 @@ export function registerCommands(bot: Telegraf) {
                 winRateStr = `${winRate.toFixed(1)}%`
               }
             } catch (e) {
-              logger.warn('Failed to fetch win rate', { user: entry.user_id, error: (e as any)?.message })
+              logger.warn({ user: entry.user_id, error: (e as any)?.message }, 'Failed to fetch win rate')
             }
 
             // Fetch whale score and generate description
@@ -2743,7 +2759,7 @@ export function registerCommands(bot: Telegraf) {
                 whaleDescription = generateWhaleDescription(descInput, { context: 'leaderboard' })
               }
             } catch (e) {
-              logger.warn('Failed to fetch whale score', { user: entry.user_id, error: (e as any)?.message })
+              logger.warn({ user: entry.user_id, error: (e as any)?.message }, 'Failed to fetch whale score')
             }
 
             msg += `${i}. ${name} (${short})\n`
@@ -2780,7 +2796,7 @@ export function registerCommands(bot: Telegraf) {
           await replySafe(ctx, msg, { inline_keyboard: keyboard })
           return
         } catch (e: any) {
-          logger.error('whales: leaderboard failed', { error: e?.message })
+          logger.error({ error: e?.message }, 'whales: leaderboard failed')
           await ctx.reply('❌ Unable to load leaderboard. Try a specific market: `/whales 0x<market_id>`', { parse_mode: 'Markdown' })
           return
         }
@@ -2810,7 +2826,7 @@ export function registerCommands(bot: Telegraf) {
             } catch {}
             let message = `🐳 Trader Found\n\n`
             try {
-              const pct = await formatWhalePercentileLinesFull(userId)
+              const pct = await formatWhalePercentileLinesFull(addr)
               if (pct) message += pct + '\n'
             } catch {}
             message += `ID: ${addr}\n`
@@ -2841,7 +2857,7 @@ export function registerCommands(bot: Telegraf) {
                   whaleScoreStr = `${Math.round(computeWhaleScore(stats, {}))}`
                 } catch {}
                 try {
-                  const pct = await formatWhalePercentileLinesFull(userId)
+                  const pct = await formatWhalePercentileLinesFull(addr)
                   message = `🐳 Profile\n\n${pct ? pct + '\n' : ''}` + message.split('\n').slice(2).join('\n')
                 } catch {}
                 const tok = await actionFollowWhaleAll(addr)
@@ -2997,7 +3013,7 @@ export function registerCommands(bot: Telegraf) {
           await ctx.reply('❌ No traders match your query. Try different keywords or use /whales for leaderboard.')
           return
         } catch (e:any) {
-          logger.error('whales: search fallback failed', { error: e?.message })
+          logger.error({ error: e?.message }, 'whales: search fallback failed')
           await ctx.reply('❌ Unable to search traders. Try again later or use /whales for leaderboard.')
           return
         }
@@ -3061,7 +3077,7 @@ export function registerCommands(bot: Telegraf) {
         await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: { inline_keyboard: keyboard } as any })
       }
     } catch (err) {
-      logger.error('Error in whales command', err)
+      logger.error(err, 'Error in whales command')
       await ctx.reply('❌ Unable to load whales. Try /markets for active markets or check your connection.')
     }
   })
@@ -3119,7 +3135,7 @@ export function registerCommands(bot: Telegraf) {
       // Single market - process normally
       await processNetForMarket(ctx, market)
     } catch (e) {
-      logger.error('net command failed', e)
+      logger.error(e, 'net command failed')
       await ctx.reply('❌ Failed to load net positions. Try again later.')
     }
   })
@@ -3175,7 +3191,7 @@ export function registerCommands(bot: Telegraf) {
       })
       await ctx.reply(msg)
     } catch (e) {
-      logger.error('processNetForMarket failed', e)
+      logger.error(e, 'processNetForMarket failed')
       await ctx.reply('❌ Failed to load net positions for this market.')
     }
   }
@@ -3201,7 +3217,7 @@ export function registerCommands(bot: Telegraf) {
 
       const commandPromise = (async () => {
         await ctx.reply('🔍 Loading market overview...')
-        logger.info('overview: resolving market from input (strict mode)', { query })
+        logger.info({ query }, 'overview: resolving market from input (strict mode)')
         // Special: If input is an event URL (no specific market slug), compute skew for all sub-markets
         if (isEventUrlWithoutMarket(query)) {
           try {
@@ -3239,7 +3255,7 @@ export function registerCommands(bot: Telegraf) {
             }
             return
           } catch (e) {
-            logger.warn('overview: event sub-markets failed', { err: (e as any)?.message })
+            logger.warn({ err: (e as any)?.message }, 'overview: event sub-markets failed')
           }
         }
         // Strict mode: only accept URLs or condition IDs, no fuzzy search
@@ -3279,7 +3295,7 @@ export function registerCommands(bot: Telegraf) {
               return
             }
           } catch (e) {
-            logger.warn('overview: group sub-markets failed', { err: (e as any)?.message })
+            logger.warn({ err: (e as any)?.message }, 'overview: group sub-markets failed')
           }
         }
         // Check if event URL has multiple children
@@ -3314,47 +3330,47 @@ export function registerCommands(bot: Telegraf) {
               return
             }
           } catch (e) {
-            logger.warn('overview: event sub-markets expansion failed', { err: (e as any)?.message })
+            logger.warn({ err: (e as any)?.message }, 'overview: event sub-markets expansion failed')
           }
         }
         if (!market) {
-          logger.warn('overview: market not found', { query })
+          logger.warn({ query }, 'overview: market not found')
           await ctx.reply('❌ Market not found.\n\nPlease provide:\n• Full market URL, or\n• Condition ID (0x...)\n\nFor search, use /markets <query> instead.')
           return
         }
 
         const conditionId = market.condition_id || market.conditionId
-        logger.info('overview: market resolved', {
+        logger.info({
           conditionId,
           question: market.question?.slice(0, 50),
           hasTokens: !!market.tokens,
           tokenCount: market.tokens?.length || 0,
           marketKeys: Object.keys(market).sort()
-        })
+        }, 'overview: market resolved')
 
         // If tokens are missing, try re-fetching by condition ID
         if (!market.tokens || market.tokens.length === 0) {
-          logger.warn('overview: market has no tokens, re-fetching by condition ID', { conditionId })
+          logger.warn({ conditionId }, 'overview: market has no tokens, re-fetching by condition ID')
           try {
             const refetchedMarket = await gammaApi.getMarket(conditionId)
             if (refetchedMarket && refetchedMarket.tokens && refetchedMarket.tokens.length > 0) {
-              logger.info('overview: refetched market has tokens', {
+              logger.info({
                 tokenCount: refetchedMarket.tokens.length
-              })
+              }, 'overview: refetched market has tokens')
               Object.assign(market, refetchedMarket) // Merge in the tokens
             } else {
               logger.warn('overview: refetched market also has no tokens')
             }
           } catch (refetchErr) {
-            logger.error('overview: failed to refetch market', { error: refetchErr })
+            logger.error({ error: refetchErr }, 'overview: failed to refetch market')
           }
         }
 
-        logger.info('overview: fetching holders', { conditionId })
+        logger.info({ conditionId }, 'overview: fetching holders')
 
         const holdersRes = await dataApi.getTopHolders({ market: conditionId, limit: 100, minBalance: 1 })
 
-        logger.info('overview: holders fetched', { count: holdersRes?.length || 0 })
+        logger.info({ count: holdersRes?.length || 0 }, 'overview: holders fetched')
         if (!holdersRes?.length) {
           await ctx.reply('❌ No holder data available for this market.')
           return
@@ -3366,20 +3382,20 @@ export function registerCommands(bot: Telegraf) {
           (t.outcome || '').toLowerCase() === 'yes'
         )
 
-        logger.info('overview: looking for YES token', {
+        logger.info({
           hasTokens: !!market.tokens,
           tokenCount: market.tokens?.length || 0,
           foundYes: !!yesToken
-        })
+        }, 'overview: looking for YES token')
 
         if (!yesToken) {
-          logger.error('overview: no YES token found', {
+          logger.error({
             conditionId,
             marketKeys: Object.keys(market),
             marketType: typeof market,
             tokensValue: market.tokens,
             url: query
-          })
+          }, 'overview: no YES token found')
           await ctx.reply(
             `❌ This market has no tradeable outcomes.\n\n` +
             `Market ID: ${conditionId}\n\n` +
@@ -3395,16 +3411,16 @@ export function registerCommands(bot: Telegraf) {
         const token = yesToken
         const outcome = token.outcome || token.token_id
         const set = holdersRes.find(h=>h.token===token.token_id)
-        logger.info('overview: processing YES token', { tokenId: token.token_id, outcome })
+        logger.info({ tokenId: token.token_id, outcome }, 'overview: processing YES token')
 
         // Get orderbook
         let book: any = null
         let midpoint: number|null = null
         let spread: number|null = null
         try {
-          logger.info('overview: fetching orderbook', { tokenId: token.token_id })
+          logger.info({ tokenId: token.token_id }, 'overview: fetching orderbook')
           book = await clobApi.getOrderbook(token.token_id)
-          logger.info('overview: orderbook fetched', { tokenId: token.token_id, hasBids: !!book?.bids?.length, hasAsks: !!book?.asks?.length })
+          logger.info({ tokenId: token.token_id, hasBids: !!book?.bids?.length, hasAsks: !!book?.asks?.length }, 'overview: orderbook fetched')
           const bestBid = book.bids?.length ? parseFloat(book.bids[0].price) : null
           const bestAsk = book.asks?.length ? parseFloat(book.asks[0].price) : null
           if (bestBid!=null && bestAsk!=null) {
@@ -3412,7 +3428,7 @@ export function registerCommands(bot: Telegraf) {
             spread = bestAsk - bestBid
           }
         } catch (err) {
-          logger.error('overview: orderbook fetch failed', { tokenId: token.token_id, error: err })
+          logger.error({ tokenId: token.token_id, error: err }, 'overview: orderbook fetch failed')
         }
 
         // Build orderbook overview message
@@ -3448,9 +3464,9 @@ export function registerCommands(bot: Telegraf) {
             msg += `No orderbook data available.\n`
           }
 
-        logger.info('overview: sending orderbook message', { tokenId: token.token_id })
+        logger.info({ tokenId: token.token_id }, 'overview: sending orderbook message')
         await ctx.reply(msg, { parse_mode: 'HTML' })
-        logger.info('overview: orderbook message sent', { tokenId: token.token_id })
+        logger.info({ tokenId: token.token_id }, 'overview: orderbook message sent')
 
         // Smart Money Skew block (detailed)
         try {
@@ -3478,7 +3494,7 @@ export function registerCommands(bot: Telegraf) {
             await ctx.reply('⚖️ Smart Money Skew: not enough data to assess for this market.', { disable_web_page_preview: true })
           }
         } catch (e) {
-          logger.warn('overview: skew block failed', { err: (e as any)?.message })
+          logger.warn({ err: (e as any)?.message }, 'overview: skew block failed')
         }
 
         // Build net position overview (YES only)
@@ -3495,9 +3511,9 @@ export function registerCommands(bot: Telegraf) {
             posMsg += `${i+1}. ${short} : ${p.shares.toLocaleString()}\n`
           })
 
-          logger.info('overview: sending position message', { tokenId: token.token_id })
+          logger.info({ tokenId: token.token_id }, 'overview: sending position message')
           await ctx.reply(posMsg, { parse_mode: 'HTML' })
-          logger.info('overview: position message sent', { tokenId: token.token_id })
+          logger.info({ tokenId: token.token_id }, 'overview: position message sent')
         }
         logger.info('overview: command completed successfully')
       })()
@@ -3507,10 +3523,10 @@ export function registerCommands(bot: Telegraf) {
       logger.info('overview: Promise.race completed')
     } catch (e: any) {
       if (e?.message === 'Command timeout') {
-        logger.warn('overview command timed out', { query })
+        logger.warn({ query }, 'overview command timed out')
         await ctx.reply('⏱️ Request timed out. This market may be too large or the API is slow. Please try again.')
       } else {
-        logger.error('overview command failed', e)
+        logger.error(e, 'overview command failed')
         await ctx.reply('❌ Failed to load overview. Try again later.')
       }
     }
@@ -3884,10 +3900,10 @@ export function registerCommands(bot: Telegraf) {
       await Promise.race([commandPromise, timeoutPromise])
     } catch (e:any) {
       if (e?.message === 'Command timeout') {
-        logger.warn('skew command timed out', { input })
+        logger.warn({ input }, 'skew command timed out')
         await ctx.reply('⏱️ Skew calculation timed out. This event/market may be large or the API is slow. Try again, or use a specific market URL.')
       } else {
-        logger.error('skew command failed', { err: e?.message, stack: e?.stack, input })
+        logger.error({ err: e?.message, stack: e?.stack, input }, 'skew command failed')
         await ctx.reply('❌ Failed to compute skew. Try again later.')
       }
     }
@@ -3980,7 +3996,7 @@ export function registerCommands(bot: Telegraf) {
         const { TradeBuffer } = await import('@smtm/data/trades')
         const cached = TradeBuffer.getBestForTokens(tokenIds || [], 15*60*1000)
         if (cached) {
-          logger.info('alpha:cache hit', { tokenId: cached.tokenId, notional: Math.round(cached.notional) })
+          logger.info({ tokenId: cached.tokenId, notional: Math.round(cached.notional) }, 'alpha:cache hit')
           let msg = `✨ <b>Cached Best Trade</b>\n\n`
           msg += `TRADE $${Math.round(cached.notional).toLocaleString()} @ ${(cached.price*100).toFixed(1)}¢\n`
           await ctx.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, msg, { parse_mode: 'HTML' })
@@ -4105,7 +4121,7 @@ export function registerCommands(bot: Telegraf) {
                       }
                     }
                   } catch (e) {
-                    logger.warn('Failed to generate whale description for alpha', { error: (e as any)?.message })
+                    logger.warn({ error: (e as any)?.message }, 'Failed to generate whale description for alpha')
                   }
 
                   // Add description to message if generated
@@ -4215,9 +4231,9 @@ export function registerCommands(bot: Telegraf) {
       }
       if (latest.length === 0) {
         if (DB_FIRST_ENABLED) {
-          logger.info('alpha:buffer empty, trying Supabase/store + fallbacks', { tokenIds: tokenIds?.length || 0, query: query || null })
+          logger.info({ tokenIds: tokenIds?.length || 0, query: query || null }, 'alpha:buffer empty, trying Supabase/store + fallbacks')
         } else {
-          logger.info('alpha:live scan starting', { tokenIds: tokenIds?.length || 0, query: query || null })
+          logger.info({ tokenIds: tokenIds?.length || 0, query: query || null }, 'alpha:live scan starting')
         }
 
         // New: Trade-first alpha scan (Data API global trades)
@@ -4441,11 +4457,11 @@ export function registerCommands(bot: Telegraf) {
           perTokenLimit: 50,
           onLog: (m, ctx) => logger.info({ ...ctx }, `alpha:big ${m}`)
         })
-        logger.info('alpha:fallback big orders', { count: bigs.length, threshold: 2000 })
+        logger.info({ count: bigs.length, threshold: 2000 }, 'alpha:fallback big orders')
         if (!bigs.length) {
           // Try largest trade even if below threshold
           const any = await findRecentBigOrders({ tokenIds, minNotionalUsd: 0, withinMs: 24*60*60*1000, perTokenLimit: 50, onLog: (m, ctx) => logger.info({ ...ctx }, `alpha:any ${m}`) })
-          logger.info('alpha:fallback any orders', { count: any.length })
+          logger.info({ count: any.length }, 'alpha:fallback any orders')
           if (any.length) {
             any.sort((a,b)=>b.notional - a.notional)
             bigs = [any[0]]
@@ -4458,7 +4474,7 @@ export function registerCommands(bot: Telegraf) {
             import('@smtm/data'),
           ])
           const trades = tokenIds?.length ? TradeBuffer.getTrades(1, { tokenIds }) : TradeBuffer.getTrades(1)
-          logger.info('alpha:fallback buffer trade count', { count: trades.length })
+          logger.info({ count: trades.length }, 'alpha:fallback buffer trade count')
           if (!trades.length) {
             // Progressive live scan across trending + active universe (sequential up to ~5m)
             const { progressiveLiveScan } = await import('@smtm/data')
@@ -4523,7 +4539,7 @@ export function registerCommands(bot: Telegraf) {
                 } catch {}
               }
             })
-            logger.info('alpha:fallback live scan', { found: !!best, notional: best ? Math.round(best.notional) : 0 })
+            logger.info({ found: !!best, notional: best ? Math.round(best.notional) : 0 }, 'alpha:fallback live scan')
             if (!best) {
               const elapsed = Math.round((Date.now() - startedAt)/1000)
               const scanned = lastIdx || 0
@@ -4623,8 +4639,8 @@ export function registerCommands(bot: Telegraf) {
       if (a.kind === 'whale') {
         const rec = a.data?.recommendation ? ` (${a.data.recommendation})` : ''
         msg += `Whale Alpha: <b>${a.alpha}</b>${rec}\n`
-        if (addr) {
-          const pctLine = await formatWhalePercentileLineForUser(addr)
+        if (a.wallet) {
+          const pctLine = await formatWhalePercentileLineForUser(a.wallet)
           if (pctLine) msg += pctLine + '\n'
         }
         if (a.data?.weightedNotionalUsd != null) msg += `Value: $${Number(a.data.weightedNotionalUsd).toLocaleString()}\n`
@@ -4761,7 +4777,7 @@ export function registerCommands(bot: Telegraf) {
           await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
           return
         } catch (e) {
-          logger.error('alpha:more trade-first failed', e)
+          logger.error(e, 'alpha:more trade-first failed')
           await ctx.reply('Error fetching fresh trade. Please try again.')
           return
         }
@@ -4803,7 +4819,7 @@ export function registerCommands(bot: Telegraf) {
       const kb = { inline_keyboard: [[{ text: 'More', callback_data: `alpha:more:${nextOffset}${tokenIdsArg && tokenIdsArg.length?':'+tokenIdsArg.join(','):''}` }]] }
       await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: kb as any })
     } catch (e) {
-      logger.error('alpha:more failed', e)
+      logger.error(e, 'alpha:more failed')
       try { await ctx.answerCbQuery('Error loading more alpha') } catch {}
     }
   })
@@ -4993,7 +5009,7 @@ export function registerCommands(bot: Telegraf) {
   // List subscriptions command
   bot.command('list', async (ctx) => {
     const userId = ctx.from!.id;
-    logger.info('List command', { userId });
+    logger.info({ userId }, 'List command');
 
     try {
       const { getUserRows } = await import('../services/subscriptions')
@@ -5032,7 +5048,7 @@ export function registerCommands(bot: Telegraf) {
       }
       await ctx.reply(msg, { reply_markup: { inline_keyboard: keyboard } as any })
     } catch (error) {
-      logger.error('Error in list command', error);
+      logger.error(error, 'Error in list command');
       await ctx.reply('❌ Unable to load your follows. Please try again or contact support if this persists.');
     }
   });
@@ -5044,7 +5060,7 @@ export function registerCommands(bot: Telegraf) {
 
   // Status command - Check WebSocket connection
   bot.command('status', async (ctx) => {
-    logger.info('Status command', { userId: ctx.from?.id });
+    logger.info({ userId: ctx.from?.id }, 'Status command');
 
     try {
       const status = wsMonitor.getStatus();
@@ -5069,7 +5085,7 @@ export function registerCommands(bot: Telegraf) {
 
       await ctx.reply(message);
     } catch (error) {
-      logger.error('Error in status command', error);
+      logger.error(error, 'Error in status command');
       await ctx.reply('❌ Unable to check status. Please try again.');
     }
   });
@@ -5079,7 +5095,7 @@ export function registerCommands(bot: Telegraf) {
     const userId = ctx.from?.id;
     const args = ctx.message.text.split(' ').slice(1)
     const firstArg = args[0]?.toLowerCase() // Declare outside try block for error logging
-    logger.info('Markets command', { userId, argsLen: args.length });
+    logger.info({ userId, argsLen: args.length }, 'Markets command');
 
     try {
       // Check for segment keywords (trending, breaking, new, ending)
@@ -5161,10 +5177,10 @@ export function registerCommands(bot: Telegraf) {
         const c = Array.isArray(markets) ? markets.length : -1
         logger.info(`markets: gammaApi active returned count=${c} type=${typeof markets}`)
       } catch (inner: any) {
-        logger.error('markets: gammaApi active failed', { error: inner?.message || String(inner) })
+        logger.error({ error: inner?.message || String(inner) }, 'markets: gammaApi active failed')
         // Fallback to direct fetch with timeout
         const url = `https://gamma-api.polymarket.com/markets?active=true&limit=${fetchLimit}&order=${orderBy}&ascending=false`
-        logger.info(`markets: fallback fetch (active by ${orderBy})`, { url })
+        logger.info({ url }, `markets: fallback fetch (active by ${orderBy})`)
         const controller = new AbortController();
         const to = setTimeout(() => controller.abort(), 7000);
         let res: Response
@@ -5173,18 +5189,18 @@ export function registerCommands(bot: Telegraf) {
         } finally {
           clearTimeout(to)
         }
-        logger.info('markets: fallback status', { status: res.status, ok: res.ok, contentType: res.headers.get('content-type') })
+        logger.info({ status: res.status, ok: res.ok, contentType: res.headers.get('content-type') }, 'markets: fallback status')
         if (!res.ok) {
           const text = await res.text().catch(() => '')
-          logger.error('markets: fallback http error', { status: res.status, bodySnippet: text.slice(0, 200) })
+          logger.error({ status: res.status, bodySnippet: text.slice(0, 200) }, 'markets: fallback http error')
           throw new Error(`gamma http ${res.status}`)
         }
         try {
           markets = await res.json()
-          logger.info('markets: fallback parsed json', { count: Array.isArray(markets) ? markets.length : -1 })
+          logger.info({ count: Array.isArray(markets) ? markets.length : -1 }, 'markets: fallback parsed json')
         } catch (parseErr: any) {
           const text = await res.text().catch(() => '')
-          logger.error('markets: json parse failed', { error: parseErr?.message, snippet: text.slice(0, 200) })
+          logger.error({ error: parseErr?.message, snippet: text.slice(0, 200) }, 'markets: json parse failed')
           throw parseErr
         }
       }
@@ -5256,7 +5272,7 @@ export function registerCommands(bot: Telegraf) {
 
               return { market: m, priceChange }
             } catch (error) {
-              logger.warn(`Failed to calculate price change for market`, { error: (error as any)?.message })
+              logger.warn({ error: (error as any)?.message }, `Failed to calculate price change for market`)
               return { market: m, priceChange: 0 }
             }
           })
@@ -5308,7 +5324,7 @@ export function registerCommands(bot: Telegraf) {
             logger.info(`markets: trending fallback filtered to ${markets.length}`)
           }
         } catch (e: any) {
-          logger.error('markets: trending fallback failed', { error: e?.message })
+          logger.error({ error: e?.message }, 'markets: trending fallback failed')
         }
       }
 
@@ -5436,11 +5452,11 @@ export function registerCommands(bot: Telegraf) {
 
       await replySafe(ctx, message, { inline_keyboard: keyboard })
     } catch (error: any) {
-      logger.error('Error in markets command', {
+      logger.error({
         error: error?.message || String(error),
         stack: error?.stack,
         segment: firstArg || 'trending'
-      })
+      }, 'Error in markets command')
       await ctx.reply(
         '❌ Could not fetch markets right now. Please try again soon.\n' +
           'Browse directly: https://polymarket.com/markets'
@@ -5527,7 +5543,7 @@ export function registerCommands(bot: Telegraf) {
           return
         }
       } catch (e) {
-        logger.error('follow by URL/handle failed', { err: (e as any)?.message })
+        logger.error({ err: (e as any)?.message }, 'follow by URL/handle failed')
         await ctx.reply('❌ Could not process your input. Try a Polymarket URL, @handle, 0x<address>, or 0x<market_id>.')
         return
       }
@@ -5559,7 +5575,7 @@ export function registerCommands(bot: Telegraf) {
         await addMarketSubscription(userId, tokenId, market.question, marketId, botConfig.websocket.priceChangeThreshold)
         await ctx.reply(`✅ Price alerts enabled! 🔔\n\nMarket: ${market.question}\n\nYou'll get notified when prices change significantly.`)
       } catch (e: any) {
-        logger.error('follow market failed', { marketId, error: e?.message })
+        logger.error({ marketId, error: e?.message }, 'follow market failed')
         await ctx.reply('❌ Failed to follow market. Use /follow 0x<market_id>.')
       }
       return
@@ -5581,7 +5597,7 @@ export function registerCommands(bot: Telegraf) {
         const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
         await ctx.reply(`✅ Following whale ${shortAddr} on all markets! 🔔\n\nYou'll get alerts on every trade they make.`)
       } catch (e: any) {
-        logger.error('follow whale all failed', { wallet, error: e?.message })
+        logger.error({ wallet, error: e?.message }, 'follow whale all failed')
         await ctx.reply('❌ Failed to follow whale. Use: /follow 0x<wallet_address>.')
       }
       return
@@ -5615,7 +5631,7 @@ export function registerCommands(bot: Telegraf) {
         const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
         await ctx.reply(`✅ Following whale ${shortAddr} on this market! 🔔\n\nMarket: ${market.question}\n\nYou'll get alerts when they trade.`)
       } catch (e: any) {
-        logger.error('follow wallet failed', { marketId, error: e?.message })
+        logger.error({ marketId, error: e?.message }, 'follow wallet failed')
         await ctx.reply('❌ Failed to follow whale on this market. Use: /follow 0x<wallet> 0x<market_id>.')
       }
       return
@@ -5658,7 +5674,7 @@ export function registerCommands(bot: Telegraf) {
           await ctx.reply(removed>0 ? `✅ Alerts disabled for pending market: ${m?.question || marketId}` : '⚠️ No follow found for this market. Use /list to see active follows.')
         }
       } catch (e:any) {
-        logger.error('unfollow market failed', { marketId, error: e?.message })
+        logger.error({ marketId, error: e?.message }, 'unfollow market failed')
         await ctx.reply('❌ Failed to unfollow. Ensure format: /unfollow 0x<market_id>.')
       }
       return
@@ -5678,7 +5694,7 @@ export function registerCommands(bot: Telegraf) {
           await ctx.reply(`✅ Removed whale ${shortAddr} from pending follows.`)
         }
       } catch (e:any) {
-        logger.error('unfollow whale all failed', { wallet, error: e?.message })
+        logger.error({ wallet, error: e?.message }, 'unfollow whale all failed')
         await ctx.reply('❌ Failed to unfollow. Ensure format: /unfollow 0x<wallet_address>.')
       }
       return
@@ -5701,7 +5717,7 @@ export function registerCommands(bot: Telegraf) {
         const shortAddr = wallet.slice(0, 6) + '...' + wallet.slice(-4)
         await ctx.reply(`✅ Stopped following whale ${shortAddr}.\n\nMarket: ${m?.question || marketId}`)
       } catch (e:any) {
-        logger.error('unfollow wallet failed', { marketId, error: e?.message })
+        logger.error({ marketId, error: e?.message }, 'unfollow wallet failed')
         await ctx.reply('❌ Failed to unfollow. Ensure format: /unfollow 0x<wallet> 0x<market_id>.')
       }
       return
@@ -5717,7 +5733,7 @@ export function registerCommands(bot: Telegraf) {
 
   // Daily tip command - Get daily rewards from Polymarket
   bot.command('daily_tip', async (ctx) => {
-    logger.info('Daily_tip command', { userId: ctx.from?.id });
+    logger.info({ userId: ctx.from?.id }, 'Daily_tip command');
 
     try {
       await ctx.reply('🔍 Loading today\'s top reward...');
@@ -5738,13 +5754,13 @@ export function registerCommands(bot: Telegraf) {
       const message = formatRewardInfo(topReward);
       await ctx.reply(message, { parse_mode: 'Markdown' });
 
-      logger.info('Daily_tip sent', {
+      logger.info({
         userId: ctx.from?.id,
         market: topReward.question,
         rewardRate: topReward.rewardRate,
-      });
+      }, 'Daily_tip sent');
     } catch (error) {
-      logger.error('Error in daily_tip command', error);
+      logger.error(error, 'Error in daily_tip command');
       await ctx.reply(
         '❌ Sorry, I encountered an error fetching reward data.\n\n' +
           'Please try again later or visit: https://polymarket.com/rewards'
@@ -6002,7 +6018,7 @@ export function registerCommands(bot: Telegraf) {
       const marketUrl = getPolymarketMarketUrl(market)
       await ctx.replyWithPhoto({ url }, { caption: `🧾 Trade Card — ${title}\n${marketUrl ? '🔗 '+marketUrl : ''}` })
     } catch (e) {
-      logger.error('card_trade failed', e)
+      logger.error(e, 'card_trade failed')
       await ctx.reply('❌ Failed to create your trade card. Please check your inputs and try again.')
     }
   })
@@ -6129,7 +6145,7 @@ export function registerCommands(bot: Telegraf) {
 
       await ctx.reply(msg, { parse_mode: 'HTML' })
     } catch (e) {
-      logger.error('track command failed', e)
+      logger.error(e, 'track command failed')
       await ctx.reply('❌ Failed to analyze market. Please try again or check if the market URL is valid.')
     }
   })

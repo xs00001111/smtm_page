@@ -43,7 +43,7 @@ async function ensureFile() {
       await fs.writeFile(FILE, HEADER)
     }
   } catch (e) {
-    logger.error('Failed to ensure links file', e)
+    logger.error(e, 'Failed to ensure links file')
   }
 }
 
@@ -79,7 +79,7 @@ export async function loadLinks() {
     }
     logger.info(`Loaded ${rows.length} links from CSV`)
   } catch (e) {
-    logger.error('Failed to load links file', e)
+    logger.error(e, 'Failed to load links file')
   }
 }
 
@@ -103,10 +103,10 @@ export async function linkPolymarketAddress(userId: number, address: string) {
         }),
         headers: { Prefer: 'resolution=merge-duplicates' },
       })
-      logger.info('Linked Polymarket address via Supabase', { userId, address: address.slice(0, 10) })
+      logger.info({ userId, address: address.slice(0, 10) }, 'Linked Polymarket address via Supabase')
       return
     } catch (e) {
-      logger.error('Supabase linkPolymarketAddress failed, falling back to CSV', e)
+      logger.error(e, 'Supabase linkPolymarketAddress failed, falling back to CSV')
     }
   }
   const row = getOrCreate(userId)
@@ -125,10 +125,10 @@ export async function linkPolymarketUsername(userId: number, username: string) {
         }),
         headers: { Prefer: 'resolution=merge-duplicates' },
       })
-      logger.info('Linked Polymarket username via Supabase', { userId, username })
+      logger.info({ userId, username }, 'Linked Polymarket username via Supabase')
       return
     } catch (e) {
-      logger.error('Supabase linkPolymarketUsername failed, falling back to CSV', e)
+      logger.error(e, 'Supabase linkPolymarketUsername failed, falling back to CSV')
     }
   }
   const row = getOrCreate(userId)
@@ -152,7 +152,7 @@ export async function getLinks(userId: number): Promise<LinkRow | undefined> {
       }
       return undefined
     } catch (e) {
-      logger.error('Supabase getLinks failed, falling back to in-memory', e)
+      logger.error(e, 'Supabase getLinks failed, falling back to in-memory')
     }
   }
   return rows.find(r => r.user_id === userId)
@@ -162,10 +162,10 @@ export async function unlinkAll(userId: number) {
   if (supabaseAvailable()) {
     try {
       await sb(`tg_links?user_id=eq.${userId}`, { method: 'DELETE' })
-      logger.info('Unlinked all via Supabase', { userId })
+      logger.info({ userId }, 'Unlinked all via Supabase')
       return 1
     } catch (e) {
-      logger.error('Supabase unlinkAll failed, falling back to CSV', e)
+      logger.error(e, 'Supabase unlinkAll failed, falling back to CSV')
     }
   }
   const before = rows.length

@@ -49,17 +49,17 @@ export async function recordSurveyResponse(userId: number, username: string | un
         body: JSON.stringify({ user_id: userId, username: username || null, answer }),
         headers: { Prefer: 'resolution=merge-duplicates' },
       })
-      logger.info('survey: recorded via Supabase', { userId, answer })
+      logger.info({ userId, answer }, 'survey: recorded via Supabase')
       return
     } catch (e) {
-      logger.error('survey: Supabase insert failed, falling back to CSV', e)
+      logger.error(e, 'survey: Supabase insert failed, falling back to CSV')
     }
   }
   try {
     await appendCsv(userId, username, answer)
-    logger.info('survey: recorded to CSV', { userId, answer })
+    logger.info({ userId, answer }, 'survey: recorded to CSV')
   } catch (e) {
-    logger.error('survey: failed to write CSV', e)
+    logger.error(e, 'survey: failed to write CSV')
   }
 }
 

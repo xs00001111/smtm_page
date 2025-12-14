@@ -317,6 +317,22 @@ export function formatVolume(value?: string | number): string {
 }
 
 /**
+ * Format large numbers with suffix (K, M, B) without currency symbol
+ */
+export function formatLargeNum(value: number): string {
+  if (value >= 1_000_000_000) {
+    return `${(value / 1_000_000_000).toFixed(1)}B`;
+  }
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(1)}K`;
+  }
+  return value.toFixed(0);
+}
+
+/**
  * Search for whales (top traders) using fuzzy matching
  */
 export async function findWhaleFuzzy(query: string, limit = 5): Promise<any[]> {

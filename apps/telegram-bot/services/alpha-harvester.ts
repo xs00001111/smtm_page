@@ -17,12 +17,12 @@ export function startAlphaHarvester() {
     return
   }
   if (timer) return
-  logger.info('alpha.harvester starting', {
+  logger.info({
     intervalMs,
     alphaEnabled: enabled,
     supabaseAlphaEnabled: env.SUPABASE_ALPHA_ENABLED === 'true',
     wsEnabled: (process.env.WEBSOCKET_ENABLED || 'true') === 'true',
-  })
+  }, 'alpha.harvester starting')
   const tick = async () => {
     if (running) return
     running = true
@@ -37,13 +37,13 @@ export function startAlphaHarvester() {
         delayMs: 250,
         maxDurationMs: 4*60*1000,
       }
-      logger.info('alpha.harvester scan.config', scanCfg)
+      logger.info(scanCfg, 'alpha.harvester scan.config')
       const best = await progressiveLiveScan({
         ...scanCfg,
         onLog: (m, ctx) => logger.info({ ...(ctx || {}) }, `alpha:harvest ${m}`)
       })
       if (best) {
-        logger.info('alpha.harvester run.result', { tokenId: best.tokenId, notional: Math.round(best.notional) })
+        logger.info({ tokenId: best.tokenId, notional: Math.round(best.notional) }, 'alpha.harvester run.result')
         // Persist approximate whale alpha
         const alphaScore = best.notional >= 10000 ? (best.notional >= 50000 ? 90 : best.notional >= 20000 ? 80 : 70) : 55
         const ev: any = {
@@ -73,14 +73,14 @@ export function startAlphaHarvester() {
       }
     } catch (e) {
       const errAny: any = e
-      logger.warn('alpha.harvester run.error', {
+      logger.warn({
         name: errAny?.name,
         message: errAny?.message || String(e),
         stack: errAny?.stack,
-      })
+      }, 'alpha.harvester run.error')
     } finally {
       running = false
-      logger.info('alpha.harvester run.end', { elapsedMs: Date.now() - t0 })
+      logger.info({ elapsedMs: Date.now() - t0 }, 'alpha.harvester run.end')
     }
   }
   timer = setInterval(tick, intervalMs)

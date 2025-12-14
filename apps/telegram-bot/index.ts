@@ -93,7 +93,7 @@ async function start() {
       await bot.telegram.setMyCommands(groupCommands, { scope: { type: 'all_group_chats' } as any });
       logger.info('Telegram command menu set');
     } catch (e: any) {
-      logger.warn('setMyCommands failed; continuing without updating menu', { err: e?.message || String(e) });
+      logger.warn({ err: e?.message || String(e) }, 'setMyCommands failed; continuing without updating menu');
     }
 
     // Restore stored data before deciding to start WS
@@ -167,7 +167,7 @@ async function start() {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       } catch (err) {
-        logger.warn('Failed to clear webhook (may not exist)', err);
+        logger.warn(err, 'Failed to clear webhook (may not exist)');
       }
     }
 
@@ -188,7 +188,7 @@ async function start() {
           });
           const port = Number(process.env.PORT || 3000);
           server.listen(port);
-          logger.info('Telegram bot webhook server listening', { port, path });
+          logger.info({ port, path }, 'Telegram bot webhook server listening');
           break; // launched
         } else {
           // Polling mode - with extra conflict handling

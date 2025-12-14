@@ -58,10 +58,10 @@ async function checkPrices(bot: Telegraf) {
       // Update last price
       subscription.lastPrice = currentPrice;
     } catch (error) {
-      logger.error('Error checking price', {
+      logger.error({
         marketId: subscription.marketId,
         error,
-      });
+      }, 'Error checking price');
     }
   }
 }
@@ -83,9 +83,9 @@ async function notifyPriceChange(
 
   try {
     await bot.telegram.sendMessage(userId, message);
-    logger.info('Sent price notification', { userId, marketId, changePercent });
+    logger.info({ userId, marketId, changePercent }, 'Sent price notification');
   } catch (error) {
-    logger.error('Failed to send notification', { userId, marketId, error });
+    logger.error({ userId, marketId, error }, 'Failed to send notification');
   }
 }
 
@@ -99,7 +99,7 @@ export function addSubscription(userId: number, marketId: string) {
   }
 
   subscriptions.push({ userId, marketId });
-  logger.info('Added subscription', { userId, marketId });
+  logger.info({ userId, marketId }, 'Added subscription');
   return true;
 }
 
@@ -113,7 +113,7 @@ export function removeSubscription(userId: number, marketId: string) {
   }
 
   subscriptions.splice(index, 1);
-  logger.info('Removed subscription', { userId, marketId });
+  logger.info({ userId, marketId }, 'Removed subscription');
   return true;
 }
 

@@ -1,5 +1,5 @@
 import { Telegraf, Markup } from 'telegraf'
-import cron from 'node-cron'
+import * as cron from 'node-cron'
 import { logger } from '../utils/logger'
 import { promises as fs } from 'fs'
 import path from 'path'
@@ -251,7 +251,7 @@ export class AlphaAlertsService {
       // Rate limit per user
       const last = lastSend.get(u.userId) || 0
       if (Date.now() - last < RATE_WINDOW_MS) {
-        logger.info('alpha_alerts.rate_limited', { userId: u.userId })
+        logger.info({ userId: u.userId }, 'alpha_alerts.rate_limited')
         continue
       }
       lastSend.set(u.userId, Date.now())
@@ -270,9 +270,9 @@ export class AlphaAlertsService {
         reply_markup: this.alertButtons().reply_markup,
         disable_web_page_preview: true,
       } as any)
-      logger.info('alpha_alerts.sent', { userId, alertId: alert.id })
+      logger.info({ userId, alertId: alert.id }, 'alpha_alerts.sent')
     } catch (e) {
-      logger.warn('alpha_alerts.send_failed', { userId, err: (e as any)?.message || e })
+      logger.warn({ userId, err: (e as any)?.message || e }, 'alpha_alerts.send_failed')
     }
   }
 
@@ -304,9 +304,9 @@ export class AlphaAlertsService {
           reply_markup: this.alertButtons().reply_markup,
           disable_web_page_preview: true,
         } as any)
-        logger.info('alpha_alerts.digest_sent', { userId: u.userId, count: items.length })
+        logger.info({ userId: u.userId, count: items.length }, 'alpha_alerts.digest_sent')
       } catch (e) {
-        logger.warn('alpha_alerts.digest_failed', { userId: u.userId, err: (e as any)?.message || e })
+        logger.warn({ userId: u.userId, err: (e as any)?.message || e }, 'alpha_alerts.digest_failed')
       }
     }
   }

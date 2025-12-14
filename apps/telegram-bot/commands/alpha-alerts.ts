@@ -138,7 +138,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
         return
       }
     } catch (e) {
-      logger.warn('alpha_alerts.cb_failed', { data, err: (e as any)?.message || e })
+      logger.warn({ data, err: (e as any)?.message || e }, 'alpha_alerts.cb_failed')
       try { await ctx.answerCbQuery('Error') } catch {}
     }
   })

@@ -52,7 +52,7 @@ export class PolymarketService {
         footer: market.active ? '🟢 Active' : '🔴 Closed',
       };
     } catch (error) {
-      logger.error('Failed to get market card:', error);
+      logger.error(error, 'Failed to get market card:');
       return null;
     }
   }
@@ -93,7 +93,7 @@ export class PolymarketService {
           : undefined,
       };
     } catch (error) {
-      logger.error('Failed to get price card:', error);
+      logger.error(error, 'Failed to get price card:');
       return null;
     }
   }
@@ -116,7 +116,7 @@ export class PolymarketService {
           : undefined,
       }));
     } catch (error) {
-      logger.error('Failed to get trending cards:', error);
+      logger.error(error, 'Failed to get trending cards:');
       return [];
     }
   }
@@ -153,7 +153,7 @@ export class PolymarketService {
         lines,
       };
     } catch (error) {
-      logger.error('Failed to get portfolio card:', error);
+      logger.error(error, 'Failed to get portfolio card:');
       return null;
     }
   }
@@ -199,7 +199,7 @@ export class PolymarketService {
         lines,
       };
     } catch (error) {
-      logger.error('Failed to get whales card:', error);
+      logger.error(error, 'Failed to get whales card:');
       return null;
     }
   }
@@ -279,7 +279,7 @@ export class PolymarketService {
 
       return cards;
     } catch (error) {
-      logger.error('Failed to get market snapshot:', error);
+      logger.error(error, 'Failed to get market snapshot:');
       return [];
     }
   }
@@ -304,7 +304,7 @@ export class PolymarketService {
           : undefined,
       }));
     } catch (error) {
-      logger.error('Failed to search markets:', error);
+      logger.error(error, 'Failed to search markets:');
       return [];
     }
   }

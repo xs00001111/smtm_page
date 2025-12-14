@@ -14,7 +14,7 @@ export function startObserverRefresh(ws: WebSocketMonitorService) {
     return
   }
   if (timer) return
-  logger.info('observer.refresh starting', { intervalMs })
+  logger.info({ intervalMs }, 'observer.refresh starting')
   const tick = async () => {
     if (running) return
     running = true
@@ -25,10 +25,10 @@ export function startObserverRefresh(ws: WebSocketMonitorService) {
       const seen = new Set<string>()
       const add = (arr:any[]) => { for (const m of arr) for (const t of (m.tokens||[])) if (t?.token_id && !seen.has(t.token_id)) { seen.add(t.token_id); tokenIds.push(t.token_id) } }
       add(trending); add(active)
-      logger.info('observer.refresh tokens', { count: tokenIds.length })
+      logger.info({ count: tokenIds.length }, 'observer.refresh tokens')
       if (tokenIds.length) ws.setObserverAssets(tokenIds)
     } catch (e) {
-      logger.warn('observer.refresh error', { err: (e as any)?.message || e })
+      logger.warn({ err: (e as any)?.message || e }, 'observer.refresh error')
     } finally {
       running = false
     }

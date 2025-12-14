@@ -24,7 +24,7 @@ class WhaleAggregator {
       if (Array.isArray(json?.events)) {
         this.events = json.events.filter((e: any)=> e && typeof e.ts==='number' && typeof e.address==='string' && typeof e.tokenId==='string' && typeof e.value==='number')
         this.prune()
-        logger.info('whale-aggregator loaded', { count: this.events.length })
+        logger.info({ count: this.events.length }, 'whale-aggregator loaded')
       }
     } catch {}
   }
@@ -46,7 +46,7 @@ class WhaleAggregator {
       const data = JSON.stringify({ events: this.events }, null, 0)
       await fs.writeFile(FILE, data)
     } catch (e) {
-      logger.error('whale-aggregator save failed', e)
+      logger.error(e, 'whale-aggregator save failed')
     }
   }
 

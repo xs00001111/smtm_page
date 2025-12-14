@@ -60,7 +60,7 @@ async function ensureFile() {
       await fs.writeFile(FILE, HEADER)
     }
   } catch (e) {
-    logger.error('Failed to ensure subscriptions file', e)
+    logger.error(e, 'Failed to ensure subscriptions file')
   }
 }
 
@@ -122,7 +122,7 @@ export async function loadSubscriptions(ws: WebSocketMonitorService) {
       logger.info(`Loaded ${restored} subscriptions from Supabase`)
       return
     } catch (e) {
-      logger.error('Failed to load subscriptions from Supabase, falling back to CSV', e)
+      logger.error(e, 'Failed to load subscriptions from Supabase, falling back to CSV')
     }
   }
   // Fallback to CSV
@@ -164,7 +164,7 @@ export async function loadSubscriptions(ws: WebSocketMonitorService) {
     }
     logger.info(`Loaded ${rows.length} subscriptions from CSV`)
   } catch (e) {
-    logger.error('Failed to load subscriptions file', e)
+    logger.error(e, 'Failed to load subscriptions file')
   }
 }
 
@@ -192,7 +192,7 @@ export async function addMarketSubscription(
       })
       return
     } catch (e) {
-      logger.error('Supabase addMarketSubscription failed, falling back to CSV', e)
+      logger.error(e, 'Supabase addMarketSubscription failed, falling back to CSV')
     }
   }
   rows.push({ created_at: new Date().toISOString(), user_id: userId, type: 'market', token_id: tokenId || '', market_condition_id: marketConditionId || undefined, market_name: marketName, threshold })
@@ -205,7 +205,7 @@ export async function removeMarketSubscription(userId: number, tokenId: string) 
       await sb(`tg_follows?user_id=eq.${userId}&kind=eq.market&token_id=eq.${tokenId}`, { method: 'DELETE' })
       return
     } catch (e) {
-      logger.error('Supabase removeMarketSubscription failed, falling back to CSV', e)
+      logger.error(e, 'Supabase removeMarketSubscription failed, falling back to CSV')
     }
   }
   rows = rows.filter((r) => !(r.type === 'market' && r.user_id === userId && r.token_id === tokenId))
@@ -218,7 +218,7 @@ export async function updateMarketToken(userId: number, conditionId: string, tok
       await sb(`tg_follows?user_id=eq.${userId}&kind=eq.market&market_condition_id=eq.${conditionId}&token_id=is.null`, { method: 'PATCH', body: JSON.stringify({ token_id: tokenId }) })
       return true
     } catch (e) {
-      logger.error('Supabase updateMarketToken failed, falling back to CSV', e)
+      logger.error(e, 'Supabase updateMarketToken failed, falling back to CSV')
     }
   }
   let updated = false
@@ -250,7 +250,7 @@ export async function getUserRows(userId: number): Promise<StoredRow[]> {
         address_filter: r.address_filter || undefined,
       }))
     } catch (e) {
-      logger.error('Supabase getUserRows failed, falling back to in-memory', e)
+      logger.error(e, 'Supabase getUserRows failed, falling back to in-memory')
       // Fall back to in-memory
     }
   }
@@ -264,7 +264,7 @@ export async function removePendingMarketByCondition(userId: number, conditionId
       await sb(`tg_follows?user_id=eq.${userId}&kind=eq.market&market_condition_id=eq.${conditionId}&token_id=is.null`, { method: 'DELETE' })
       return 1
     } catch (e) {
-      logger.error('Supabase removePendingMarketByCondition failed, falling back to CSV', e)
+      logger.error(e, 'Supabase removePendingMarketByCondition failed, falling back to CSV')
     }
   }
   const before = rows.length
@@ -280,7 +280,7 @@ export async function removePendingWhaleByCondition(userId: number, conditionId:
       await sb(`tg_follows?user_id=eq.${userId}&kind=eq.whale&market_condition_id=eq.${conditionId}${walletFilter}&token_id=is.null`, { method: 'DELETE' })
       return 1
     } catch (e) {
-      logger.error('Supabase removePendingWhaleByCondition failed, falling back to CSV', e)
+      logger.error(e, 'Supabase removePendingWhaleByCondition failed, falling back to CSV')
     }
   }
   const before = rows.length
@@ -315,7 +315,7 @@ export async function addWhaleSubscription(
       })
       return
     } catch (e) {
-      logger.error('Supabase addWhaleSubscription failed, falling back to CSV', e)
+      logger.error(e, 'Supabase addWhaleSubscription failed, falling back to CSV')
     }
   }
   rows.push({ created_at: new Date().toISOString(), user_id: userId, type: 'whale', token_id: tokenId || '', market_condition_id: marketConditionId || undefined, market_name: marketName, min_trade_size: minTradeSize, address_filter: addressFilter })
@@ -328,7 +328,7 @@ export async function removeWhaleSubscription(userId: number, tokenId: string) {
       await sb(`tg_follows?user_id=eq.${userId}&kind=eq.whale&token_id=eq.${tokenId}`, { method: 'DELETE' })
       return
     } catch (e) {
-      logger.error('Supabase removeWhaleSubscription failed, falling back to CSV', e)
+      logger.error(e, 'Supabase removeWhaleSubscription failed, falling back to CSV')
     }
   }
   rows = rows.filter((r) => !(r.type === 'whale' && r.user_id === userId && r.token_id === tokenId))
@@ -341,7 +341,7 @@ export async function updateWhaleToken(userId: number, conditionId: string, toke
       await sb(`tg_follows?user_id=eq.${userId}&kind=eq.whale&market_condition_id=eq.${conditionId}&token_id=is.null`, { method: 'PATCH', body: JSON.stringify({ token_id: tokenId }) })
       return true
     } catch (e) {
-      logger.error('Supabase updateWhaleToken failed, falling back to CSV', e)
+      logger.error(e, 'Supabase updateWhaleToken failed, falling back to CSV')
     }
   }
   let updated = false
@@ -379,7 +379,7 @@ export async function addWhaleSubscriptionAll(
       })
       return
     } catch (e) {
-      logger.error('Supabase addWhaleSubscriptionAll failed, falling back to CSV', e)
+      logger.error(e, 'Supabase addWhaleSubscriptionAll failed, falling back to CSV')
     }
   }
   rows.push({ created_at: new Date().toISOString(), user_id: userId, type: 'whale_all', token_id: '', market_name: 'All Markets', min_trade_size: minTradeSize, address_filter: addressFilter })
@@ -392,7 +392,7 @@ export async function removeWhaleSubscriptionAll(userId: number, addressFilter: 
       await sb(`tg_follows?user_id=eq.${userId}&kind=eq.whale_all&address_filter=eq.${addressFilter}`, { method: 'DELETE' })
       return
     } catch (e) {
-      logger.error('Supabase removeWhaleSubscriptionAll failed, falling back to CSV', e)
+      logger.error(e, 'Supabase removeWhaleSubscriptionAll failed, falling back to CSV')
     }
   }
   rows = rows.filter((r) => !(r.type === 'whale_all' && r.user_id === userId && (r.address_filter || '').toLowerCase() === addressFilter.toLowerCase()))

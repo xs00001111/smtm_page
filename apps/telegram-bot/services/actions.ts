@@ -58,7 +58,7 @@ export async function createAction(type: ActionType, data: Record<string, any>, 
       await sb('tg_actions', { method: 'POST', body: JSON.stringify([{ id, type, expires_at: new Date(expiresAt).toISOString(), data }]) })
       return id
     } catch (e) {
-      logger.error('actions: supabase create failed, using memory', e)
+      logger.error(e, 'actions: supabase create failed, using memory')
     }
   }
   mem.set(id, rec)
@@ -78,7 +78,7 @@ export async function resolveAction(id: string): Promise<ActionRecord | null> {
       await sb(`tg_actions?id=eq.${id}`, { method: 'DELETE' })
       return { id: r.id, type: r.type, expires_at: exp, data: r.data || {} }
     } catch (e) {
-      logger.error('actions: supabase resolve failed, fallback to memory', e)
+      logger.error(e, 'actions: supabase resolve failed, fallback to memory')
     }
   }
   const rec = mem.get(id) || null

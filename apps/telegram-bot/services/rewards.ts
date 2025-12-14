@@ -41,14 +41,14 @@ export async function getRewardMarkets(limit = 20): Promise<RewardInfo[]> {
       }))
       .slice(0, limit)
 
-    logger.info('rewards: gamma results', { count: rewardMarkets.length })
+    logger.info({ count: rewardMarkets.length }, 'rewards: gamma results')
     if (rewardMarkets.length > 0) return rewardMarkets
 
     // Final fallback: return empty and let caller present link
     logger.warn('rewards: no reward markets found from any source')
     return []
   } catch (error) {
-    logger.error('Error fetching reward markets', error)
+    logger.error(error, 'Error fetching reward markets')
     throw error
   }
 }
@@ -69,7 +69,7 @@ export async function getTopRewardMarket(): Promise<RewardInfo | null> {
 
     return markets[0];
   } catch (error) {
-    logger.error('Error fetching top reward market', error);
+    logger.error(error, 'Error fetching top reward market');
     return null;
   }
 }

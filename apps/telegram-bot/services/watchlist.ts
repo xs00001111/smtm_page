@@ -17,15 +17,15 @@ export async function seedWatchlistFromSupabase(limit = 1000): Promise<boolean> 
   try {
     // Get latest day snapshot
     const path = `top_trader_daily?select=wallet,rank,day_utc&order=day_utc.desc,rank.asc&limit=${limit}`
-    logger.info('watchlist.seed fetch', { path })
+    logger.info({ path }, 'watchlist.seed fetch')
     const rows = await sb<any[]>(path)
     if (!rows || rows.length === 0) { logger.info('watchlist.seed empty'); return false }
     const addrs = rows.map(r => (r.wallet || '').toLowerCase()).filter((a:string)=>a && a.startsWith('0x') && a.length===42)
-    logger.info('watchlist.seed applying', { count: addrs.length, sample: addrs.slice(0, 10) })
+    logger.info({ count: addrs.length, sample: addrs.slice(0, 10) }, 'watchlist.seed applying')
     WhaleDetector.setWatchlist(addrs)
     return addrs.length > 0
   } catch (e) {
-    logger.warn('watchlist.seed error', { err: (e as any)?.message || e })
+    logger.warn({ err: (e as any)?.message || e }, 'watchlist.seed error')
     return false
   }
 }

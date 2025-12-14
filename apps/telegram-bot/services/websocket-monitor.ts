@@ -100,7 +100,7 @@ export class WebSocketMonitorService {
       this.resolvePendingMarkets().catch(()=>{})
     } catch (error) {
       this.isConnecting = false;
-      logger.error('Failed to start WebSocket service', error);
+      logger.error(error, 'Failed to start WebSocket service');
       this.scheduleReconnect();
     }
   }
@@ -130,7 +130,7 @@ export class WebSocketMonitorService {
       ?.find((sub) => sub.userId === userId);
 
     if (existing) {
-      logger.info('User already subscribed to market', { userId, tokenId });
+      logger.info({ userId, tokenId }, 'User already subscribed to market');
       return false;
     }
 
@@ -151,7 +151,7 @@ export class WebSocketMonitorService {
     }
     this.updateSubscriptions();
 
-    logger.info('Added market subscription', { userId, tokenId, marketName });
+    logger.info({ userId, tokenId, marketName }, 'Added market subscription');
     return true;
   }
 
@@ -166,12 +166,12 @@ export class WebSocketMonitorService {
   ): boolean {
     const list = this.pendingMarketSubscriptions.get(conditionId) || []
     if (list.find((s) => s.userId === userId)) {
-      logger.info('User already has pending market subscription', { userId, conditionId })
+      logger.info({ userId, conditionId }, 'User already has pending market subscription')
       return false
     }
     list.push({ userId, tokenId: '', marketName, priceChangeThreshold })
     this.pendingMarketSubscriptions.set(conditionId, list)
-    logger.info('Added pending market subscription', { userId, conditionId })
+    logger.info({ userId, conditionId }, 'Added pending market subscription')
     // Try to resolve shortly
     setTimeout(()=>{ this.resolvePendingMarkets().catch(()=>{}) }, 500)
     return true
@@ -179,7 +179,7 @@ export class WebSocketMonitorService {
 
   private async resolvePendingMarkets(): Promise<void> {
     if (this.pendingMarketSubscriptions.size === 0) return
-    logger.info('Resolving pending market subscriptions', { count: this.pendingMarketSubscriptions.size, whales: this.pendingWhaleSubscriptions.size })
+    logger.info({ count: this.pendingMarketSubscriptions.size, whales: this.pendingWhaleSubscriptions.size }, 'Resolving pending market subscriptions')
     const conditionIds = new Set<string>([
       ...this.pendingMarketSubscriptions.keys(),
       ...this.pendingWhaleSubscriptions.keys(),
@@ -213,10 +213,10 @@ export class WebSocketMonitorService {
           } catch {}
         }
       } catch (e) {
-        logger.error('resolvePendingMarkets error', e)
+        logger.error(e, 'resolvePendingMarkets error')
       }
       if (tokenId) {
-        logger.info('Resolved condition to token', { conditionId, tokenId, priceSubs: marketSubs.length, whaleSubs: whaleSubs.length })
+        logger.info({ conditionId, tokenId, priceSubs: marketSubs.length, whaleSubs: whaleSubs.length }, 'Resolved condition to token')
         // Activate price alert subscribers
         for (const sub of marketSubs) {
           this.subscribeToMarket(sub.userId, tokenId, sub.marketName, sub.priceChangeThreshold)
@@ -249,12 +249,12 @@ export class WebSocketMonitorService {
   ): boolean {
     const list = this.pendingWhaleSubscriptions.get(conditionId) || []
     if (list.find((s) => s.userId === userId)) {
-      logger.info('User already has pending whale subscription', { userId, conditionId })
+      logger.info({ userId, conditionId }, 'User already has pending whale subscription')
       return false
     }
     list.push({ userId, marketName, minTradeSize, addressFilter })
     this.pendingWhaleSubscriptions.set(conditionId, list)
-    logger.info('Added pending whale subscription', { userId, conditionId })
+    logger.info({ userId, conditionId }, 'Added pending whale subscription')
     // Try to resolve shortly
     setTimeout(()=>{ this.resolvePendingMarkets().catch(()=>{}) }, 500)
     return true
@@ -281,7 +281,7 @@ export class WebSocketMonitorService {
     // Update WebSocket subscriptions
     this.updateSubscriptions();
 
-    logger.info('Removed market subscription', { userId, tokenId });
+    logger.info({ userId, tokenId }, 'Removed market subscription');
     return true;
   }
 
@@ -300,7 +300,7 @@ export class WebSocketMonitorService {
       ?.find((sub) => sub.userId === userId);
 
     if (existing) {
-      logger.info('User already subscribed to whale trades', { userId, tokenId });
+      logger.info({ userId, tokenId }, 'User already subscribed to whale trades');
       return false;
     }
 
@@ -322,7 +322,7 @@ export class WebSocketMonitorService {
     }
     this.updateSubscriptions();
 
-    logger.info('Added whale trade subscription', { userId, tokenId, marketName });
+    logger.info({ userId, tokenId, marketName }, 'Added whale trade subscription');
     return true;
   }
 
@@ -347,7 +347,7 @@ export class WebSocketMonitorService {
     // Update WebSocket subscriptions
     this.updateSubscriptions();
 
-    logger.info('Removed whale trade subscription', { userId, tokenId });
+    logger.info({ userId, tokenId }, 'Removed whale trade subscription');
     return true;
   }
 
@@ -365,7 +365,7 @@ export class WebSocketMonitorService {
       ?.find((sub) => sub.userId === userId);
 
     if (existing) {
-      logger.info('User already subscribed to whale-all', { userId, wallet: walletKey });
+      logger.info({ userId, wallet: walletKey }, 'User already subscribed to whale-all');
       return false;
     }
 
@@ -379,7 +379,7 @@ export class WebSocketMonitorService {
     subs.push(subscription);
     this.whaleAllSubscriptions.set(walletKey, subs);
 
-    logger.info('Added whale-all subscription', { userId, wallet: walletKey });
+    logger.info({ userId, wallet: walletKey }, 'Added whale-all subscription');
     return true;
   }
 
@@ -402,7 +402,7 @@ export class WebSocketMonitorService {
       this.whaleAllSubscriptions.set(walletKey, subs);
     }
 
-    logger.info('Removed whale-all subscription', { userId, wallet: walletKey });
+    logger.info({ userId, wallet: walletKey }, 'Removed whale-all subscription');
     return true;
   }
 
@@ -447,10 +447,10 @@ export class WebSocketMonitorService {
    */
   private handleMessage(message: Message): void {
     try {
-      logger.debug('WebSocket message received', {
+      logger.debug({
         topic: message.topic,
         type: message.type,
-      });
+      }, 'WebSocket message received');
 
       if (message.topic === 'clob_market') {
         this.handleMarketMessage(message);
@@ -458,7 +458,7 @@ export class WebSocketMonitorService {
         this.handleTradeMessage(message);
       }
     } catch (error) {
-      logger.error('Error handling WebSocket message', error);
+      logger.error(error, 'Error handling WebSocket message');
     }
   }
 
@@ -484,7 +484,7 @@ export class WebSocketMonitorService {
     const newPrice = parseFloat(payload.price);
 
     if (!tokenId || isNaN(newPrice)) {
-      logger.warn('Invalid price change payload', payload);
+      logger.warn(payload, 'Invalid price change payload');
       return;
     }
 
@@ -570,11 +570,11 @@ export class WebSocketMonitorService {
     const tradeValue = size * price;
 
     if (!tokenId || isNaN(tradeValue)) {
-      logger.warn('Invalid trade payload', payload);
+      logger.warn(payload, 'Invalid trade payload');
       return;
     }
 
-    logger.info('ws:trade', { assetId: tokenId, price, size, notional: Math.round(tradeValue), maker: (payload.maker_address || payload.maker || '').toLowerCase() })
+    logger.info({ assetId: tokenId, price, size, notional: Math.round(tradeValue), maker: (payload.maker_address || payload.maker || '').toLowerCase() }, 'ws:trade')
 
     // Feed detector for global whale ingestion (in-memory)
     try {
@@ -583,7 +583,7 @@ export class WebSocketMonitorService {
       const wl = new Set((WhaleDetector as any).getWatchlist ? (WhaleDetector as any).getWatchlist() : [])
       const mk = (payload.maker_address || payload.maker || '').toLowerCase()
       if (mk && wl.has(mk)) {
-        logger.info('alpha:ws whale_trade', { assetId: tokenId, maker: mk, price, size, notional: Math.round(tradeValue) })
+        logger.info({ assetId: tokenId, maker: mk, price, size, notional: Math.round(tradeValue) }, 'alpha:ws whale_trade')
       }
     } catch {}
     // Feed raw trade buffer for alpha fallbacks and skew
@@ -599,7 +599,7 @@ export class WebSocketMonitorService {
           // If following a specific wallet, filter by maker address
           const maker = (payload.maker_address || payload.maker || '').toLowerCase();
           if (sub.addressFilter && maker !== sub.addressFilter) continue;
-          logger.info('notify:whale_trade', { tokenId, userId: sub.userId, market: sub.marketName, minTradeSize: sub.minTradeSize, notional: Math.round(tradeValue), maker })
+          logger.info({ tokenId, userId: sub.userId, market: sub.marketName, minTradeSize: sub.minTradeSize, notional: Math.round(tradeValue), maker }, 'notify:whale_trade')
           await this.notifyWhaleTrade(sub, payload, tradeValue);
         }
       }
@@ -643,16 +643,16 @@ export class WebSocketMonitorService {
       await this.bot.telegram.sendMessage(subscription.userId, message, {
         parse_mode: 'Markdown',
       });
-      logger.info('Sent price change notification', {
+      logger.info({
         userId: subscription.userId,
         tokenId: subscription.tokenId,
         changePercent,
-      });
+      }, 'Sent price change notification');
     } catch (error) {
-      logger.error('Failed to send price notification', {
+      logger.error({
         userId: subscription.userId,
         error,
-      });
+      }, 'Failed to send price notification');
     }
   }
 
@@ -680,16 +680,16 @@ export class WebSocketMonitorService {
       await this.bot.telegram.sendMessage(subscription.userId, message, {
         parse_mode: 'Markdown',
       });
-      logger.info('Sent whale trade notification', {
+      logger.info({
         userId: subscription.userId,
         tokenId: subscription.tokenId,
         tradeValue,
-      });
+      }, 'Sent whale trade notification');
     } catch (error) {
-      logger.error('Failed to send whale trade notification', {
+      logger.error({
         userId: subscription.userId,
         error,
-      });
+      }, 'Failed to send whale trade notification');
     }
   }
 
@@ -733,16 +733,16 @@ export class WebSocketMonitorService {
       await this.bot.telegram.sendMessage(subscription.userId, message, {
         parse_mode: 'Markdown',
       });
-      logger.info('Sent whale-all trade notification', {
+      logger.info({
         userId: subscription.userId,
         wallet: subscription.addressFilter,
         tradeValue,
-      });
+      }, 'Sent whale-all trade notification');
     } catch (error) {
-      logger.error('Failed to send whale-all trade notification', {
+      logger.error({
         userId: subscription.userId,
         error,
-      });
+      }, 'Failed to send whale-all trade notification');
     }
   }
 
@@ -813,7 +813,7 @@ export class WebSocketMonitorService {
    * Handle errors
    */
   private handleError(error: Error): void {
-    logger.error('WebSocket error', error);
+    logger.error(error, 'WebSocket error');
 
     // Check for rate limit error (429)
     if (error.message && error.message.includes('429')) {
@@ -924,13 +924,13 @@ export class WebSocketMonitorService {
 
     try {
       this.client.subscribe({ subscriptions });
-      logger.info('Updated WebSocket subscriptions', {
+      logger.info({
         marketCount: this.marketSubscriptions.size,
         whaleCount: this.whaleSubscriptions.size,
         totalTokens: allTokenIds.size,
-      });
+      }, 'Updated WebSocket subscriptions');
     } catch (error) {
-      logger.error('Failed to update subscriptions', error);
+      logger.error(error, 'Failed to update subscriptions');
     }
   }
 
@@ -943,7 +943,7 @@ export class WebSocketMonitorService {
       if (id && !this.observerTokenIds.has(id)) { this.observerTokenIds.add(id); added++ }
     }
     if (added > 0) {
-      logger.info('Observer assets updated', { added, total: this.observerTokenIds.size })
+      logger.info({ added, total: this.observerTokenIds.size }, 'Observer assets updated')
       // Ensure WS started and refresh subs
       if (!this.client && !this.isConnecting) this.start()
       this.updateSubscriptions()

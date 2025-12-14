@@ -103,7 +103,7 @@ export function startResolutionMonitor(ws: WebSocketMonitorService) {
                 `${header}\n\n${question}\n\nWinning outcome: ${winner}\n\nAlerts for this market are now turned off.`
               )
             } catch (e) {
-              logger.warn('Failed to notify resolution', { user: r.user_id, conditionId, err: (e as any)?.message })
+              logger.warn({ user: r.user_id, conditionId, err: (e as any)?.message }, 'Failed to notify resolution')
             }
             try {
               const { removeMarketSubscription, removePendingMarketByCondition, removeWhaleSubscription, removePendingWhaleByCondition } = await import('./subscriptions')
@@ -117,15 +117,15 @@ export function startResolutionMonitor(ws: WebSocketMonitorService) {
                 if (r.token_id) (ws as any).unsubscribeFromWhaleTrades(r.user_id, r.token_id)
               }
             } catch (e) {
-              logger.warn('Failed to remove follow after resolution', { user: r.user_id, conditionId, err: (e as any)?.message })
+              logger.warn({ user: r.user_id, conditionId, err: (e as any)?.message }, 'Failed to remove follow after resolution')
             }
           }
         } catch (e) {
-          logger.warn('Resolution check failed for market', { conditionId, err: (e as any)?.message })
+          logger.warn({ conditionId, err: (e as any)?.message }, 'Resolution check failed for market')
         }
       }
     } catch (e) {
-      logger.warn('Resolution monitor run failed', { err: (e as any)?.message })
+      logger.warn({ err: (e as any)?.message }, 'Resolution monitor run failed')
     }
   }
 
@@ -136,11 +136,11 @@ export function startResolutionMonitor(ws: WebSocketMonitorService) {
   // Final scan (within last window): every S seconds (6-field cron)
   cron.schedule(`*/${finalEverySec} * * * * *`, () => scanResolutions('final'))
 
-  logger.info('Resolution monitor started', {
+  logger.info({
     baseEveryMin,
     nearEveryMin,
     nearWindowHours: Math.round(nearWindowMs / 3600000),
     finalEverySec,
     finalWindowMin: Math.round(finalWindowMs / 60000),
-  })
+  }, 'Resolution monitor started')
 }

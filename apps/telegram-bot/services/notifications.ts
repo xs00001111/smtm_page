@@ -23,9 +23,9 @@ export class NotificationService {
       if (card.url) message += useEmojis ? `\n\n🔗 ${card.url}` : `\n\nLink: ${card.url}`;
 
       await this.bot.telegram.sendMessage(userId, message);
-      logger.info('Sent card notification', { userId, title: card.title });
+      logger.info({ userId, title: card.title }, 'Sent card notification');
     } catch (error) {
-      logger.error('Failed to send card notification', { userId, error });
+      logger.error({ userId, error }, 'Failed to send card notification');
       throw error;
     }
   }
@@ -41,9 +41,9 @@ export class NotificationService {
   async sendMessage(userId: number, text: string) {
     try {
       await this.bot.telegram.sendMessage(userId, text);
-      logger.info('Sent message', { userId });
+      logger.info({ userId }, 'Sent message');
     } catch (error) {
-      logger.error('Failed to send message', { userId, error });
+      logger.error({ userId, error }, 'Failed to send message');
       throw error;
     }
   }

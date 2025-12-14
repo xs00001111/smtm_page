@@ -72,14 +72,14 @@ class AlphaAggregatorImpl {
       if (!tokenId || !Number.isFinite(price) || !Number.isFinite(size) || size <= 0) return
 
       const notionalPre = size * price
-      logger.info('alpha:onTrade received', { assetId: tokenId, wallet, price, size, notional: Math.round(notionalPre) })
+      logger.info({ assetId: tokenId, wallet, price, size, notional: Math.round(notionalPre) }, 'alpha:onTrade received')
 
       const alpha = await buildWhaleAlphaForTrade({ wallet, sizeShares: size, price, tokenId })
       const notional = size * price
       const isWhaleBase = classifyWhale(notional, alpha.whaleScore)
       const rel = await isTopOfRecentTrades(tokenId, notional, 10)
       const isWhale = isWhaleBase || rel.isTop
-      logger.info('alpha:onTrade computed', { assetId: tokenId, wallet, whaleScore: alpha.whaleScore, alpha: alpha.alpha, recommendation: alpha.recommendation, notional: Math.round(notional), isWhale, isWhaleBase, topRecent: rel })
+      logger.info({ assetId: tokenId, wallet, whaleScore: alpha.whaleScore, alpha: alpha.alpha, recommendation: alpha.recommendation, notional: Math.round(notional), isWhale, isWhaleBase, topRecent: rel }, 'alpha:onTrade computed')
       if (!isWhale) return
 
       // Try enrich with market mapping
@@ -118,9 +118,9 @@ class AlphaAggregatorImpl {
       this.push(event)
       this.lastWhaleEmit.set(whaleKey, nowTs)
       this.lastEventByKey.set(dedupeKey, { ts: nowTs, alpha: alpha.alpha })
-      logger.info('alpha:whale emitted', { conditionId: condId, assetId: tokenId, wallet, alpha: alpha.alpha, whaleScore: alpha.whaleScore, notional: Math.round(alpha.weightedNotionalUsd || notional) })
+      logger.info({ conditionId: condId, assetId: tokenId, wallet, alpha: alpha.alpha, whaleScore: alpha.whaleScore, notional: Math.round(alpha.weightedNotionalUsd || notional) }, 'alpha:whale emitted')
     } catch (e) {
-      logger.warn('alpha-aggregator onTrade failed', { err: (e as any)?.message })
+      logger.warn({ err: (e as any)?.message }, 'alpha-aggregator onTrade failed')
     }
   }
 
@@ -135,7 +135,7 @@ class AlphaAggregatorImpl {
   private start() {
     if (this.schedulerStarted) return
     this.schedulerStarted = true
-    setInterval(() => this.tick().catch((e)=>logger.warn('alpha-aggregator tick failed', { err: (e as any)?.message })), this.skewIntervalMs)
+    setInterval(() => this.tick().catch((e)=>logger.warn({ err: (e as any)?.message }, 'alpha-aggregator tick failed')), this.skewIntervalMs)
   }
 
   private async tick(): Promise<void> {
@@ -163,9 +163,9 @@ class AlphaAggregatorImpl {
             data: skew,
           })
           this.lastSkewEmit.set(condId, now)
-          logger.info('alpha:smart_skew emitted', { conditionId: condId, yes: pair.yes, no: pair.no, skew: skew.skew, skewYes: skew.skewYes, smartPoolUsd: skew.smartPoolUsd, alpha: skew.alpha })
+          logger.info({ conditionId: condId, yes: pair.yes, no: pair.no, skew: skew.skew, skewYes: skew.skewYes, smartPoolUsd: skew.smartPoolUsd, alpha: skew.alpha }, 'alpha:smart_skew emitted')
         } else {
-          logger.debug ? logger.debug('alpha:smart_skew computed (no emit)', { conditionId: condId, skew: skew.skew, smartPoolUsd: skew.smartPoolUsd, trigger: skew.trigger }) : logger.info('alpha:smart_skew computed (no emit)', { conditionId: condId, skew: skew.skew, smartPoolUsd: skew.smartPoolUsd, trigger: skew.trigger })
+          logger.debug ? logger.debug({ conditionId: condId, skew: skew.skew, smartPoolUsd: skew.smartPoolUsd, trigger: skew.trigger }, 'alpha:smart_skew computed (no emit)') : logger.info({ conditionId: condId, skew: skew.skew, smartPoolUsd: skew.smartPoolUsd, trigger: skew.trigger }, 'alpha:smart_skew computed (no emit)')
         }
       } catch (e) {
         // best-effort
@@ -203,7 +203,7 @@ class AlphaAggregatorImpl {
           skewResult: skewRes || undefined,
           cluster,
         })
-        logger.info('alpha:insider computed', { conditionId: condId, tokenId: e.tokenId, wallet: e.wallet, clusterCount: cluster.count, clusterDurationMs: cluster.durationMs, clusterNotional: Math.round(cluster.notionalUsd), insiderScore: insider.insiderScore, trigger: insider.trigger })
+        logger.info({ conditionId: condId, tokenId: e.tokenId, wallet: e.wallet, clusterCount: cluster.count, clusterDurationMs: cluster.durationMs, clusterNotional: Math.round(cluster.notionalUsd), insiderScore: insider.insiderScore, trigger: insider.trigger }, 'alpha:insider computed')
         if (insider.trigger) {
           // Cooldown/dedupe per (market,wallet)
           const key = `${condId}|${e.wallet}`
@@ -229,7 +229,7 @@ class AlphaAggregatorImpl {
           })
           this.lastInsiderEmit.set(key, now)
           this.lastEventByKey.set(dedupeKey2, { ts: now, alpha: insider.insiderScore })
-          logger.info('alpha:insider emitted', { conditionId: condId, tokenId: e.tokenId, wallet: e.wallet, insiderScore: insider.insiderScore })
+          logger.info({ conditionId: condId, tokenId: e.tokenId, wallet: e.wallet, insiderScore: insider.insiderScore }, 'alpha:insider emitted')
         }
       }
     } catch {}
