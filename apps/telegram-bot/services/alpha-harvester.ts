@@ -57,14 +57,30 @@ export function startAlphaHarvester() {
           logger.warn({ err: (e as any)?.message }, 'alpha.harvester failed to fetch market details')
         }
 
+        // Get whale description if available
+        let whaleDesc = best.wallet ? `${best.wallet.slice(0, 6)}...${best.wallet.slice(-4)}` : 'Unknown'
+        try {
+          const { getWhaleDescription } = await import('@smtm/data/whale-descriptions')
+          if (best.wallet) {
+            const desc = getWhaleDescription(best.wallet)
+            if (desc) whaleDesc = desc
+          }
+        } catch (e) {
+          logger.warn({ err: (e as any)?.message }, 'alpha.harvester failed to get whale description')
+        }
+
         // Persist approximate whale alpha
         const alphaScore = best.notional >= 10000 ? (best.notional >= 50000 ? 90 : best.notional >= 20000 ? 80 : 70) : 55
 
         // Format alert title and summary similar to /alpha command
-        const side = best.side || 'TRADE'
+        const side = best.side === 'BUY' ? 'bought YES' : best.side === 'SELL' ? 'sold YES' : 'traded'
         const amount = `$${Math.round(best.notional).toLocaleString()}`
         const price = `${(best.price * 100).toFixed(1)}¢`
-        const whaleInfo = best.whaleScore ? ` (whale ${best.whaleScore})` : ''
+
+        // Title: "Whale bought YES at 99.8¢"
+        const title = `${whaleDesc} ${side} at ${price}`
+        // Reason: Market question + amount
+        const reason = `${marketQuestion}\n${amount}${best.whaleScore ? ` · Rank ${best.whaleScore}` : ''}`
 
         const ev: any = {
           id: `${Date.now()}-${best.tokenId}-${Math.round(best.notional)}`,
@@ -74,8 +90,8 @@ export function startAlphaHarvester() {
           conditionId: best.marketId || undefined,
           wallet: best.wallet || undefined,
           alpha: alphaScore,
-          title: `${side} ${amount} @ ${price}${whaleInfo}`,
-          summary: marketQuestion,
+          title: title,
+          summary: reason,
           data: {
             weightedNotionalUsd: best.notional,
             whaleScore: best.whaleScore || null,
