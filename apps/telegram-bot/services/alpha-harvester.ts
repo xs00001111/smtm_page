@@ -1,4 +1,6 @@
-import { progressiveLiveScan } from '@smtm/data'
+// NOTE: alpha utilities are not exported from the @smtm/data barrel.
+// Import from the module path directly to avoid undefined at runtime.
+import { progressiveLiveScan } from '@smtm/data/alpha'
 import { persistAlphaEvent } from './alpha-store'
 import { alphaAlerts } from './alpha-alerts'
 import { logger } from '../utils/logger'
@@ -15,21 +17,30 @@ export function startAlphaHarvester() {
     return
   }
   if (timer) return
-  logger.info('alpha.harvester starting', { intervalMs })
+  logger.info('alpha.harvester starting', {
+    intervalMs,
+    alphaEnabled: enabled,
+    supabaseAlphaEnabled: env.SUPABASE_ALPHA_ENABLED === 'true',
+    wsEnabled: (process.env.WEBSOCKET_ENABLED || 'true') === 'true',
+  })
   const tick = async () => {
     if (running) return
     running = true
     const t0 = Date.now()
     try {
       logger.info('alpha.harvester run.begin')
-      const best = await progressiveLiveScan({
+      const scanCfg = {
         minNotionalUsd: 0,
         withinMs: 24*60*60*1000,
         perTokenLimit: 200,
         maxMarkets: 200,
         delayMs: 250,
         maxDurationMs: 4*60*1000,
-        onLog: (m, ctx) => logger.info({ ...ctx }, `alpha:harvest ${m}`)
+      }
+      logger.info('alpha.harvester scan.config', scanCfg)
+      const best = await progressiveLiveScan({
+        ...scanCfg,
+        onLog: (m, ctx) => logger.info({ ...(ctx || {}) }, `alpha:harvest ${m}`)
       })
       if (best) {
         logger.info('alpha.harvester run.result', { tokenId: best.tokenId, notional: Math.round(best.notional) })
@@ -61,7 +72,12 @@ export function startAlphaHarvester() {
         logger.info('alpha.harvester run.empty')
       }
     } catch (e) {
-      logger.warn('alpha.harvester run.error', { err: (e as any)?.message || e })
+      const errAny: any = e
+      logger.warn('alpha.harvester run.error', {
+        name: errAny?.name,
+        message: errAny?.message || String(e),
+        stack: errAny?.stack,
+      })
     } finally {
       running = false
       logger.info('alpha.harvester run.end', { elapsedMs: Date.now() - t0 })
