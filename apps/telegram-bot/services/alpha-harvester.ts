@@ -1,6 +1,6 @@
 // NOTE: alpha utilities are not exported from the @smtm/data barrel.
 // Import from the module path directly to avoid undefined at runtime.
-import { progressiveLiveScan } from '@smtm/data/alpha'
+import { scanAlphaFromTrades } from '@smtm/data/alpha'
 import { persistAlphaEvent } from './alpha-store'
 import { alphaAlerts } from './alpha-alerts'
 import { logger } from '../utils/logger'
@@ -30,15 +30,13 @@ export function startAlphaHarvester() {
     try {
       logger.info('alpha.harvester run.begin')
       const scanCfg = {
-        minNotionalUsd: 0,
-        withinMs: 24*60*60*1000,
-        perTokenLimit: 200,
-        maxMarkets: 200,
-        delayMs: 250,
-        maxDurationMs: 4*60*1000,
+        windowMs: 12 * 60 * 60 * 1000,
+        minNotionalUsd: 1000,
+        limit: 1000,
+        maxBatches: 3,
       }
       logger.info(scanCfg, 'alpha.harvester scan.config')
-      const best = await progressiveLiveScan({
+      const best = await scanAlphaFromTrades({
         ...scanCfg,
         onLog: (m, ctx) => logger.info({ ...(ctx || {}) }, `alpha:harvest ${m}`)
       })
@@ -48,14 +46,22 @@ export function startAlphaHarvester() {
         const alphaScore = best.notional >= 10000 ? (best.notional >= 50000 ? 90 : best.notional >= 20000 ? 80 : 70) : 55
         const ev: any = {
           id: `${Date.now()}-${best.tokenId}-${Math.round(best.notional)}`,
-          ts: Date.now(),
+          ts: best.ts,
           kind: 'whale',
           tokenId: best.tokenId,
           conditionId: best.marketId || undefined,
+          wallet: best.wallet || undefined,
           alpha: alphaScore,
           title: alphaScore === 55 ? 'Harvester: Small Trade' : 'Harvester: Big Trade',
           summary: `${best.side || 'TRADE'} $${Math.round(best.notional).toLocaleString()} @ ${(best.price*100).toFixed(1)}¢`,
-          data: { weightedNotionalUsd: best.notional, whaleScore: null, recommendation: null },
+          data: {
+            weightedNotionalUsd: best.notional,
+            whaleScore: best.whaleScore || null,
+            recommendation: null,
+            side: best.side,
+            price: best.price,
+            notional_usd: best.notional,
+          },
         }
         await persistAlphaEvent(ev as any)
         // Also notify opted-in users (confidence scaled from alpha)
