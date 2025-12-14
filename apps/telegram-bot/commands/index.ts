@@ -4415,9 +4415,8 @@ export function registerCommands(bot: Telegraf) {
         } catch (e) {
           logger.warn({ err: String((e as any)?.message || e) }, 'alpha:skew_fallback_error')
         }
-        // Nothing found
-        await ctx.reply('⚠️ No fresh alpha found in the recent window.', { disable_web_page_preview: true })
-        return
+        // Nothing found in DB-first path — inform user but continue with live scan fallbacks
+        try { await ctx.reply('⚠️ No fresh alpha found in DB window — scanning live sources…', { disable_web_page_preview: true }) } catch {}
         // Fallback: hit CLOB API for recent big orders (real trades)
         const { findRecentBigOrders } = await import('@smtm/data')
         let bigs = await findRecentBigOrders({
