@@ -66,14 +66,19 @@ export function startAlphaHarvester() {
         await persistAlphaEvent(ev as any)
         // Also notify opted-in users (confidence scaled from alpha)
         try {
-          await alphaAlerts().sendAlphaAlert({
+          const alertPayload = {
             id: String(ev.id),
             title: ev.title,
             confidence: Math.max(0, Math.min(1, ev.alpha / 100)),
             reason: ev.summary,
             ts: ev.ts,
-          })
-        } catch {}
+          }
+          logger.info({ alertId: alertPayload.id, confidence: alertPayload.confidence }, 'alpha.harvester sending alert')
+          await alphaAlerts().sendAlphaAlert(alertPayload)
+          logger.info({ alertId: alertPayload.id }, 'alpha.harvester alert sent')
+        } catch (e) {
+          logger.error({ err: (e as any)?.message || e, stack: (e as any)?.stack }, 'alpha.harvester alert send failed')
+        }
       } else {
         logger.info('alpha.harvester run.empty')
       }

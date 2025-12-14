@@ -236,6 +236,7 @@ export class AlphaAlertsService {
 
   async sendAlphaAlert(alert: AlertPayload): Promise<void> {
     const users = await this.store.allEnabled()
+    logger.info({ alertId: alert.id, enabledUsers: users.length, confidence: alert.confidence }, 'alpha_alerts.processing')
     const now = new Date()
     const tasks: Promise<any>[] = []
 
