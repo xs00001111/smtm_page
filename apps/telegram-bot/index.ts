@@ -14,6 +14,7 @@ import { startAlphaHarvester } from './services/alpha-harvester';
 import { startObserverRefresh } from './services/observer-refresh';
 import { startTradersHarvester } from './services/traders-harvester';
 import { seedWatchlistFromSupabase } from './services/watchlist';
+import { initAlphaAlerts, alphaAlerts } from './services/alpha-alerts';
 
 const token = env.TELEGRAM_BOT_TOKEN
 if (!token) {
@@ -98,6 +99,9 @@ async function start() {
     // Restore stored data before deciding to start WS
     await loadLinks();
     await loadSubscriptions(wsMonitor);
+    // Initialize alpha alerts (prefs store + digest scheduler)
+    const alphaSvc = initAlphaAlerts(bot);
+    await alphaSvc.init();
     // Pre-warm observer assets with trending markets to receive trade activity quickly
     try {
       const trending = await gammaApi.getTrendingMarkets(6)
@@ -213,6 +217,22 @@ async function start() {
           throw error;
         }
       }
+    }
+
+    // Example usage: expose a simple dev hook to send a sample alert locally
+    if (process.env.ALPHA_ALERTS_SAMPLE === 'true') {
+      setTimeout(() => {
+        try {
+          void alphaAlerts().sendAlphaAlert({
+            id: `sample-${Date.now()}`,
+            title: 'Whale bought YES at 22% (sample)',
+            marketUrl: 'https://polymarket.com/market/example',
+            confidence: 0.82,
+            reason: 'Top 1% trader; strong orderbook shift',
+            ts: Date.now(),
+          })
+        } catch {}
+      }, 2000)
     }
 
     // Enable graceful stop

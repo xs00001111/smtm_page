@@ -2,6 +2,7 @@ import { buildWhaleAlphaForTrade, classifyWhale, computeSmartSkewAlpha, computeI
 import { logger } from '../utils/logger'
 import { botConfig } from '../config/bot'
 import { persistAlphaEvent } from './alpha-store'
+import { alphaAlerts } from './alpha-alerts'
 
 export type AlphaKind = 'whale' | 'smart_skew' | 'insider'
 
@@ -48,6 +49,18 @@ class AlphaAggregatorImpl {
     if (this.buffer.length > this.maxEvents) this.buffer.splice(0, this.buffer.length - this.maxEvents)
     // Best-effort persistence (optional)
     void persistAlphaEvent(event)
+    // Notify opted-in users (best-effort). Confidence scaled 0..1 from alpha 0..100.
+    try {
+      const conf = Math.max(0, Math.min(1, (Number(event.alpha) || 0) / 100))
+      void alphaAlerts().sendAlphaAlert({
+        id: String(event.id),
+        title: event.marketName ? `${event.title} — ${event.marketName}` : event.title,
+        marketUrl: (event as any).marketUrl || undefined,
+        confidence: conf,
+        reason: event.summary || undefined,
+        ts: event.ts || Date.now(),
+      })
+    } catch {}
   }
 
   async onTrade(payload: any, context?: { marketName?: string }) {

@@ -1,5 +1,6 @@
 import { progressiveLiveScan } from '@smtm/data'
 import { persistAlphaEvent } from './alpha-store'
+import { alphaAlerts } from './alpha-alerts'
 import { logger } from '../utils/logger'
 import { env } from '@smtm/shared/env'
 
@@ -34,7 +35,7 @@ export function startAlphaHarvester() {
         logger.info('alpha.harvester run.result', { tokenId: best.tokenId, notional: Math.round(best.notional) })
         // Persist approximate whale alpha
         const alphaScore = best.notional >= 10000 ? (best.notional >= 50000 ? 90 : best.notional >= 20000 ? 80 : 70) : 55
-        await persistAlphaEvent({
+        const ev: any = {
           id: `${Date.now()}-${best.tokenId}-${Math.round(best.notional)}`,
           ts: Date.now(),
           kind: 'whale',
@@ -44,7 +45,18 @@ export function startAlphaHarvester() {
           title: alphaScore === 55 ? 'Harvester: Small Trade' : 'Harvester: Big Trade',
           summary: `${best.side || 'TRADE'} $${Math.round(best.notional).toLocaleString()} @ ${(best.price*100).toFixed(1)}¢`,
           data: { weightedNotionalUsd: best.notional, whaleScore: null, recommendation: null },
-        } as any)
+        }
+        await persistAlphaEvent(ev as any)
+        // Also notify opted-in users (confidence scaled from alpha)
+        try {
+          await alphaAlerts().sendAlphaAlert({
+            id: String(ev.id),
+            title: ev.title,
+            confidence: Math.max(0, Math.min(1, ev.alpha / 100)),
+            reason: ev.summary,
+            ts: ev.ts,
+          })
+        } catch {}
       } else {
         logger.info('alpha.harvester run.empty')
       }

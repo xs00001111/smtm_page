@@ -12,6 +12,7 @@ import { linkPolymarketAddress, linkPolymarketUsername, unlinkAll, getLinks, par
 import { actionFollowMarket, actionFollowWhaleAll, actionFollowWhaleMarket, resolveAction, actionUnfollowMarket, actionUnfollowWhaleAll, actionUnfollowWhaleMarket, actionFollowWhaleAllMany } from '../services/actions';
 import { logActionEvent } from '../services/analytics';
 import { recordSurveyResponse } from '../services/survey';
+import { registerAlphaAlertsCommands } from './alpha-alerts';
 
 // Lightweight skew cache to avoid recomputation storms (10 minutes)
 const SkewCache: Map<string, { ts: number; result: any }> = new Map()
@@ -858,6 +859,8 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
 }
 
 export function registerCommands(bot: Telegraf) {
+  // Alpha alerts command set (opt-in feed)
+  registerAlphaAlertsCommands(bot)
   // Start command
   bot.command('start', async (ctx) => {
     logger.info('User started bot', { userId: ctx.from?.id });
