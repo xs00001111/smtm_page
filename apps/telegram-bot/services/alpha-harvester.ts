@@ -44,17 +44,32 @@ export function startAlphaHarvester() {
         logger.info({ tokenId: best.tokenId, notional: Math.round(best.notional) }, 'alpha.harvester run.result')
 
         // Fetch market details to get the question
-        let marketQuestion = 'Market'
+        let marketQuestion = 'Unknown Market'
         let marketUrl: string | undefined
         try {
-          const { gammaApi } = await import('@smtm/data')
-          const market = await gammaApi.getMarketByCondition(best.marketId!)
+          const { gammaApi, clobApi } = await import('@smtm/data')
+
+          // Try getting market by token ID first
+          let market = await clobApi.getMarket(best.tokenId)
+
+          // If that fails, try by condition ID
+          if (!market?.question && best.marketId) {
+            market = await gammaApi.getMarketByCondition(best.marketId)
+          }
+
           if (market) {
-            marketQuestion = market.question || market.title || 'Market'
-            marketUrl = market.id ? `https://polymarket.com/event/${market.slug || market.id}` : undefined
+            marketQuestion = market.question || market.title || market.description || 'Unknown Market'
+            // Build market URL
+            if (market.slug) {
+              marketUrl = `https://polymarket.com/event/${market.slug}`
+            } else if (market.id) {
+              marketUrl = `https://polymarket.com/event/${market.id}`
+            } else if (best.marketId) {
+              marketUrl = `https://polymarket.com/event?id=${best.marketId}`
+            }
           }
         } catch (e) {
-          logger.warn({ err: (e as any)?.message }, 'alpha.harvester failed to fetch market details')
+          logger.warn({ err: (e as any)?.message, tokenId: best.tokenId, conditionId: best.marketId }, 'alpha.harvester failed to fetch market details')
         }
 
         // Get whale description if available
