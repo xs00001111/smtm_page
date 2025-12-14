@@ -27,6 +27,14 @@ export function startAlphaHarvester() {
     if (running) return
     running = true
     const t0 = Date.now()
+
+    // HARD STOP: Disable alerts completely until ready for launch
+    const alertsEnabled = env.ALPHA_ALERTS_ENABLED !== 'false'
+    if (!alertsEnabled) {
+      logger.info('alpha.harvester skipping - alerts disabled via ALPHA_ALERTS_ENABLED=false')
+      running = false
+      return
+    }
     try {
       logger.info('alpha.harvester run.begin')
       const scanCfg = {
