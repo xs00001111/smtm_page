@@ -174,16 +174,23 @@ export class AlphaAlertsService {
   }
 
   private async importSupabaseUsers(): Promise<void> {
+    logger.info('alpha.import starting Supabase user import...')
     try {
       const SUPABASE_URL = process.env.SUPABASE_URL
       const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 
+      logger.info({
+        hasUrl: !!SUPABASE_URL,
+        hasKey: !!SUPABASE_KEY
+      }, 'alpha.import checking Supabase config')
+
       if (!SUPABASE_URL || !SUPABASE_KEY) {
-        logger.info('Supabase not configured, skipping user import')
+        logger.warn('alpha.import Supabase not configured, skipping user import')
         return
       }
 
       const url = `${SUPABASE_URL}/rest/v1/tg_user?select=telegram_user_id&is_bot=eq.false`
+      logger.info('alpha.import fetching users from Supabase...')
       const res = await fetch(url, {
         headers: {
           apikey: SUPABASE_KEY,
@@ -193,11 +200,12 @@ export class AlphaAlertsService {
       })
 
       if (!res.ok) {
-        logger.warn({ status: res.status }, 'Failed to fetch Supabase users for alpha import')
+        logger.warn({ status: res.status, statusText: res.statusText }, 'alpha.import failed to fetch Supabase users')
         return
       }
 
       const users = await res.json() as Array<{ telegram_user_id: number }>
+      logger.info({ fetchedUsers: users?.length || 0 }, 'alpha.import fetched users, creating preferences...')
       let imported = 0
 
       for (const user of users || []) {
@@ -208,9 +216,9 @@ export class AlphaAlertsService {
         imported++
       }
 
-      logger.info({ totalUsers: users?.length || 0, imported }, 'Supabase users imported to alpha preferences')
+      logger.info({ totalUsers: users?.length || 0, imported }, 'alpha.import ✅ COMPLETE - Supabase users imported to alpha preferences')
     } catch (e) {
-      logger.warn({ err: (e as any)?.message || e }, 'Failed to import Supabase users, continuing without import')
+      logger.error({ err: (e as any)?.message || e, stack: (e as any)?.stack }, 'alpha.import ❌ FAILED - Error importing Supabase users')
     }
   }
 
