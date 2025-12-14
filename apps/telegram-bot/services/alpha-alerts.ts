@@ -177,11 +177,15 @@ export class AlphaAlertsService {
     logger.info('alpha.import starting Supabase user import...')
     try {
       const SUPABASE_URL = process.env.SUPABASE_URL
-      const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+      const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+      const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
+      const SUPABASE_KEY = SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY
 
       logger.info({
         hasUrl: !!SUPABASE_URL,
-        hasKey: !!SUPABASE_KEY
+        hasServiceKey: !!SUPABASE_SERVICE_KEY,
+        hasAnonKey: !!SUPABASE_ANON_KEY,
+        usingServiceKey: !!SUPABASE_SERVICE_KEY
       }, 'alpha.import checking Supabase config')
 
       if (!SUPABASE_URL || !SUPABASE_KEY) {
