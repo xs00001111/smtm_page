@@ -179,23 +179,28 @@ export class AlphaAlertsService {
     const tier = prefs.alpha_tier
     const qh = prefs.quiet_hours
     const rows: any[] = []
+
+    // Normalize tier names: 'high' or 'high_confidence' → 'all', keep 'daily_digest' as 'daily'
+    const isAll = tier === 'high' || tier === 'high_confidence'
+    const isDaily = tier === 'daily_digest'
+
     if (!enabled) {
+      // When disabled, show enable options
       rows.push([
-        Markup.button.callback('Enable ⚡', 'alrt:t:high'),
-        Markup.button.callback('Enable 🎯', 'alrt:t:high_confidence'),
+        Markup.button.callback('All alerts', 'alrt:t:all'),
+        Markup.button.callback('Daily summary', 'alrt:t:daily'),
       ])
-      rows.push([Markup.button.callback('Enable 🧠 Daily', 'alrt:t:daily_digest')])
     } else {
+      // When enabled, show current selection and allow switching
       rows.push([
-        Markup.button.callback('🔕 Mute', 'alrt:disable'),
-        Markup.button.callback('⚙️ Settings', 'alrt:settings'),
+        Markup.button.callback(`All alerts${isAll ? ' ✓' : ''}`, 'alrt:t:all'),
+        Markup.button.callback(`Daily summary${isDaily ? ' ✓' : ''}`, 'alrt:t:daily'),
       ])
       rows.push([
-        Markup.button.callback(`⚡ High${tier==='high'?' ✓':''}`, 'alrt:t:high'),
-        Markup.button.callback(`🎯 High conf${tier==='high_confidence'?' ✓':''}`, 'alrt:t:high_confidence'),
-        Markup.button.callback(`🧠 Daily${tier==='daily_digest'?' ✓':''}`, 'alrt:t:daily_digest'),
+        Markup.button.callback('Turn off', 'alrt:disable'),
       ])
     }
+
     const qLabel = qh ? `Quiet: ${qh.startHour}-${qh.endHour}` : 'Quiet: Off'
     rows.push([
       Markup.button.callback(`${qLabel}`, 'alrt:qh:menu'),

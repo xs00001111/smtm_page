@@ -4,9 +4,14 @@ import { logger } from '../utils/logger'
 
 function formatStatusLine(p: { alpha_enabled: boolean; alpha_tier: string; quiet_hours: any }) {
   const en = p.alpha_enabled ? 'On' : 'Off'
-  const tier = p.alpha_enabled ? ` • Tier: ${p.alpha_tier}` : ''
+  // Map internal tier to display name
+  let tierDisplay = ''
+  if (p.alpha_enabled) {
+    if (p.alpha_tier === 'daily_digest') tierDisplay = ' • Daily'
+    else tierDisplay = ' • All'
+  }
   const qh = p.quiet_hours ? ` • Quiet: ${p.quiet_hours.startHour}-${p.quiet_hours.endHour}` : ' • Quiet: Off'
-  return `Alpha alerts: <b>${en}</b>${tier}${qh}`
+  return `Alpha alerts: <b>${en}</b>${tierDisplay}${qh}`
 }
 
 export function registerAlphaAlertsCommands(bot: Telegraf) {
@@ -16,7 +21,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
     try {
       const svc = alphaAlerts()
       const prefs = await svc.getPrefs(ctx.from.id)
-      const msg = `${formatStatusLine(prefs)}\n<i>Opt‑in; no backfill. Tiers: ⚡ all, 🎯 ≥0.75 conf, 🧠 daily 09:00. Quiet hours queue to digest.</i>`
+      const msg = `${formatStatusLine(prefs)}\n<i>Opt-in only. All = real-time alerts. Daily = morning summary at 09:00. Quiet hours queue alerts.</i>`
       await ctx.reply(msg, { parse_mode: 'HTML', ...(svc.buildSettingsKeyboard(prefs) as any) })
     } catch (e) {
       logger.warn('alpha_alerts.alpha_cmd_post_failed', (e as any)?.message || e)
@@ -28,7 +33,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
     try {
       const svc = alphaAlerts()
       const prefs = await svc.getPrefs(ctx.from.id)
-      const msg = `Settings — ${formatStatusLine(prefs)}\n<i>Opt‑in; no backfill. Tiers: ⚡ all, 🎯 ≥0.75 conf, 🧠 daily 09:00. Quiet hours queue to digest.</i>`
+      const msg = `Settings — ${formatStatusLine(prefs)}\n<i>Opt-in only. All = real-time alerts. Daily = morning summary at 09:00. Quiet hours queue alerts.</i>`
       await ctx.reply(msg, { parse_mode: 'HTML', ...(svc.buildSettingsKeyboard(prefs) as any) })
     } catch {}
   })
@@ -38,7 +43,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
     try {
       const svc = alphaAlerts()
       await svc.updatePrefs(ctx.from.id, { alpha_enabled: false })
-      await ctx.reply('🔕 Alpha alerts muted. You can re-enable anytime via /alpha or /settings.')
+      await ctx.reply('Alpha alerts turned off. You can re-enable anytime via /alpha or /settings.')
     } catch {}
   })
 
@@ -77,7 +82,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
         await svc.updatePrefs(userId, { alpha_enabled: false })
         try { await ctx.answerCbQuery('Muted') } catch {}
         const prefs = await svc.getPrefs(userId)
-        await ctx.reply('🔕 Alpha alerts muted.', { ...(svc.buildSettingsKeyboard(prefs) as any) })
+        await ctx.reply('Alpha alerts turned off.', { ...(svc.buildSettingsKeyboard(prefs) as any) })
         return
       }
       if (data === 'alrt:settings') {
@@ -88,12 +93,17 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
       }
       if (data.startsWith('alrt:t:')) {
         const tier = data.split(':')[2] as any
-        const valid = tier === 'high' || tier === 'high_confidence' || tier === 'daily_digest'
-        if (!valid) { await ctx.answerCbQuery('Invalid tier'); return }
-        await svc.updatePrefs(userId, { alpha_enabled: true, alpha_tier: tier })
+        // Map simplified tier names to internal values
+        let internalTier: string
+        if (tier === 'all') internalTier = 'high'
+        else if (tier === 'daily') internalTier = 'daily_digest'
+        else if (tier === 'high' || tier === 'high_confidence' || tier === 'daily_digest') internalTier = tier
+        else { await ctx.answerCbQuery('Invalid tier'); return }
+
+        await svc.updatePrefs(userId, { alpha_enabled: true, alpha_tier: internalTier })
         await ctx.answerCbQuery('Updated')
         const prefs = await svc.getPrefs(userId)
-        await ctx.reply('✅ Preferences updated', { ...(svc.buildSettingsKeyboard(prefs) as any) })
+        await ctx.reply('Preferences updated', { ...(svc.buildSettingsKeyboard(prefs) as any) })
         return
       }
       if (data === 'alrt:qh:menu') {
@@ -117,15 +127,14 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
         return
       }
       if (data === 'alrt:onboard:yes') {
-        await ctx.answerCbQuery('How active?')
-        await ctx.reply('How active do you want alerts?', {
+        await ctx.answerCbQuery('Choose alert frequency')
+        await ctx.reply('Choose your alert preference:', {
           reply_markup: {
             inline_keyboard: [
               [
-                { text: '⚡ High frequency', callback_data: 'alrt:t:high' },
-                { text: '🎯 High confidence', callback_data: 'alrt:t:high_confidence' },
+                { text: 'All alerts', callback_data: 'alrt:t:all' },
+                { text: 'Daily summary', callback_data: 'alrt:t:daily' },
               ],
-              [ { text: '🧠 Daily summary', callback_data: 'alrt:t:daily_digest' } ],
             ],
           },
         } as any)
