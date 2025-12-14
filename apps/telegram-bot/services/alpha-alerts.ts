@@ -159,6 +159,8 @@ export class AlphaAlertsService {
 
   async init(): Promise<void> {
     await this.store.init()
+    // Import existing Supabase users on startup
+    await this.importSupabaseUsers()
     // Schedule daily digest at 09:00 server time
     try {
       if (this.digestTask) this.digestTask.stop()
@@ -168,6 +170,47 @@ export class AlphaAlertsService {
       logger.info('alpha_alerts.scheduler started for 09:00 daily digests')
     } catch (e) {
       logger.warn('alpha_alerts.scheduler failed to start', (e as any)?.message || e)
+    }
+  }
+
+  private async importSupabaseUsers(): Promise<void> {
+    try {
+      const SUPABASE_URL = process.env.SUPABASE_URL
+      const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+
+      if (!SUPABASE_URL || !SUPABASE_KEY) {
+        logger.info('Supabase not configured, skipping user import')
+        return
+      }
+
+      const url = `${SUPABASE_URL}/rest/v1/tg_user?select=telegram_user_id&is_bot=eq.false`
+      const res = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!res.ok) {
+        logger.warn({ status: res.status }, 'Failed to fetch Supabase users for alpha import')
+        return
+      }
+
+      const users = await res.json() as Array<{ telegram_user_id: number }>
+      let imported = 0
+
+      for (const user of users || []) {
+        const userId = user.telegram_user_id
+        if (!userId || !Number.isFinite(userId)) continue
+        // getPrefs will auto-create if missing with opt-in defaults
+        await this.store.get(userId)
+        imported++
+      }
+
+      logger.info({ totalUsers: users?.length || 0, imported }, 'Supabase users imported to alpha preferences')
+    } catch (e) {
+      logger.warn({ err: (e as any)?.message || e }, 'Failed to import Supabase users, continuing without import')
     }
   }
 
