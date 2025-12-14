@@ -10,6 +10,11 @@ let running = false
 let timer: any = null
 
 export function startAlphaHarvester() {
+  // HARDCODED DISABLE: Don't even start the harvester
+  logger.info('alpha.harvester HARDCODED DISABLED - not starting')
+  return
+
+  // eslint-disable-next-line no-unreachable
   const enabled = env.ALPHA_HARVEST_ENABLED === 'true'
   const intervalMs = Math.max(60_000, parseInt(env.ALPHA_HARVEST_INTERVAL_MS || '180000', 10))
   if (!enabled) {
@@ -28,10 +33,10 @@ export function startAlphaHarvester() {
     running = true
     const t0 = Date.now()
 
-    // HARD STOP: Disable alerts completely until ready for launch
-    const alertsEnabled = env.ALPHA_ALERTS_ENABLED !== 'false'
+    // HARD STOP: Alerts hardcoded to DISABLED until ready for launch
+    const alertsEnabled = false // TODO: Change to true when ready to launch
     if (!alertsEnabled) {
-      logger.info('alpha.harvester skipping - alerts disabled via ALPHA_ALERTS_ENABLED=false')
+      logger.info('alpha.harvester skipping - alerts HARDCODED disabled')
       running = false
       return
     }
