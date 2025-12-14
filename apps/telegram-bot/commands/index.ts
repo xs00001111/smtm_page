@@ -3932,7 +3932,20 @@ export function registerCommands(bot: Telegraf) {
       const ctxRef = ctx
 
       const { AlphaAggregator } = await import('../services/alpha-aggregator')
-      let latest = AlphaAggregator.getLatest(1, tokenIds)
+      function dedupeByIdStable(arr: any[]): any[] {
+        const seen = new Set<string>()
+        const out: any[] = []
+        for (let i = arr.length - 1; i >= 0; i--) {
+          const e: any = arr[i]
+          const id = String(e?.id || `${e?.ts || ''}-${e?.tokenId || ''}-${e?.wallet || ''}-${e?.alpha || ''}`)
+          if (seen.has(id)) continue
+          seen.add(id)
+          out.push(e)
+        }
+        return out.reverse()
+      }
+      // Pull a slightly larger window, then dedupe by id to avoid repeats
+      let latest = dedupeByIdStable(AlphaAggregator.getLatest(5, tokenIds))
       // Log-only: probe DB for unseen fresh alpha (<=12h) and log, do not return it to the user
       try {
         if (DB_LOG_ONLY_PROBE && ctx.from?.id) {
@@ -4590,7 +4603,7 @@ export function registerCommands(bot: Telegraf) {
         return
       }
 
-      const a = latest[0]
+      const a = latest[latest.length - 1]
       const title = marketTitle || a.marketName || 'Fresh Alpha'
       // Try to build a market URL
       let marketUrl: string | null = null
@@ -4750,13 +4763,15 @@ export function registerCommands(bot: Telegraf) {
       }
       const offset = parseInt(parts[2] || '1', 10)
       const tokenIdsArg = parts[3] ? parts[3].split(',') : undefined
-      const { AlphaAggregator } = await import('../services/alpha-aggregator')
-      const list = AlphaAggregator.getLatest(offset + 1, tokenIdsArg)
-      if (list.length <= offset) {
-        await ctx.reply('No more alpha right now. Check back soon!')
-        return
-      }
-      const a = list[list.length - 1 - offset]
+        const { AlphaAggregator } = await import('../services/alpha-aggregator')
+        // Fetch a larger slice to allow deduping by id
+        const slice = AlphaAggregator.getLatest(Math.min(10, offset + 5), tokenIdsArg)
+        const list = dedupeByIdStable(slice)
+        if (list.length <= offset) {
+          await ctx.reply('No more alpha right now. Check back soon!')
+          return
+        }
+        const a = list[list.length - 1 - offset]
       const title = a.marketName || 'Alpha'
       // Build market URL if possible
       let marketUrl: string | null = null
