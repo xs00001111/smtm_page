@@ -10,17 +10,17 @@ function formatStatusLine(p: { alpha_enabled: boolean; alpha_tier: string; quiet
 }
 
 export function registerAlphaAlertsCommands(bot: Telegraf) {
-  // /alpha – prepend status + controls; keep existing main /alpha behavior elsewhere
+  // /alpha – show settings AFTER the alpha response, not before
   bot.command('alpha', async (ctx, next) => {
+    await next()
     try {
       const svc = alphaAlerts()
       const prefs = await svc.getPrefs(ctx.from.id)
       const msg = `${formatStatusLine(prefs)}`
       await ctx.reply(msg, { parse_mode: 'HTML', ...(svc.buildSettingsKeyboard(prefs) as any) })
     } catch (e) {
-      logger.warn('alpha_alerts.alpha_cmd_failed', (e as any)?.message || e)
+      logger.warn('alpha_alerts.alpha_cmd_post_failed', (e as any)?.message || e)
     }
-    return next()
   })
 
   // /settings – direct to alpha settings
@@ -143,4 +143,3 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
     }
   })
 }
-

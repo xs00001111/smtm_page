@@ -3975,7 +3975,7 @@ export function registerCommands(bot: Telegraf) {
       } catch {}
       // Try cached best trade (10-15 min) before HTTP (disabled when DB-first is off)
       if (latest.length === 0 && DB_FIRST_ENABLED) {
-        const { TradeBuffer } = await import('@smtm/data')
+        const { TradeBuffer } = await import('@smtm/data/trades')
         const cached = TradeBuffer.getBestForTokens(tokenIds || [], 15*60*1000)
         if (cached) {
           logger.info('alpha:cache hit', { tokenId: cached.tokenId, notional: Math.round(cached.notional) })
@@ -4451,7 +4451,10 @@ export function registerCommands(bot: Telegraf) {
         }
         if (!bigs.length) {
           // Last-resort: show most recent buffered trade if any
-          const { TradeBuffer, buildWhaleAlphaForTrade } = await import('@smtm/data')
+          const [{ TradeBuffer }, { buildWhaleAlphaForTrade }] = await Promise.all([
+            import('@smtm/data/trades'),
+            import('@smtm/data'),
+          ])
           const trades = tokenIds?.length ? TradeBuffer.getTrades(1, { tokenIds }) : TradeBuffer.getTrades(1)
           logger.info('alpha:fallback buffer trade count', { count: trades.length })
           if (!trades.length) {
