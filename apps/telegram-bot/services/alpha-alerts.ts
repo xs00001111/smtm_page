@@ -205,7 +205,13 @@ export class AlphaAlertsService {
       })
 
       if (!res.ok) {
-        logger.warn({ status: res.status, statusText: res.statusText }, 'alpha.import failed to fetch Supabase users')
+        const errorText = await res.text().catch(() => 'Unable to read error body')
+        logger.warn({
+          status: res.status,
+          statusText: res.statusText,
+          errorBody: errorText,
+          url: url
+        }, 'alpha.import failed to fetch Supabase users')
         return
       }
 
