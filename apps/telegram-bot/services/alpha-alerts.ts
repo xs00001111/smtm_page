@@ -196,6 +196,7 @@ export class AlphaAlertsService {
           apikey: SUPABASE_KEY,
           Authorization: `Bearer ${SUPABASE_KEY}`,
           'Content-Type': 'application/json',
+          'Accept-Profile': 'analytics',
         },
       })
 
