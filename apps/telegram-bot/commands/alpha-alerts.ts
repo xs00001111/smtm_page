@@ -22,7 +22,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
       const svc = alphaAlerts()
       const prefs = await svc.getPrefs(ctx.from.id)
       const msg = `${formatStatusLine(prefs)}\n<i>Opt-in only. All = real-time alerts. Daily = morning summary at 09:00. Quiet hours queue alerts.</i>`
-      await ctx.reply(msg, { parse_mode: 'HTML', ...(svc.buildSettingsKeyboard(prefs) as any) })
+      await ctx.reply(msg, { parse_mode: 'HTML' })
     } catch (e) {
       logger.warn('alpha_alerts.alpha_cmd_post_failed', (e as any)?.message || e)
     }
@@ -34,7 +34,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
       const svc = alphaAlerts()
       const prefs = await svc.getPrefs(ctx.from.id)
       const msg = `Settings — ${formatStatusLine(prefs)}\n<i>Opt-in only. All = real-time alerts. Daily = morning summary at 09:00. Quiet hours queue alerts.</i>`
-      await ctx.reply(msg, { parse_mode: 'HTML', ...(svc.buildSettingsKeyboard(prefs) as any) })
+      await ctx.reply(msg, { parse_mode: 'HTML' })
     } catch {}
   })
 
@@ -66,7 +66,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
       await ctx.reply(msg, kb as any)
       // Also show current status
       const status = `${formatStatusLine(prefs)}`
-      await ctx.reply(status, { parse_mode: 'HTML', ...(svc.buildSettingsKeyboard(prefs) as any) })
+      await ctx.reply(status, { parse_mode: 'HTML' })
     } catch {}
     return next()
   })
@@ -82,13 +82,13 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
         await svc.updatePrefs(userId, { alpha_enabled: false })
         try { await ctx.answerCbQuery('Muted') } catch {}
         const prefs = await svc.getPrefs(userId)
-        await ctx.reply('Alpha alerts turned off.', { ...(svc.buildSettingsKeyboard(prefs) as any) })
+        await ctx.reply('Alpha alerts turned off.')
         return
       }
       if (data === 'alrt:settings') {
         const prefs = await svc.getPrefs(userId)
         await ctx.answerCbQuery('Settings')
-        await ctx.reply('Alpha settings', { ...(svc.buildSettingsKeyboard(prefs) as any) })
+        await ctx.reply('Alpha settings')
         return
       }
       if (data.startsWith('alrt:t:')) {
@@ -103,7 +103,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
         await svc.updatePrefs(userId, { alpha_enabled: true, alpha_tier: internalTier })
         await ctx.answerCbQuery('Updated')
         const prefs = await svc.getPrefs(userId)
-        await ctx.reply('Preferences updated', { ...(svc.buildSettingsKeyboard(prefs) as any) })
+        await ctx.reply('Preferences updated')
         return
       }
       if (data === 'alrt:qh:menu') {
@@ -123,7 +123,7 @@ export function registerAlphaAlertsCommands(bot: Telegraf) {
         await svc.updatePrefs(userId, { quiet_hours: qh })
         await ctx.answerCbQuery('Saved quiet hours')
         const prefs = await svc.getPrefs(userId)
-        await ctx.reply('✅ Quiet hours updated', { ...(svc.buildSettingsKeyboard(prefs) as any) })
+        await ctx.reply('Quiet hours updated')
         return
       }
       if (data === 'alrt:onboard:yes') {
