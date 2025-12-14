@@ -4220,7 +4220,7 @@ export function registerCommands(bot: Telegraf) {
 
         // New: Trade-first alpha scan (Data API global trades)
         try {
-          const { scanAlphaFromTrades } = await import('@smtm/data')
+          const { scanAlphaFromTrades } = await import('@smtm/data/alpha')
           const best = await scanAlphaFromTrades({ windowMs: 12*60*60*1000, minNotionalUsd: 1000, limit: 1000, maxBatches: 3, onLog: (m, ctx) => logger.info({ ...ctx }, `alpha:trades_first ${m}`) })
           if (best) {
             const notionalStr = `$${Math.round(best.notional).toLocaleString()}`
@@ -4431,7 +4431,7 @@ export function registerCommands(bot: Telegraf) {
         // Nothing found in DB-first path — inform user but continue with live scan fallbacks
         try { await ctx.reply('⚠️ No fresh alpha found in DB window — scanning live sources…', { disable_web_page_preview: true }) } catch {}
         // Fallback: hit CLOB API for recent big orders (real trades)
-        const { findRecentBigOrders } = await import('@smtm/data')
+        const { findRecentBigOrders } = await import('@smtm/data/alpha')
         let bigs = await findRecentBigOrders({
           tokenIds,
           minNotionalUsd: 2000,
