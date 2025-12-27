@@ -39,16 +39,20 @@ export interface SkewSnapshotRow {
   meta: any
 }
 
-function supabaseAvailable() {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
-  return !!(url && key)
+function supabaseAvailable(): { ok: boolean; url?: string; keyKind?: 'service'|'anon'; reason?: string } {
+  const url = process.env.SUPABASE_URL || env.SUPABASE_URL
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY
+  const anon = process.env.SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY
+  if (!url && !service && !anon) return { ok: false, reason: 'missing SUPABASE_URL and key' }
+  if (!url) return { ok: false, reason: 'missing SUPABASE_URL' }
+  if (!service && !anon) return { ok: false, reason: 'missing SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY' }
+  return { ok: true, url, keyKind: service ? 'service' : 'anon' }
 }
 
 function key() { return env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || '' }
 
 async function sb<T>(path: string, init?: RequestInit): Promise<T> {
-  const base = process.env.SUPABASE_URL
+  const base = process.env.SUPABASE_URL || env.SUPABASE_URL
   if (!base) throw new Error('Missing SUPABASE_URL')
   const url = `${base}/rest/v1/${path}`
   const res = await fetch(url, {
@@ -75,8 +79,13 @@ const L1: Map<string, CacheEntry> = new Map()
 function cacheKey(conditionId: string, source: SkewSource) { return `${conditionId}|${source}` }
 
 export async function persistSkewSnapshot(input: SkewSnapshotInput): Promise<string | null> {
-  if (!supabaseAvailable()) {
-    logger.info('skew:store persist skipped; Supabase not configured')
+  const avail = supabaseAvailable()
+  if (!avail.ok) {
+    logger.info(`skew:store persist skipped; Supabase not configured${avail.reason?': '+avail.reason:''}`)
+    return null
+  }
+  if (typeof fetch !== 'function') {
+    logger.info('skew:store persist skipped; fetch API not available in runtime')
     return null
   }
   const row = {
@@ -133,8 +142,13 @@ export async function fetchLatestSkew(params: { conditionId: string; source?: Sk
   const now = Date.now()
   const cached = L1.get(key)
   if (cached && (now - cached.ts) < Math.min(useCacheMs, cached.ttlMs)) return cached.value
-  if (!supabaseAvailable()) {
-    logger.info('skew:store fetch skipped; Supabase not configured')
+  const avail = supabaseAvailable()
+  if (!avail.ok) {
+    logger.info(`skew:store fetch skipped; Supabase not configured${avail.reason?': '+avail.reason:''}`)
+    return null
+  }
+  if (typeof fetch !== 'function') {
+    logger.info('skew:store fetch skipped; fetch API not available in runtime')
     return null
   }
   const sinceIso = new Date(Date.now() - maxAgeSec * 1000).toISOString()

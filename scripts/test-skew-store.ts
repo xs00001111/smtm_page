@@ -143,7 +143,12 @@ async function test_persist_sets_cache_for_read() {
 async function test_supabase_unavailable() {
   const { __clearSkewCache, fetchLatestSkew, persistSkewSnapshot } = await load(); __clearSkewCache()
   const oldUrl = process.env.SUPABASE_URL
+  const shared = await import('../packages/shared/env')
+  const oldShared = { ...((shared as any).env || {}) }
   delete process.env.SUPABASE_URL
+  ;(shared as any).env.SUPABASE_URL = undefined
+  ;(shared as any).env.SUPABASE_SERVICE_ROLE_KEY = undefined
+  ;(shared as any).env.SUPABASE_ANON_KEY = undefined
   // @ts-ignore
   global.fetch = undefined
   const id = await persistSkewSnapshot({
@@ -153,6 +158,8 @@ async function test_supabase_unavailable() {
   const row = await fetchLatestSkew({ conditionId: 'cond-unavail', source: 'holders' })
   if (row !== null) throw new Error('fetch should return null when Supabase unavailable')
   if (oldUrl) process.env.SUPABASE_URL = oldUrl
+  // restore shared env snapshot
+  Object.assign((shared as any).env, oldShared)
 }
 
 ;(async () => {
