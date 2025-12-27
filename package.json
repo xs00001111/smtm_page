@@ -20,7 +20,8 @@
     "test:setup": "tsx packages/data/test-setup.ts",
     "example:basic": "tsx packages/data/examples/basic-usage.ts",
     "example:whales": "tsx packages/data/examples/whale-tracker.ts",
-    "test:data": "npm run test:setup"
+    "test:data": "npm run test:setup",
+    "test:skew": "tsx scripts/test-skew-store.ts"
   },
   "dependencies": {
     "@polymarket/clob-client": "^4.22.8",
