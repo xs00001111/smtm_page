@@ -40,14 +40,17 @@ export interface SkewSnapshotRow {
 }
 
 function supabaseAvailable() {
-  return !!(env.SUPABASE_URL && (env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY))
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+  return !!(url && key)
 }
 
 function key() { return env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || '' }
 
 async function sb<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!env.SUPABASE_URL) throw new Error('Missing SUPABASE_URL')
-  const url = `${env.SUPABASE_URL}/rest/v1/${path}`
+  const base = process.env.SUPABASE_URL
+  if (!base) throw new Error('Missing SUPABASE_URL')
+  const url = `${base}/rest/v1/${path}`
   const res = await fetch(url, {
     ...(init || {}),
     headers: {
@@ -152,4 +155,3 @@ export async function fetchLatestSkew(params: { conditionId: string; source?: Sk
 
 // Test-only helpers
 export function __clearSkewCache() { L1.clear() }
-
