@@ -122,10 +122,23 @@ export async function getWalletWhaleStats(wallet: string, opts?: WhaleStatsOptio
   const tradesPerHour = sampleCount / Math.max(0.25, windowHours)
 
   // Approximate win rate from public Data API (closed positions)
+  // Lightweight win‑rate cache (10 min)
+  const WR_TTL = 10 * 60 * 1000
+  const g: any = global as any
+  if (!g._wrCache) g._wrCache = new Map<string, { ts: number; v: number }>()
+  const cache: Map<string, { ts: number; v: number }> = g._wrCache
   let winRate = 0
   try {
-    const wr = await dataApi.getUserWinRate(wallet)
-    winRate = clamp(wr.winRate || 0, 0, 100)
+    const now = Date.now()
+    const ent = cache.get(wallet)
+    if (ent && (now - ent.ts) < WR_TTL) {
+      winRate = ent.v
+    } else {
+      const signal: AbortSignal | undefined = (opts as any)?.signal
+      const wr = await dataApi.getUserWinRate(wallet, undefined as any, signal)
+      winRate = clamp(wr.winRate || 0, 0, 100)
+      cache.set(wallet, { ts: now, v: winRate })
+    }
   } catch {
     winRate = 0
   }
@@ -648,7 +661,7 @@ export async function computeSmartSkewFromHolders(
     } catch {}
   }
 
-  // Score wallets and compute PnL for examples
+  // Score wallets and compute PnL for examples (bounded concurrency + timeouts)
   const scoreCache = new Map<string, number>()
   const pnlCache = new Map<string, number>()
   const positionCache = new Map<string, number>() // Track position size for boosting
@@ -658,35 +671,61 @@ export async function computeSmartSkewFromHolders(
   for (const h of yesEval) positionCache.set(h.wallet, h.usd)
   for (const h of noEval) positionCache.set(h.wallet, h.usd)
 
-  for (const w of evalWallets) {
-    // Skip non-address or undefined wallets for external API calls
-    if (!isAddr(w)) { scoreCache.set(w, 0); pnlCache.set(w, 0); continue }
-    try {
-      const stats = await getWalletWhaleStats(w, cfg)
-      let baseScore = computeWhaleScore(stats, cfg)
+  const MAX_CONC = 6
+  let idx = 0
+  const worker = async () => {
+    while (idx < evalWallets.length) {
+      const w = evalWallets[idx++]
+      if (!isAddr(w)) { scoreCache.set(w, 0); pnlCache.set(w, 0); continue }
+      // Stats with ~1.4s timeout (UI path)
+      let baseScore = 0
+      try {
+        const stats = await Promise.race([
+          (async () => {
+            const ctrl = new AbortController()
+            try {
+              const s = await getWalletWhaleStats(w, Object.assign({}, cfg || {}, { signal: ctrl.signal }))
+              return s
+            } finally {
+              // no-op
+            }
+          })(),
+          new Promise<WhaleStats>((resolve) => setTimeout(() => {
+            try { /* abort underlying */ } catch {}
+            resolve({ avgBetUsd:0, tradesPerHour:0, winRate:0, sampleCount:0, windowHours: (cfg?.windowMs ?? 6*60*60*1000)/3600000 })
+          }, 1400))
+        ])
+        baseScore = computeWhaleScore(stats, cfg)
+      } catch { baseScore = 0 }
 
-      // Boost score based on current position size (helps in extreme markets where USD is small)
-      // Tiered boost ensures large positions always qualify as whales
+      // Boost by position size
       const posUsd = positionCache.get(w) || 0
       let positionBoost = 0
-      if (posUsd >= 100000) positionBoost = 50        // $100k+ → guaranteed whale
-      else if (posUsd >= 50000) positionBoost = 45    // $50k+ → very likely whale
-      else if (posUsd >= 20000) positionBoost = 40    // $20k+ → serious holder
-      else if (posUsd >= 10000) positionBoost = 35    // $10k+ → significant
-      else if (posUsd >= 5000) positionBoost = 30     // $5k+ → notable
-      else if (posUsd >= 2000) positionBoost = 20     // $2k+ → moderate
-      else if (posUsd >= 1000) positionBoost = 10     // $1k+ → small
-      else positionBoost = Math.round(posUsd / 100)   // <$1k → minimal
-
+      if (posUsd >= 100000) positionBoost = 50
+      else if (posUsd >= 50000) positionBoost = 45
+      else if (posUsd >= 20000) positionBoost = 40
+      else if (posUsd >= 10000) positionBoost = 35
+      else if (posUsd >= 5000) positionBoost = 30
+      else if (posUsd >= 2000) positionBoost = 20
+      else if (posUsd >= 1000) positionBoost = 10
+      else positionBoost = Math.round(posUsd / 100)
       const finalScore = Math.min(100, Math.round(baseScore + positionBoost))
-
       scoreCache.set(w, finalScore)
-    } catch { scoreCache.set(w, 0) }
-    try {
-      const pnl = await dataApi.getUserAccuratePnL(w)
-      pnlCache.set(w, pnl.totalPnL || 0)
-    } catch { pnlCache.set(w, 0) }
+
+      // PnL with ~1.4s timeout
+      try {
+        const pnl = await Promise.race([
+          (async () => {
+            const ctrl = new AbortController()
+            try { return await dataApi.getUserAccuratePnL(w, ctrl.signal) } finally {}
+          })(),
+          new Promise<any>((resolve)=> setTimeout(()=> resolve({ totalPnL: 0 }), 1400))
+        ])
+        pnlCache.set(w, pnl.totalPnL || 0)
+      } catch { pnlCache.set(w, 0) }
+    }
   }
+  await Promise.all(Array.from({ length: Math.min(MAX_CONC, Math.max(1, evalWallets.length)) }, () => worker()))
 
   // Aggregate whale vs retail by threshold
   let yesWhale = 0, noWhale = 0, yesRetail = 0, noRetail = 0

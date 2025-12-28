@@ -28,20 +28,20 @@ export const wsMonitor = new WebSocketMonitorService(bot);
 // Register all commands
 initAnalyticsLogging(bot);
 
-// Auto-enable alpha alerts for any user who chats with the bot
-bot.use(async (ctx, next) => {
-  try {
-    const userId = ctx.from?.id;
-    if (userId && !ctx.from?.is_bot) {
-      // Silently ensure user has alpha preferences (will create if missing)
-      await alphaAlerts().getPrefs(userId);
+// Alpha alerts auto-prefs disabled unless explicitly enabled via env
+if ((env as any).ALPHA_ALERTS_ENABLED === 'true') {
+  bot.use(async (ctx, next) => {
+    try {
+      const userId = ctx.from?.id;
+      if (userId && !ctx.from?.is_bot) {
+        await alphaAlerts().getPrefs(userId);
+      }
+    } catch (err) {
+      logger.warn({ err: (err as any)?.message, userId: ctx.from?.id }, 'Failed to auto-create alpha prefs');
     }
-  } catch (err) {
-    // Don't block the request if prefs fail
-    logger.warn({ err: (err as any)?.message, userId: ctx.from?.id }, 'Failed to auto-create alpha prefs');
-  }
-  return next();
-});
+    return next();
+  });
+}
 
 registerCommands(bot);
 
@@ -115,9 +115,11 @@ async function start() {
     // Restore stored data before deciding to start WS
     await loadLinks();
     await loadSubscriptions(wsMonitor);
-    // Initialize alpha alerts (prefs store + digest scheduler)
-    const alphaSvc = initAlphaAlerts(bot);
-    await alphaSvc.init();
+    // Initialize alpha alerts only if enabled
+    if ((env as any).ALPHA_ALERTS_ENABLED === 'true') {
+      const alphaSvc = initAlphaAlerts(bot);
+      await alphaSvc.init();
+    }
     // Pre-warm observer assets with trending markets to receive trade activity quickly
     try {
       const trending = await gammaApi.getTrendingMarkets(6)
@@ -236,7 +238,7 @@ async function start() {
     }
 
     // Example usage: expose a simple dev hook to send a sample alert locally
-    if (process.env.ALPHA_ALERTS_SAMPLE === 'true') {
+    if ((env as any).ALPHA_ALERTS_ENABLED === 'true' && process.env.ALPHA_ALERTS_SAMPLE === 'true') {
       setTimeout(() => {
         try {
           void alphaAlerts().sendAlphaAlert({

@@ -39,6 +39,44 @@ async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?
   const cached = SkewCache.get(conditionId)
   if (cached && (now - cached.ts) < SKEW_CACHE_MS) return cached.result
   try {
+    // 0) Try persistent cache (Supabase) first with a longer freshness window
+    // Any error here should not abort; we fall back to live calculation.
+    const row = await (async () => {
+      try {
+        const { fetchLatestSkew } = await import('../services/skew-store')
+        // Use 12h freshness for UI path
+        return await fetchLatestSkew({ conditionId, source: 'holders', maxAgeSec: 12 * 60 * 60, useCacheMs: 60 * 1000 })
+      } catch (e) {
+        logger.debug ? logger.debug({ conditionId, err: (e as any)?.message || String(e) }, 'skew:persistent read failed (fallback to live)') : logger.info({ conditionId, err: (e as any)?.message || String(e) }, 'skew:persistent read failed (fallback to live)')
+        return null
+      }
+    })()
+    if (row) {
+      const skew = Number(row.skew ?? 0.5)
+      const skewYes = Number(row.skew_yes ?? (skew >= 0.5 ? skew : 1 - skew))
+      const direction = (row.direction as any) || (skewYes >= 0.5 ? 'YES' : 'NO')
+      const smartPoolUsd = Number(row.smart_pool_usd ?? 0)
+      const meta: any = {
+        whaleScoreThreshold: row.whale_threshold ?? 45,
+        windowMs: 0,
+        walletsEvaluated: row.wallets_evaluated ?? 0,
+        hasData: true,
+      }
+      const res = {
+        direction,
+        skewYes: parseFloat(skewYes.toFixed(4)),
+        skew: parseFloat(skew.toFixed(4)),
+        alpha: Math.max(0, Math.min(100, Math.round(60 + (skew - 0.75) * 180))),
+        trigger: false,
+        smartPoolUsd: parseFloat(smartPoolUsd.toFixed(2)),
+        volumes: { yesWhale: 0, noWhale: 0, yesRetail: 0, noRetail: 0 },
+        meta,
+      }
+      const resAny: any = res; resAny._source = 'holders_db'
+      SkewCache.set(conditionId, { ts: now, result: res })
+      return res
+    }
+
     // Resolve token IDs if not supplied
     let y = yesTokenId, n = noTokenId
     if (!y || !n) {
@@ -57,18 +95,45 @@ async function getSmartSkew(conditionId: string, yesTokenId?: string, noTokenId?
     // Tune for responsiveness in UI: cap evaluated wallets moderately
     let res = await computeSmartSkewFromHolders(
       { conditionId, yesTokenId: yTok, noTokenId: nTok },
-      { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), minSmartPoolUsd: 100, maxWallets: 40 }
+      { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_ui ${m}`), minSmartPoolUsd: 100, maxWallets: 10 }
     )
 
     // Mark source for debugging (avoid assigning to parenthesized assertion)
     const resAny: any = res
     resAny._source = 'holders'
 
-    // Check if we have meaningful data
+    // Check if we have meaningful data (be lenient to avoid false negatives)
     const walletsEvaluated = Number(((res as any)?.meta?.walletsEvaluated) || 0)
     const hasDataMeta = (res as any)?.meta?.hasData
-    const hasData = typeof hasDataMeta === 'boolean' ? hasDataMeta : ((res.smartPoolUsd || 0) >= 100 && walletsEvaluated > 0)
+    let hasData = typeof hasDataMeta === 'boolean' ? hasDataMeta : ((res.smartPoolUsd || 0) >= 100 && walletsEvaluated > 0)
+    // If the compute produced a numeric skew, treat it as valid even if meta is thin
+    if (!hasData && Number.isFinite((res as any)?.skew)) {
+      hasData = true
+    }
     if (!hasData) return null
+    // Persist snapshot best-effort; failure should not affect live result.
+    ;(async () => {
+      try {
+        const { persistSkewSnapshot } = await import('../services/skew-store')
+        await persistSkewSnapshot({
+          conditionId,
+          yesTokenId: yTok,
+          noTokenId: nTok,
+          source: 'holders',
+          skewYes: res.skewYes,
+          skew: res.skew,
+          direction: res.direction,
+          smartPoolUsd: res.smartPoolUsd,
+          walletsEvaluated: walletsEvaluated || null,
+          whaleThreshold: ((res as any)?.meta?.whaleScoreThreshold ?? 45),
+          paramsHash: null,
+          computedAt: new Date(),
+          meta: (res as any)?.meta || {},
+        })
+      } catch (e) {
+        logger.debug ? logger.debug({ conditionId, err: (e as any)?.message || String(e) }, 'skew:persistent write failed (ignored)') : logger.info({ conditionId, err: (e as any)?.message || String(e) }, 'skew:persistent write failed (ignored)')
+      }
+    })()
     SkewCache.set(conditionId, { ts: now, result: res })
     return res
   } catch (e) {
@@ -876,7 +941,7 @@ async function resolveMarketFromInput(input: string, allowFuzzy = true): Promise
 
 export function registerCommands(bot: Telegraf) {
   // Alpha alerts command set (opt-in feed)
-  registerAlphaAlertsCommands(bot)
+  try { registerAlphaAlertsCommands(bot) } catch {}
   // Start command
   bot.command('start', async (ctx) => {
     logger.info({ userId: ctx.from?.id }, 'User started bot');
@@ -890,7 +955,6 @@ export function registerCommands(bot: Telegraf) {
         '• /overview <market> — orderbook & positions\n' +
         '• /follow 0x<market_id> — price alerts\n' +
         '• /list — view your follows\n\n' +
-        'Alpha Alerts (opt‑in): Off by default. Tiers: ⚡ All, 🎯 ≥0.75 conf, 🧠 daily 09:00. No backfill; quiet hours queue to digest. Manage: /settings\n\n' +
         'More commands: /help',
       {
         reply_markup: {
@@ -1017,8 +1081,12 @@ export function registerCommands(bot: Telegraf) {
                         } catch {}
                       }
                       if (!y || !n) continue
-                      const res = await getSmartSkew(cid, y, n)
-                      if (!res) continue
+          // Per-child timeout to keep UI responsive
+          const res = await Promise.race([
+            getSmartSkew(cid, y, n),
+            new Promise<null>((_, reject)=> setTimeout(()=> reject(new Error('skew_child_timeout')), 5000))
+          ]).catch(()=>null as any)
+          if (!res) continue
                       const ev = (ch as any).eventSlug || eventSlug
                       const url = ev && ch.slug && ev !== ch.slug
                         ? `https://polymarket.com/event/${ev}/${ch.slug}`
@@ -1147,7 +1215,10 @@ export function registerCommands(bot: Telegraf) {
                     } catch {}
                   }
                   if (!y || !n) continue
-                  const res = await getSmartSkew(cid, y, n)
+                  const res = await Promise.race([
+                    getSmartSkew(cid, y, n),
+                    new Promise<null>((_, reject)=> setTimeout(()=> reject(new Error('skew_child_timeout')), 5000))
+                  ]).catch(()=>null as any)
                   if (!res) continue
                   const ev = (ch as any).eventSlug || eventSlug
                   const url = ev && ch.slug && ev !== ch.slug
@@ -1180,7 +1251,87 @@ export function registerCommands(bot: Telegraf) {
           const yes = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='yes')?.token_id
           const no = (m.tokens || []).find((t:any)=> String(t.outcome||'').toLowerCase()==='no')?.token_id
           logger.info({ cond, hasYes: !!yes, hasNo: !!no }, 'skew: single-market fallback')
-          const res = await getSmartSkew(cond, yes, no)
+          // Hard timeout for single-market skew — typed race to avoid masking results
+          const work = getSmartSkew(cond, yes, no)
+            .then(v => ({ ok: true as const, v }))
+            .catch(err => ({ ok: false as const, err }))
+          const out: any = await Promise.race([
+            work,
+            new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 25000)),
+          ])
+          if (out && (out as any).timeout) {
+            logger.warn({ cond, yes, no }, 'skew: single-market timeout')
+            await ctx.reply('⏱️ Skew calculation timed out. Try again or use /skew <market>.')
+            // Background compute to seed snapshot
+            if (yes && no) {
+              ;(async () => {
+                try {
+                  const { computeSmartSkewFromHolders } = await import('@smtm/data')
+                  const bg = await computeSmartSkewFromHolders(
+                    { conditionId: cond, yesTokenId: yes, noTokenId: no },
+                    { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_bg ${m}`), minSmartPoolUsd: 100, maxWallets: 25 }
+                  )
+                  if (bg && (bg.meta?.walletsEvaluated ?? 0) > 0) {
+                    try {
+                      const { persistSkewSnapshot } = await import('../services/skew-store')
+                      await persistSkewSnapshot({
+                        conditionId: cond,
+                        yesTokenId: yes,
+                        noTokenId: no,
+                        source: 'holders',
+                        skewYes: bg.skewYes,
+                        skew: bg.skew,
+                        direction: bg.direction,
+                        smartPoolUsd: bg.smartPoolUsd,
+                        walletsEvaluated: bg.meta?.walletsEvaluated ?? null,
+                        whaleThreshold: (bg as any)?.meta?.whaleScoreThreshold ?? 45,
+                        computedAt: new Date(),
+                        meta: (bg as any)?.meta || {},
+                      })
+                    } catch {}
+                  }
+                } catch {}
+              })()
+            }
+            return
+          }
+          if ((out as any)?.ok === false) {
+            logger.warn({ cond, yes, no, err: (out as any)?.err?.message || String((out as any)?.err) }, 'skew: single-market error')
+            await ctx.reply('⚠️ Not enough data to assess skew.')
+            // Background compute to seed snapshot
+            if (yes && no) {
+              ;(async () => {
+                try {
+                  const { computeSmartSkewFromHolders } = await import('@smtm/data')
+                  const bg = await computeSmartSkewFromHolders(
+                    { conditionId: cond, yesTokenId: yes, noTokenId: no },
+                    { onLog: (m, c)=> logger.info({ ...c }, `alpha:skew_bg ${m}`), minSmartPoolUsd: 100, maxWallets: 25 }
+                  )
+                  if (bg && (bg.meta?.walletsEvaluated ?? 0) > 0) {
+                    try {
+                      const { persistSkewSnapshot } = await import('../services/skew-store')
+                      await persistSkewSnapshot({
+                        conditionId: cond,
+                        yesTokenId: yes,
+                        noTokenId: no,
+                        source: 'holders',
+                        skewYes: bg.skewYes,
+                        skew: bg.skew,
+                        direction: bg.direction,
+                        smartPoolUsd: bg.smartPoolUsd,
+                        walletsEvaluated: bg.meta?.walletsEvaluated ?? null,
+                        whaleThreshold: (bg as any)?.meta?.whaleScoreThreshold ?? 45,
+                        computedAt: new Date(),
+                        meta: (bg as any)?.meta || {},
+                      })
+                    } catch {}
+                  }
+                } catch {}
+              })()
+            }
+            return
+          }
+          const res = (out as any)?.v
           logger.info({
             hasResult: !!res,
             resultType: typeof res,
@@ -2121,8 +2272,7 @@ export function registerCommands(bot: Telegraf) {
         '• /follow 0x<market_id> — price alerts\n' +
         '• /follow 0x<wallet> — whale trades (all markets)\n' +
         '• /follow 0x<wallet> 0x<market_id> — whale on specific market\n' +
-        '• /unfollow <...>  •  /list — manage follows\n' +
-        '• Alpha Alerts (opt‑in): OFF by default. Tiers: ⚡ All, 🎯 ≥0.75 conf, 🧠 daily 09:00. No backfill; quiet hours queue to digest. Manage: /settings\n\n' +
+        '• /unfollow <...>  •  /list — manage follows\n\n' +
         'Analysis\n' +
         '• /profile_card [address|@username|url] — trader profile\n' +
         '   e.g. /profile_card @alice  •  /profile_card 0xABC...\n' +

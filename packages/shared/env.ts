@@ -1,7 +1,13 @@
 import * as dotenv from 'dotenv';
+import * as path from 'path';
 import { z } from 'zod';
 
+// Load env from CWD first (app-local .env), then fall back to monorepo root .env
 dotenv.config();
+try {
+  const rootEnvPath = path.resolve(__dirname, '../../.env');
+  dotenv.config({ path: rootEnvPath, override: false });
+} catch {}
 
 const envSchema = z.object({
   TIMEZONE: z.string().default('America/New_York'),
@@ -48,6 +54,8 @@ const envSchema = z.object({
   // Observer refresh
   OBSERVER_REFRESH_ENABLED: z.string().default('true'),
   OBSERVER_REFRESH_INTERVAL_MS: z.string().default('300000'),
+  // Feature flags
+  ALPHA_ALERTS_ENABLED: z.string().default('false'),
 });
 
 export const env = envSchema.parse({
@@ -86,4 +94,5 @@ export const env = envSchema.parse({
   ALPHA_HARVEST_INTERVAL_MS: process.env.ALPHA_HARVEST_INTERVAL_MS || '180000',
   OBSERVER_REFRESH_ENABLED: process.env.OBSERVER_REFRESH_ENABLED || 'true',
   OBSERVER_REFRESH_INTERVAL_MS: process.env.OBSERVER_REFRESH_INTERVAL_MS || '300000',
+  ALPHA_ALERTS_ENABLED: process.env.ALPHA_ALERTS_ENABLED || 'false',
 });

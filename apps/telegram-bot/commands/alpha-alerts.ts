@@ -1,5 +1,6 @@
 import { Telegraf } from 'telegraf'
 import { alphaAlerts } from '../services/alpha-alerts'
+import { env } from '@smtm/shared/env'
 import { logger } from '../utils/logger'
 
 function formatStatusLine(p: { alpha_enabled: boolean; alpha_tier: string; quiet_hours: any }) {
@@ -15,6 +16,9 @@ function formatStatusLine(p: { alpha_enabled: boolean; alpha_tier: string; quiet
 }
 
 export function registerAlphaAlertsCommands(bot: Telegraf) {
+  if (env.ALPHA_ALERTS_ENABLED !== 'true') {
+    return
+  }
   // /alpha – show settings AFTER the alpha response, not before
   bot.command('alpha', async (ctx, next) => {
     await next()

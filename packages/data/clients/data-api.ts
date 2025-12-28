@@ -108,13 +108,14 @@ export class DataApiClient {
    * @param params - User address and optional pagination
    * @returns Array of positions
    */
-  async getUserPositions(params: PositionsParams): Promise<Position[]> {
+  async getUserPositions(params: PositionsParams, signal?: AbortSignal): Promise<Position[]> {
     const { data } = await this.client.get<Position[]>('/positions', {
       params: {
         user: params.user,
         limit: params.limit,
         offset: params.offset,
       },
+      signal,
     });
     return data;
   }
@@ -129,10 +130,12 @@ export class DataApiClient {
   async getClosedPositions(
     user: string,
     limit?: number,
-    offset?: number
+    offset?: number,
+    signal?: AbortSignal
   ): Promise<ClosedPosition[]> {
     const { data } = await this.client.get<ClosedPosition[]>('/closed-positions', {
       params: { user, limit, offset },
+      signal,
     });
     return data;
   }
@@ -344,10 +347,11 @@ export class DataApiClient {
    */
   async getUserWinRate(
     user: string,
-    limit = 500
+    limit = 500,
+    signal?: AbortSignal
   ): Promise<{ wins: number; total: number; winRate: number }> {
     try {
-      const closedPositions = await this.getClosedPositions(user, limit);
+      const closedPositions = await this.getClosedPositions(user, limit, undefined, signal);
 
       if (!closedPositions || closedPositions.length === 0) {
         return { wins: 0, total: 0, winRate: 0 };
@@ -374,7 +378,7 @@ export class DataApiClient {
 
       // Optionally incorporate open positions that are effectively worthless due to resolved outcomes not yet reflected (Polymarket bug)
       try {
-        const openPositions = await this.getUserPositions({ user, limit: Math.min(1000, Math.max(500, limit)) });
+        const openPositions = await this.getUserPositions({ user, limit: Math.min(1000, Math.max(500, limit)) }, signal);
         // Aggregate current value per market for open positions not already in marketPnL
         const openByMarket = new Map<string, number>();
         for (let i=0; i<openPositions.length; i++) {
@@ -426,11 +430,12 @@ export class DataApiClient {
    * @returns Object with calculated PnL, realized PnL, unrealized PnL
    */
   async getUserAccuratePnL(
-    user: string
+    user: string,
+    signal?: AbortSignal
   ): Promise<{ totalPnL: number; realizedPnL: number; unrealizedPnL: number; currentValue: number }> {
     try {
       // Fetch all closed positions (realized PnL)
-      const closedPositions = await this.getClosedPositions(user, 1000);
+      const closedPositions = await this.getClosedPositions(user, 1000, undefined, signal);
 
       // Calculate realized PnL from closed positions
       let realizedPnL = 0;
@@ -445,7 +450,7 @@ export class DataApiClient {
       const currentValue = parseFloat(userValue.value || '0');
 
       // Fetch open positions to calculate unrealized PnL
-      const openPositions = await this.getUserPositions({ user, limit: 500 });
+      const openPositions = await this.getUserPositions({ user, limit: 500 }, signal);
       let unrealizedPnL = 0;
       if (openPositions && openPositions.length > 0) {
         for (const position of openPositions) {

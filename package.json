@@ -21,7 +21,8 @@
     "example:basic": "tsx packages/data/examples/basic-usage.ts",
     "example:whales": "tsx packages/data/examples/whale-tracker.ts",
     "test:data": "npm run test:setup",
-    "test:skew": "tsx scripts/test-skew-store.ts"
+    "test:skew": "tsx scripts/test-skew-store.ts",
+    "test:skew:e2e": "RUN_E2E_SUPABASE=1 tsx scripts/it-skew-store.ts"
   },
   "dependencies": {
     "@polymarket/clob-client": "^4.22.8",
