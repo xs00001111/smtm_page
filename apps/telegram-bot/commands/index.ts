@@ -4114,6 +4114,37 @@ export function registerCommands(bot: Telegraf) {
       }
       // Pull a slightly larger window, then dedupe by id to avoid repeats
       let latest = dedupeByIdStable(AlphaAggregator.getLatest(5, tokenIds))
+      // Fast path: if we already have a fresh alpha in memory, surface it immediately
+      if (latest.length > 0) {
+        try {
+          const a: any = latest[latest.length - 1]
+          let message = ''
+          // Build a compact card depending on kind
+          if (a.kind === 'smart_skew') {
+            const direction = a?.data?.direction || ''
+            const skew = a?.data?.skew != null ? Math.round(a.data.skew*100) : null
+            const pool = a?.data?.smartPoolUsd != null ? Math.round(Number(a.data.smartPoolUsd)).toLocaleString() : null
+            message = `✨ <b>Smart-Skew Alpha</b>\n\n` + [direction, skew!=null?`Skew ${skew}%`:null, pool?`Pool $${pool}`:null].filter(Boolean).join(' • ')
+          } else if (a.kind === 'whale') {
+            const d = a.data || {}
+            const notional = d.weightedNotionalUsd != null ? `$${Math.round(Number(d.weightedNotionalUsd)).toLocaleString()}` : ''
+            const side = d.side || 'TRADE'
+            message = `✨ <b>Fresh Trade</b>\n\n${side}${notional?` ${notional}`:''}`
+          } else {
+            message = `✨ <b>${a.title || 'Alpha'}</b>\n\n${a.summary || ''}`
+          }
+          // Try to add market link
+          try {
+            if (a.conditionId) {
+              const mk = await gammaApi.getMarket(a.conditionId)
+              const url = getPolymarketMarketUrl(mk)
+              if (url) message += `\n🔗 ${url}`
+            }
+          } catch {}
+          await ctx.telegram.editMessageText(searching.chat.id, searching.message_id, undefined, message, { parse_mode: 'HTML' })
+          return
+        } catch {}
+      }
       // Log-only: probe DB for unseen fresh alpha (<=12h) and log, do not return it to the user
       try {
         if (DB_LOG_ONLY_PROBE && ctx.from?.id) {

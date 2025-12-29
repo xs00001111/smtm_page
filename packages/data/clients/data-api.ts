@@ -26,6 +26,9 @@ export class DataApiClient {
   private client: AxiosInstance;
   private baseURL = 'https://data-api.polymarket.com';
   private dbg(msg: string, ctx?: any) { dataDbg(msg, ctx) }
+  // Leaderboard short cache (HTML scrape)
+  private static lbCache: Map<string, { ts: number; data: LeaderboardEntry[] }> = new Map();
+  private static readonly LB_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
   constructor(timeout = 10000) {
     this.client = axios.create({
@@ -185,44 +188,18 @@ export class DataApiClient {
    */
   async getLeaderboard(params?: LeaderboardParams): Promise<LeaderboardEntry[]> {
     const limit = params?.limit || 50;
-    const offset = params?.offset || 0;
-    const range = params?.range;
-    // Attempt 1: axios
+    const range = params?.range || 'all';
+    // Serve from short cache
     try {
-      dataDbg('leaderboard.api.axios', { limit, offset, range });
-      const { data } = await this.client.get<LeaderboardEntry[]>('/leaderboard', { params: { limit, offset, range } });
-      dataDbg('leaderboard.api.axios.ok', { count: Array.isArray(data) ? data.length : 0 });
-      return data;
-    } catch (err1: any) {
-      // Attempt 2: fetch with explicit headers
-      try {
-        const url = `${this.baseURL}/leaderboard?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}${range?`&range=${encodeURIComponent(range)}`:''}`;
-        dataDbg('leaderboard.api.fetch', { url });
-        const res = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; smtm-bot/1.0; +https://smtm.ai)',
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Origin': 'https://polymarket.com',
-            'Referer': 'https://polymarket.com/',
-          },
-        } as any);
-        if (res.ok) {
-          const text = await res.text();
-          try {
-            const json = JSON.parse(text);
-            dataDbg('leaderboard.api.fetch.ok', { count: Array.isArray(json) ? json.length : 0 });
-            return Array.isArray(json) ? (json as LeaderboardEntry[]) : [];
-          } catch (e) {
-            console.error('getLeaderboard: JSON parse failed', { snippet: text.slice(0, 200) });
-            return [];
-          }
-        }
-        console.error('getLeaderboard: fetch failed', { status: res.status, statusText: res.statusText });
-      } catch (err2) {
-        console.error('getLeaderboard fallback fetch error:', (err2 as any)?.message || err2);
+      const ent = DataApiClient.lbCache.get(range);
+      if (ent && (Date.now() - ent.ts) < DataApiClient.LB_TTL_MS) {
+        this.dbg('leaderboard.cache.hit', { range, count: ent.data.length });
+        return ent.data.slice(0, limit);
       }
-      // Attempt 3: scrape public leaderboard HTML and parse __NEXT_DATA__ as last resort
+    } catch {}
+    // API deprecated for public — use HTML scrape only
+    try {
+      this.dbg('leaderboard.api.disabled', { reason: 'deprecated endpoint; using HTML only' });
       try {
         const url2 = 'https://polymarket.com/leaderboard';
         dataDbg('leaderboard.html.fetch', { url: url2 });
@@ -257,6 +234,7 @@ export class DataApiClient {
                     profile_image: entry.profileImage || entry.profile_image || '',
                   }));
                   dataDbg('leaderboard.html.ok', { count: items.length });
+                  try { DataApiClient.lbCache.set(range, { ts: Date.now(), data: items }); } catch {}
                   if (items.length) return items;
                 }
               }
@@ -274,17 +252,15 @@ export class DataApiClient {
             pnl: 0,
             profile_image: '',
           } as any));
-          if (items.length) { dataDbg('leaderboard.html.addrs', { count: items.length }); return items; }
+          if (items.length) { dataDbg('leaderboard.html.addrs', { count: items.length }); try { DataApiClient.lbCache.set(range, { ts: Date.now(), data: items }); } catch {} return items; }
         } else {
           dataDbg('leaderboard.html.status', { status: res2.status, statusText: res2.statusText });
         }
       } catch (e3) {
         console.error('getLeaderboard scrape fallback failed', (e3 as any)?.message || e3);
       }
-      // If all attempts fail, return empty to let callers degrade gracefully
-      console.error('getLeaderboard: axios failed', (err1 as any)?.message || err1);
-      return [];
-    }
+    } catch {}
+    return [];
   }
 
   /**
