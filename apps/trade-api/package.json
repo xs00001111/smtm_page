@@ -1,0 +1,25 @@
+{
+  "name": "@smtm/trade-api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@google-cloud/secret-manager": "^5.6.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "supertest": "^7.1.1",
+    "vitest": "^2.0.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.4"
+  }
+}
