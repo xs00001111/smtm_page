@@ -1,3 +1,5 @@
+# NOTE: Execution APIs (apps/link-api, apps/trade-api) are NOT deployed via Render.
+# These services run on Google Cloud Run. Do not add them here.
 services:
   - type: worker
     name: telegram-bot

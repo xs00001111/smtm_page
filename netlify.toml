@@ -1,3 +1,5 @@
+# NOTE: Only builds the web app in apps/web.
+# Execution APIs (apps/link-api, apps/trade-api) are NOT deployed on Netlify.
 [build]
   base = "apps/web"
   command = "cd ../.. && npm install && cd apps/web && ln -sf ../../node_modules node_modules && npm run build"
