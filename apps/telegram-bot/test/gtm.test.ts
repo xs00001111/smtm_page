@@ -57,6 +57,20 @@ vi.mock('@smtm/data', () => {
 import { getGameSet } from '../services/gtm-aggregator'
 import { createApp } from '../http/server'
 
+// Mock store to make endpoint tests deterministic
+vi.mock('../services/gtm-store', () => {
+  const sample = Array.from({ length: 10 }).map((_, i) => ({
+    address: `0x${String(i+1).padStart(40,'a')}`.slice(0,42),
+    pnl: { totalPnL: i<5?1000:-1000, realizedPnL: 0, unrealizedPnL: 0, currentValue: 0 },
+    topHoldings: [{ market: `0xcond_${i}`, assetId: '', outcome: 'YES', size: 100, value: 100, marketName: 'M', marketSlug: 'm' }],
+    label: i<5?'good':'bad'
+  }))
+  return {
+    ensureDailySnapshot: vi.fn(async () => ({ id: '1', day_utc: '2025-01-01', traders: sample, created_at: new Date().toISOString(), seed: null, meta: {} })),
+    todayUtc: vi.fn(() => '2025-01-01')
+  }
+})
+
 describe('gtm aggregator', () => {
   it('returns 10 traders with 5 good and 5 bad', async () => {
     const traders = await getGameSet(0) // disable cache in test
@@ -77,8 +91,8 @@ describe('gtm http endpoints', () => {
   let app: any
   beforeAll(() => { app = createApp() })
 
-  it('GET /gtm/game returns 10 traders with labels', async () => {
-    const res = await request(app).get('/gtm/game')
+  it('GET /battle returns 10 traders with labels (from snapshot)', async () => {
+    const res = await request(app).get('/battle')
     expect(res.status).toBe(200)
     expect(Array.isArray(res.body.traders)).toBe(true)
     expect(res.body.traders.length).toBe(10)

@@ -84,11 +84,19 @@ export async function persistGameSnapshot(input: GameSnapshotInput): Promise<str
 export async function ensureDailySnapshot(params?: { ttlSec?: number; seed?: string | null; dayUtc?: string }): Promise<GameSnapshotRow | null> {
   const day = params?.dayUtc || todayUtc()
   const existing = await fetchGameSnapshotByDay(day)
-  if (existing) return existing
-  // Generate a fresh set; disable cache for correctness
+  if (existing && Array.isArray(existing.traders) && existing.traders.length >= 10) return existing
+  // Generate a fresh set; disable cache for correctness and enforce 10 via aggregator backfill
   const traders = await getGameSet(0)
+  if (existing) {
+    // Repair today if less than 10
+    try {
+      const updated: any[] = await sb(`gtm_game_snapshot?day_utc=eq.${encodeURIComponent(day)}`, { method: 'PATCH', body: JSON.stringify({ traders }) })
+      if (updated && updated[0]) return updated[0] as GameSnapshotRow
+    } catch (e) {
+      logger.warn({ err: (e as any)?.message || e }, 'gtm:store repair update failed, attempting insert fallback')
+    }
+  }
   const id = await persistGameSnapshot({ dayUtc: day, traders, seed: params?.seed || null })
-  if (!id) return null
+  if (!id) return await fetchGameSnapshotByDay(day)
   return await fetchGameSnapshotByDay(day)
 }
-

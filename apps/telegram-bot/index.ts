@@ -5,6 +5,7 @@ import { registerCommands } from './commands';
 import { gammaApi } from '@smtm/data';
 import { startPriceMonitoring } from './services/price-monitor';
 import { createApp as createGtmApp } from './http/server';
+import { startGtmScheduler } from './services/gtm-scheduler';
 import { WebSocketMonitorService } from './services/websocket-monitor';
 import { botConfig } from './config/bot';
 import { loadSubscriptions } from './services/subscriptions';
@@ -202,6 +203,8 @@ async function start() {
           const port = Number(process.env.PORT || 3000);
           app.listen(port);
           logger.info({ port, path }, 'Telegram bot webhook + GTM server listening');
+          // Start daily snapshot scheduler
+          startGtmScheduler();
           break; // launched
         } else {
           // Polling mode - with extra conflict handling
@@ -215,6 +218,7 @@ async function start() {
           const port = Number(process.env.PORT || 3000);
           app.listen(port);
           logger.info({ port }, 'GTM HTTP server listening');
+          startGtmScheduler();
         } catch (e) {
           logger.warn({ err: (e as any)?.message || e }, 'Failed to start GTM HTTP server');
         }

@@ -97,14 +97,14 @@ export async function getGameSet(ttlSec = 60): Promise<TraderSnapshot[]> {
   if (ent && now() - ent.ts < ttlSec * 1000) return ent.data
 
   // 1) Winners from leaderboard (fast path)
-  const winnersRaw = await dataApi.getLeaderboard({ limit: 50 /* best-effort scrape */ })
+  const winnersRaw = await dataApi.getLeaderboard({ limit: 200 /* expand to improve coverage */ })
   const topWinners = (winnersRaw || [])
     .filter(x => x?.user_id)
     .slice(0, 8)
     .map(x => ({ addr: String(x.user_id).toLowerCase(), name: x.user_name }))
 
   // 2) Candidate losers from recent trades
-  const recentTrades = await dataApi.getTrades({ limit: 500 }).catch(()=>[] as any[])
+  const recentTrades = await dataApi.getTrades({ limit: 2000 }).catch(()=>[] as any[])
   const tradeAddrs = Array.from(new Set(recentTrades.map(extractAddressFromTrade).filter(Boolean) as string[]))
 
   const loserAddrs = await findLosers(tradeAddrs, 5)
@@ -123,9 +123,24 @@ export async function getGameSet(ttlSec = 60): Promise<TraderSnapshot[]> {
   // Build snapshots
   const snapshots: TraderSnapshot[] = []
   const mapName = new Map(topWinners.map(w => [w.addr, w.name]))
-  const allAddrs = Array.from(new Set([...winnerAddrs, ...loserAddrs])).slice(0, 20)
-  const tasks = allAddrs.map(addr => getSnapshot(addr, mapName.get(addr)))
-  const results = await Promise.all(tasks)
+  const seenAddr = new Set<string>()
+  const allAddrs: string[] = []
+  for (const a of [...winnerAddrs, ...loserAddrs]) { const s=a.toLowerCase(); if (!seenAddr.has(s)) { seenAddr.add(s); allAddrs.push(s) } }
+  // Expand pool with more leaderboard addresses if needed
+  for (const w of (winnersRaw || [])) {
+    const a = String(w.user_id || '').toLowerCase(); if (a && !seenAddr.has(a)) { seenAddr.add(a); allAddrs.push(a) }
+    if (allAddrs.length >= 100) break
+  }
+
+  const results: TraderSnapshot[] = []
+  const nameMap = mapName
+  const batchSize = 20
+  for (let i = 0; i < allAddrs.length && results.length < 30; i += batchSize) {
+    const slice = allAddrs.slice(i, i + batchSize)
+    const batch = await Promise.all(slice.map(addr => getSnapshot(addr, nameMap.get(addr))))
+    results.push(...batch)
+    if (results.length >= 30) break
+  }
   // Ensure label distribution: keep best 5 >=0 as good, best 5 negative as bad
   const goods = results.filter(r => r.pnl.totalPnL >= 0).sort((a,b)=>b.pnl.totalPnL - a.pnl.totalPnL).slice(0,5)
   const bads = results.filter(r => r.pnl.totalPnL < 0).sort((a,b)=>a.pnl.totalPnL - b.pnl.totalPnL).slice(0,5)
@@ -150,7 +165,7 @@ export async function getGameSet(ttlSec = 60): Promise<TraderSnapshot[]> {
     for (const r of results) {
       if (seen.has(r.address)) continue
       const label: 'good' | 'bad' = r.pnl.totalPnL >= 0 ? 'good' : 'bad'
-      if ((label === 'good' && goodCount >= 5) || (label === 'bad' && badCount >= 5)) continue
+      // relax balance if needed; only enforce max 10
       seen.add(r.address); final.push({ ...r, label }); if (label==='good') goodCount++; else badCount++
       if (final.length >= 10) break
     }
