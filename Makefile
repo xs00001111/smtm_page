@@ -23,4 +23,4 @@ lint:
 	npm run lint || true
 
 test:
-	npm run test -w @smtm/link-api && npm run test -w @smtm/trade-api
+	npm run test -w @smtm/link-api && npm run test -w @smtm/trade-api && npm run test -w @smtm/telegram-bot
