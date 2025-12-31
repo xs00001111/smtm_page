@@ -29,3 +29,4 @@ export default async function WhaleProfilePage({ params, searchParams }: PagePro
     </main>
   )
 }
+export const runtime = 'edge'

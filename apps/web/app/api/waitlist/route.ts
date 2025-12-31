@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+export const runtime = 'edge'
 
 // Saves waitlist entries to GitHub as a CSV file when configured via env vars.
 // Env required: GITHUB_TOKEN (repo content write), GITHUB_REPO (e.g. owner/name)

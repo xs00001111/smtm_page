@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+export const runtime = 'edge'
 import { gammaApi } from '@smtm/data/clients/gamma-api'
 import { dataApi } from '@smtm/data/clients/data-api'
 import { findMarket as findMarketUtil } from '@smtm/data/find-market'

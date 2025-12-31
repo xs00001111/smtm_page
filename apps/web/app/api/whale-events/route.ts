@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+export const runtime = 'edge'
 import { WhaleDetector } from '@smtm/data/whales'
 
 export async function GET(req: Request) {

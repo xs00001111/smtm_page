@@ -195,3 +195,4 @@ export default async function WhalesPage({ searchParams }: { searchParams?: { [k
     </main>
   )
 }
+export const runtime = 'edge'

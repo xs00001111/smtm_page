@@ -24,3 +24,4 @@ export default async function MiniProfilePage({
     </main>
   )
 }
+export const runtime = 'edge'
