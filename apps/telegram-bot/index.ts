@@ -4,6 +4,7 @@ import { logger } from './utils/logger';
 import { registerCommands } from './commands';
 import { gammaApi } from '@smtm/data';
 import { startPriceMonitoring } from './services/price-monitor';
+import { createApp as createGtmApp } from './http/server';
 import { WebSocketMonitorService } from './services/websocket-monitor';
 import { botConfig } from './config/bot';
 import { loadSubscriptions } from './services/subscriptions';
@@ -196,17 +197,11 @@ async function start() {
           const url = process.env.TELEGRAM_WEBHOOK_URL as string;
           const path = new URL(url).pathname || '/telegram-webhook';
           await bot.telegram.setWebhook(url);
-          const { createServer } = await import('http');
-          const server = createServer((req, res) => {
-            if (req.url === path && req.method === 'POST') {
-              (bot.webhookCallback(path) as any)(req, res);
-            } else {
-              res.statusCode = 200; res.end('ok');
-            }
-          });
+          const app = createGtmApp();
+          app.post(path, bot.webhookCallback(path) as any);
           const port = Number(process.env.PORT || 3000);
-          server.listen(port);
-          logger.info({ port, path }, 'Telegram bot webhook server listening');
+          app.listen(port);
+          logger.info({ port, path }, 'Telegram bot webhook + GTM server listening');
           break; // launched
         } else {
           // Polling mode - with extra conflict handling
@@ -214,6 +209,15 @@ async function start() {
           await bot.launch({ dropPendingUpdates: true });
         }
         logger.info('Telegram bot is running');
+        // Ensure GTM endpoints are available even in polling mode
+        try {
+          const app = createGtmApp();
+          const port = Number(process.env.PORT || 3000);
+          app.listen(port);
+          logger.info({ port }, 'GTM HTTP server listening');
+        } catch (e) {
+          logger.warn({ err: (e as any)?.message || e }, 'Failed to start GTM HTTP server');
+        }
         break;
       } catch (error: any) {
         if (!useWebhook && error?.response?.error_code === 409) {

@@ -123,16 +123,41 @@ export async function getGameSet(ttlSec = 60): Promise<TraderSnapshot[]> {
   // Build snapshots
   const snapshots: TraderSnapshot[] = []
   const mapName = new Map(topWinners.map(w => [w.addr, w.name]))
-  const allAddrs = [...winnerAddrs, ...loserAddrs]
+  const allAddrs = Array.from(new Set([...winnerAddrs, ...loserAddrs])).slice(0, 20)
   const tasks = allAddrs.map(addr => getSnapshot(addr, mapName.get(addr)))
   const results = await Promise.all(tasks)
   // Ensure label distribution: keep best 5 >=0 as good, best 5 negative as bad
   const goods = results.filter(r => r.pnl.totalPnL >= 0).sort((a,b)=>b.pnl.totalPnL - a.pnl.totalPnL).slice(0,5)
   const bads = results.filter(r => r.pnl.totalPnL < 0).sort((a,b)=>a.pnl.totalPnL - b.pnl.totalPnL).slice(0,5)
-  const final = [...goods.map(g => ({...g, label: 'good' as const})), ...bads.map(b => ({...b, label: 'bad' as const}))]
+  // Build unique final set: prefer top goods then top bads, enforce 5/5 if possible
+  const seen = new Set<string>()
+  const final: TraderSnapshot[] = []
+  let goodCount = 0, badCount = 0
+  for (const g of goods) {
+    if (!seen.has(g.address) && goodCount < 5) {
+      seen.add(g.address); final.push({ ...g, label: 'good' }); goodCount++
+    }
+    if (goodCount >= 5) break
+  }
+  for (const b of bads) {
+    if (!seen.has(b.address) && badCount < 5) {
+      seen.add(b.address); final.push({ ...b, label: 'bad' }); badCount++
+    }
+    if (badCount >= 5) break
+  }
+  // If still short due to scarcity, backfill with remaining unique results irrespective of label
+  if (final.length < 10) {
+    for (const r of results) {
+      if (seen.has(r.address)) continue
+      const label: 'good' | 'bad' = r.pnl.totalPnL >= 0 ? 'good' : 'bad'
+      if ((label === 'good' && goodCount >= 5) || (label === 'bad' && badCount >= 5)) continue
+      seen.add(r.address); final.push({ ...r, label }); if (label==='good') goodCount++; else badCount++
+      if (final.length >= 10) break
+    }
+  }
 
-  cache.set(key, { ts: now(), data: final })
-  return final
+  cache.set(key, { ts: now(), data: final.slice(0, 10) })
+  return final.slice(0, 10)
 }
 
 export async function getTrader(address: string): Promise<TraderSnapshot> {

@@ -8,6 +8,7 @@
     "start": "tsx index.ts",
     "test": "vitest run",
     "dev:gtm": "tsx http/server.ts",
+    "gtm:snapshot": "tsx scripts/gtm-snapshot.ts",
     "migrate:alpha-users": "tsx scripts/migrate-users-to-alpha.ts"
   },
   "dependencies": {
