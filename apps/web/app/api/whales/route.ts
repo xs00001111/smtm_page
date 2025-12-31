@@ -1,13 +1,41 @@
 import { NextResponse } from 'next/server'
 export const runtime = 'edge'
-import { gammaApi } from '@smtm/data/clients/gamma-api'
-import { dataApi } from '@smtm/data/clients/data-api'
-import { findMarket as findMarketUtil } from '@smtm/data/find-market'
+
+// Edge-safe helpers using native fetch (avoid Node adapters)
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...init, headers: { 'Accept': 'application/json', ...(init?.headers || {}) } })
+  if (!res.ok) throw new Error(`Request failed ${res.status}`)
+  return res.json() as Promise<T>
+}
+
+type GammaMarket = { condition_id: string; question: string; market_slug?: string; slug?: string; tokens?: Array<{ token_id: string; outcome: string }> }
+type HoldersResponse = { token: string; holders: Array<{ address: string; balance: string }> }
+
+async function searchMarket(q: string): Promise<GammaMarket | null> {
+  // Try slug/exact search first
+  try {
+    const arr = await fetchJson<GammaMarket[]>(`https://gamma-api.polymarket.com/markets?slug=${encodeURIComponent(q)}`)
+    if (Array.isArray(arr) && arr.length) return arr[0]
+  } catch {}
+  // Fallback to generic search among active
+  try {
+    const arr = await fetchJson<GammaMarket[]>(`https://gamma-api.polymarket.com/markets?search=${encodeURIComponent(q)}&active=true`)
+    return Array.isArray(arr) && arr.length ? arr[0] : null
+  } catch { return null }
+}
+
+async function getTrendingMarkets(limit = 8): Promise<GammaMarket[]> {
+  return fetchJson<GammaMarket[]>(`https://gamma-api.polymarket.com/markets?active=true&limit=${limit}&order=volume&ascending=false`)
+}
+
+async function getTopHolders(conditionId: string, limit = 40, minBalance = 250): Promise<HoldersResponse[]> {
+  return fetchJson<HoldersResponse[]>(`https://data-api.polymarket.com/holders?market=${conditionId}&limit=${limit}&minBalance=${minBalance}`)
+}
 
 type Holder = { address: string; balance: string }
 
 async function getTopHoldersForMarket(conditionId: string, limit = 40, minBalance = 250) {
-  const holdersResp = await dataApi.getTopHolders({ market: conditionId, limit, minBalance })
+  const holdersResp = await getTopHolders(conditionId, limit, minBalance)
   const holders: Holder[] = []
   holdersResp.forEach((token) => {
     token.holders.forEach((h) => holders.push({ address: h.address, balance: h.balance }))
@@ -33,7 +61,7 @@ export async function GET(req: Request) {
 
     // Per-market whales
     if (q) {
-      const market = await findMarketUtil(q)
+      const market = await searchMarket(q)
       if (!market) return NextResponse.json({ ok: false, error: 'Market not found' }, { status: 404 })
 
       const whales = await getTopHoldersForMarket(market.condition_id, Math.min(Math.max(limit, 1), 200), minBalance)
@@ -52,7 +80,7 @@ export async function GET(req: Request) {
     }
 
     // Aggregate whales from trending markets (by total volume)
-    const trending = await gammaApi.getTrendingMarkets(8)
+    const trending = await getTrendingMarkets(8)
     const allHolders: Array<{ address: string; balance: number }> = []
     for (const m of trending) {
       const list = await getTopHoldersForMarket(m.condition_id, 30, minBalance)
