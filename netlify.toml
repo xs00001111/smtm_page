@@ -17,8 +17,7 @@
   package = "@netlify/plugin-nextjs"
 
 [[redirects]]
-  from = "/*"
+  from = "https://battle.smtm.ai/*"
   to = "https://smtm-wordle.ventuss.workers.dev/:splat"
-  status = 200
+  status = 301
   force = true
-  conditions = {Host = ["battle.smtm.ai"]}
