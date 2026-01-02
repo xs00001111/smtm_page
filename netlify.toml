@@ -15,3 +15,10 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+[[redirects]]
+  from = "/*"
+  to = "https://smtm-wordle.ventuss.workers.dev/:splat"
+  status = 200
+  force = true
+  conditions = {Host = ["battle.smtm.ai"]}
