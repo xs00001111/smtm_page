@@ -140,9 +140,9 @@ async function getExecLink(tgUserId: string) {
 }
 
 // --- Routes ---
-app.get('/healthz', (_req, res) => res.status(200).send('ok'))
+app.get('/healthz', (_req: express.Request, res: express.Response) => res.status(200).send('ok'))
 
-app.get('/status', requireHmac, async (req, res) => {
+app.get('/status', requireHmac, async (req: express.Request, res: express.Response) => {
   try {
     const userId = String(req.query.telegram_user_id || '')
     if (!userId) return res.status(400).json({ error: 'telegram_user_id required' })
@@ -154,7 +154,7 @@ app.get('/status', requireHmac, async (req, res) => {
   }
 })
 
-app.post('/link', requireHmac, async (req, res) => {
+app.post('/link', requireHmac, async (req: express.Request, res: express.Response) => {
   try {
     const { telegram_user_id, credentials } = req.body || {}
     if (!telegram_user_id) return res.status(400).json({ error: 'telegram_user_id required' })
@@ -171,7 +171,7 @@ app.post('/link', requireHmac, async (req, res) => {
   }
 })
 
-app.post('/unlink', requireHmac, async (req, res) => {
+app.post('/unlink', requireHmac, async (req: express.Request, res: express.Response) => {
   try {
     const { telegram_user_id } = req.body || {}
     if (!telegram_user_id) return res.status(400).json({ error: 'telegram_user_id required' })
