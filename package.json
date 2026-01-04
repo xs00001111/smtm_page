@@ -22,11 +22,13 @@
     "example:whales": "tsx packages/data/examples/whale-tracker.ts",
     "test:data": "npm run test:setup",
     "test:skew": "tsx scripts/test-skew-store.ts",
-    "test:skew:e2e": "RUN_E2E_SUPABASE=1 tsx scripts/it-skew-store.ts"
+    "test:skew:e2e": "RUN_E2E_SUPABASE=1 tsx scripts/it-skew-store.ts",
+    "test:portal": "tsx apps/web/test/link-helpers.test.ts"
   },
   "dependencies": {
     "@polymarket/clob-client": "^4.22.8",
     "@polymarket/real-time-data-client": "^1.4.0",
+    "@privy-io/react-auth": "^3.10.0",
     "axios": "^1.12.2",
     "cheerio": "^1.1.2",
     "class-variance-authority": "0.7.0",
