@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import crypto from 'crypto'
+import * as crypto from 'crypto'
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
