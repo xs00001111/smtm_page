@@ -73,6 +73,7 @@ async function getLatestSecretPayload(secretName: string): Promise<any | null> {
 }
 
 app.get('/healthz', (_req: express.Request, res: express.Response) => res.status(200).send('ok'))
+app.head('/healthz', (_req: express.Request, res: express.Response) => res.status(200).end())
 
 app.post('/trade', requireHmac, async (req: express.Request, res: express.Response) => {
   try {

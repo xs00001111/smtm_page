@@ -141,6 +141,7 @@ async function getExecLink(tgUserId: string) {
 
 // --- Routes ---
 app.get('/healthz', (_req: express.Request, res: express.Response) => res.status(200).send('ok'))
+app.head('/healthz', (_req: express.Request, res: express.Response) => res.status(200).end())
 
 app.get('/status', requireHmac, async (req: express.Request, res: express.Response) => {
   try {
