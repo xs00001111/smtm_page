@@ -62,7 +62,8 @@ async function getLatestSecretPayload(secretName: string): Promise<any | null> {
     // Access latest version shorthand
     const name = `${secretName}/versions/latest`
     const [ver] = await sm.accessSecretVersion({ name })
-    const data = ver.payload?.data?.toString('utf8') || ''
+    const raw = ver.payload?.data ?? new Uint8Array()
+    const data = Buffer.from(raw).toString('utf8')
     if (!data) return null
     return JSON.parse(data)
   } catch (e: any) {
