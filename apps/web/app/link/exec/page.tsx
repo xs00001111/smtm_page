@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { ethers } from 'ethers'
+// Support either ethers v5 or v6 at runtime
+let Ethers: any
+try { Ethers = require('ethers') } catch { Ethers = null }
 import { ClobClient } from '@polymarket/clob-client'
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { ensureCsrf, parseInitData } from '../helpers'
@@ -26,8 +28,9 @@ export default function ExecLinkPage() {
   const csrf = useCsrf()
   const initData = useMemo(() => (typeof window !== 'undefined' ? parseInitData(window, window.location.href) : null), [])
 
-  const { login, ready, authenticated } = usePrivy()
-  const { wallets } = useWallets()
+  const hasPrivy = !!process.env.NEXT_PUBLIC_PRIVY_APP_ID
+  const { login, ready, authenticated } = hasPrivy ? usePrivy() : ({} as any)
+  const { wallets } = hasPrivy ? useWallets() : ({ wallets: [] } as any)
 
   const connectInjected = useCallback(async () => {
     setMessage('')
@@ -39,8 +42,16 @@ export default function ExecLinkPage() {
       // Request accounts via EIP-1193
       const eth = (window as any).ethereum
       await eth.request({ method: 'eth_requestAccounts' })
-      const provider = new ethers.providers.Web3Provider(eth, 'any')
-      const signer = provider.getSigner()
+      let signer: any
+      if (Ethers?.providers?.Web3Provider) {
+        const provider = new Ethers.providers.Web3Provider(eth, 'any')
+        signer = provider.getSigner()
+      } else if (Ethers?.BrowserProvider) {
+        const provider = new Ethers.BrowserProvider(eth)
+        signer = await provider.getSigner()
+      } else {
+        throw new Error('Unsupported ethers version')
+      }
       const addr = await signer.getAddress()
       setAddress(addr)
       setConnected(true)
@@ -54,7 +65,7 @@ export default function ExecLinkPage() {
     setStatus('linking')
     setMessage('')
     try {
-      let signer: ethers.Signer | null = null
+      let signer: any | null = null
       let addr = ''
       // Prefer Privy embedded/external wallet if available
       const privyWallet = wallets && wallets.length > 0 ? wallets[0] : undefined
@@ -70,8 +81,15 @@ export default function ExecLinkPage() {
       if (!signer) {
         if (typeof window === 'undefined' || !(window as any).ethereum) throw new Error('No wallet provider')
         const eth = (window as any).ethereum
-        const provider = new ethers.providers.Web3Provider(eth, 'any')
-        signer = provider.getSigner()
+        if (Ethers?.providers?.Web3Provider) {
+          const provider = new Ethers.providers.Web3Provider(eth, 'any')
+          signer = provider.getSigner()
+        } else if (Ethers?.BrowserProvider) {
+          const provider = new Ethers.BrowserProvider(eth)
+          signer = await provider.getSigner()
+        } else {
+          throw new Error('Unsupported ethers version')
+        }
         addr = await signer.getAddress()
       }
 
@@ -138,28 +156,29 @@ export default function ExecLinkPage() {
         <p className="text-sm text-white/70">Connect your wallet, then enable trading. We derive Polymarket CLOB credentials via a one-time wallet signature and store them securely. You can revoke anytime.</p>
       </section>
 
-      <section className="rounded-lg border border-white/10 p-5 space-y-4 bg-black/20">
-        <div className="text-sm font-medium">Step 1 — Verify Identity</div>
-        <div className="text-sm text-white/70">If you opened this inside Telegram, we detect your Telegram proof automatically. Otherwise, connect a browser wallet.</div>
-        <div className="flex gap-2 pt-2">
-          {process.env.NEXT_PUBLIC_PRIVY_APP_ID ? (
-            <Button onClick={() => login()} variant="outline" disabled={!ready || authenticated}>Sign in with Privy</Button>
-          ) : null}
-          <Button onClick={connectInjected} variant="outline">Connect Wallet (MetaMask/Coinbase)</Button>
+      <section className="space-y-8">
+        <div className="space-y-2">
+          <div className="text-sm font-medium">Step 1 — Connect a Wallet</div>
+          <div className="text-sm text-white/70">Use an embedded wallet (Privy) or a browser wallet. Works the same on web or Telegram.</div>
+          <div className="pt-2 flex flex-col sm:flex-row gap-2 justify-center sm:justify-start">
+            {process.env.NEXT_PUBLIC_PRIVY_APP_ID ? (
+              <Button className="w-full sm:w-auto" onClick={() => login()} variant="outline" disabled={!ready || authenticated}>Sign in (embedded wallet)</Button>
+            ) : null}
+            <Button className="w-full sm:w-auto" onClick={connectInjected} variant="outline">Connect Wallet</Button>
+          </div>
+          {address ? <p className="text-teal text-sm">Connected {address.slice(0,6)}…{address.slice(-4)}</p> : null}
         </div>
-        {address ? <p className="text-teal text-sm">Connected {address.slice(0,6)}…{address.slice(-4)}</p> : null}
-        {initData ? <p className="text-teal text-sm">Telegram proof detected</p> : <p className="text-amber-300 text-sm">No Telegram proof found (ok when testing)</p>}
-      </section>
 
-      <section className="rounded-lg border border-white/10 p-5 space-y-4 bg-black/20">
-        <div className="text-sm font-medium">Step 2 — Enable Trading (trade-only)</div>
-        <div className="text-xs text-white/60">We’ll request a one-time wallet signature to derive Polymarket API credentials and store them server-side.</div>
-        <div className="flex gap-2 pt-2">
-          <Button onClick={onLink} disabled={!connected || status === 'linking'} variant="cta">{status === 'linking' ? 'Enabling…' : 'Enable Trading'}</Button>
-          <Button onClick={onUnlink} disabled={status === 'unlinking'} variant="outline">{status === 'unlinking' ? 'Unlinking…' : 'Unlink'}</Button>
-          <Button onClick={onStatus} disabled={status === 'checking'}>{status === 'checking' ? 'Checking…' : 'Status'}</Button>
+        <div className="space-y-2">
+          <div className="text-sm font-medium">Step 2 — Enable Trading</div>
+          <div className="text-xs text-white/60">We’ll request a one-time wallet signature to derive credentials and store them securely for execution and account features.</div>
+          <div className="flex flex-col sm:flex-row gap-2 pt-2 justify-center sm:justify-start">
+            <Button className="w-full sm:w-auto" onClick={onLink} disabled={!connected || status === 'linking'} variant="cta">{status === 'linking' ? 'Enabling…' : 'Enable'}</Button>
+            <Button className="w-full sm:w-auto" onClick={onUnlink} disabled={status === 'unlinking'} variant="outline">{status === 'unlinking' ? 'Unlinking…' : 'Unlink'}</Button>
+            <Button className="w-full sm:w-auto" onClick={onStatus} disabled={status === 'checking'}>{status === 'checking' ? 'Checking…' : 'Status'}</Button>
+          </div>
+          {message ? <p className={status === 'error' ? 'text-red-400' : 'text-teal'}>{message}</p> : null}
         </div>
-        {message ? <p className={status === 'error' ? 'text-red-400' : 'text-teal'}>{message}</p> : null}
       </section>
 
       <section className="text-xs text-white/50">

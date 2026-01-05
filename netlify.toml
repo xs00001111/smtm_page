@@ -16,6 +16,20 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+## Portal routing
+## 1) Canonicalize shorthand to the portal page
+[[redirects]]
+  from = "/link"
+  to = "/link/exec"
+  status = 301
+
+## 2) If someone opens a portal path on battle.smtm.ai, send them to the main site
+[[redirects]]
+  from = "https://battle.smtm.ai/link/*"
+  to = "https://www.smtm.ai/link/:splat"
+  status = 301
+  force = true
+
 [[redirects]]
   from = "https://battle.smtm.ai/*"
   to = "https://smtm-wordle.ventuss.workers.dev/:splat"
