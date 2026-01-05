@@ -26,8 +26,10 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
           appId={appId}
           config={{
             appearance: { theme: 'dark' },
-            embeddedWallets: { createOnLogin: 'users-without-wallets' },
-            loginMethods: ['email', 'phone', 'google', 'apple'],
+            embeddedWallets: {
+              ethereum: { createOnLogin: 'users-without-wallets' },
+            },
+            loginMethods: ['email', 'sms', 'google', 'apple'],
           }}
         >
           {children}
