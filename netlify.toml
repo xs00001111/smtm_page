@@ -2,7 +2,7 @@
 # Execution APIs (apps/link-api, apps/trade-api) are NOT deployed on Netlify.
 [build]
   base = "apps/web"
-  command = "cd ../.. && npm ci --workspaces --include-workspace-root && npm run build -w @smtm/web"
+  command = "cd ../.. && rm -rf apps/web/node_modules && npm ci --workspaces --include-workspace-root && npm run build -w @smtm/web"
   publish = ".next"
   # Skip build when:
   #  - commit message includes [skip netlify], OR
