@@ -23,7 +23,9 @@
     "test:data": "npm run test:setup",
     "test:skew": "tsx scripts/test-skew-store.ts",
     "test:skew:e2e": "RUN_E2E_SUPABASE=1 tsx scripts/it-skew-store.ts",
-    "test:portal": "tsx apps/web/test/link-helpers.test.ts"
+    "test:portal": "tsx apps/web/test/link-helpers.test.ts",
+    "test:portal:routes": "tsx apps/web/test/api-exec-routes.test.ts",
+    "test:portal:all": "run-p test:portal test:portal:routes"
   },
   "dependencies": {
     "@polymarket/clob-client": "^4.22.8",
