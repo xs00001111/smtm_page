@@ -4,6 +4,9 @@
   base = "apps/web"
   command = "cd ../.. && rm -rf apps/web/node_modules && npm ci --workspaces --include-workspace-root && npm run build -w @smtm/web"
   publish = ".next"
+
+[build.environment]
+  NETLIFY_SKIP_INSTALL = "true"
   # Skip build when:
   #  - commit message includes [skip netlify], OR
   #  - changes do not touch apps/web (monorepo optimization)
