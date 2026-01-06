@@ -36,6 +36,16 @@ export default function ExecLinkPage() {
 
   // Close menu when clicking outside
   useEffect(() => {
+    // If a Privy wallet is present after login, treat as connected
+    if (hasPrivy && authenticated && wallets && wallets.length > 0) {
+      const w = wallets[0] as any
+      const addr = (w?.address || '').toString()
+      if (addr) {
+        setAddress(addr)
+        setConnected(true)
+        setMessage(`Connected: ${addr.slice(0, 6)}…${addr.slice(-4)}`)
+      }
+    }
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowMenu(false)

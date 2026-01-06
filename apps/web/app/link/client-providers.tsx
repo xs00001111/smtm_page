@@ -4,6 +4,11 @@ import { PrivyProvider } from '@privy-io/react-auth'
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID
+  // Allow login methods to be configured via env. Default: email, sms, google (hide Apple until configured)
+  const loginMethods = (process.env.NEXT_PUBLIC_PRIVY_LOGIN_METHODS || 'email,sms,google')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean) as any
   return (
     <>
       {/* Telegram WebApp SDK (if opened inside Telegram) */}
@@ -29,7 +34,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
             embeddedWallets: {
               ethereum: { createOnLogin: 'users-without-wallets' },
             },
-            loginMethods: ['email', 'sms', 'google', 'apple'],
+            loginMethods,
           }}
         >
           {children}
@@ -40,4 +45,3 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
     </>
   )
 }
-
