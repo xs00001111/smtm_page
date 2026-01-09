@@ -39,6 +39,8 @@ export class PizzintClient {
     dashboard: 60_000,
     marketCard: 600_000,
     gdelt: 3_600_000,
+    breaking: 30_000,
+    osintMatch: 300_000,
   }
 
   constructor(opts?: PizzintClientOptions) {
@@ -138,7 +140,54 @@ export class PizzintClient {
     this.setCached(key, json)
     return json
   }
+
+  async getBreaking(opts?: { window?: string }): Promise<any> {
+    const params = { window: opts?.window || '6h' }
+    const key = this.cacheKey('/api/breaking', params)
+    const c = this.getCached<any>(key, this.ttl.breaking)
+    if (c) return c
+    // Try the endpoint; if 404 or error, fall back to filtering osint-feed by window + isAlert
+    try {
+      const json = await this.getJson<any>('/api/breaking', params)
+      this.setCached(key, json)
+      return json
+    } catch (e: any) {
+      // Fallback path
+      const win = params.window || '6h'
+      const windowMs = this.parseWindowMs(win)
+      const since = Date.now() - windowMs
+      const feed = await this.getOsintFeed({ includeTruth: 1, limit: 80, truthLimit: 80 })
+      const tweets = Array.isArray(feed?.tweets) ? feed.tweets : []
+      const items = tweets.filter((t: any) => {
+        const ts = Date.parse(String(t?.timestamp || ''))
+        return Number.isFinite(ts) && ts >= since && (t?.isAlert === true)
+      })
+      const result = { success: true, items, source: 'fallback_osint' }
+      this.setCached(key, result)
+      return result
+    }
+  }
+
+  private parseWindowMs(expr: string): number {
+    const m = String(expr || '').trim().match(/^(\d+)([smhd])$/i)
+    if (!m) return 6 * 60 * 60 * 1000
+    const n = Number(m[1]); const u = m[2].toLowerCase()
+    if (u === 's') return n * 1000
+    if (u === 'm') return n * 60 * 1000
+    if (u === 'h') return n * 60 * 60 * 1000
+    if (u === 'd') return n * 24 * 60 * 60 * 1000
+    return 6 * 60 * 60 * 1000
+  }
+
+  async getOsintPolymarketMatch(tweetId: string): Promise<any> {
+    const params = { tweetId }
+    const key = this.cacheKey('/api/osint-polymarket-match', params)
+    const c = this.getCached<any>(key, this.ttl.osintMatch)
+    if (c) return c
+    const json = await this.getJson<any>('/api/osint-polymarket-match', params)
+    this.setCached(key, json)
+    return json
+  }
 }
 
 export const pizzint = new PizzintClient()
-
